@@ -258,4 +258,14 @@ app.get('/ocorrencias', verificarAutenticacao, async (req, res) => {
 
         res.render('ocorrencias-lista', { 
             ocorrencias: result.rows, tipos: tipos.rows, clientes: clientes.rows, transportadoras: transportadoras.rows,
-            buscaAtual
+            buscaAtual: busca || '', tipoAtual: tipo_id || '', clienteAtual: clienteIdFiltro, 
+            transportadoraAtual: transportadoraIdFiltro, statusAtual: status !== undefined ? status : 'Em Aberto', 
+            ordenarAtual: ordenar || 'id', ordemAtual: dir, erro: null, sucesso: null 
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Erro interno');
+    }
+});
+
+app.get('/ocorrencias/nova', verificarAutenticacao, async (req, res) => {
