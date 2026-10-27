@@ -57,6 +57,68 @@ app.post('/login', async (req, res) => {
 app.get('/dashboard', verificarAutenticacao, (req, res) => res.render('dashboard', { usuario: req.session.usuario, erro: req.query.erro || null }));
 app.get('/solucao', verificarAutenticacao, (req, res) => res.render('dashboard-solucao', { usuario: req.session.usuario }));
 
+// UTILIZADORES
+app.get('/usuarios', verificarAdmin, async (req, res) => {
+    try {
+        const result = await pool.query('SELECT id, nome, usuario, nivel FROM usuarios ORDER BY nome ASC');
+        res.render('usuarios-lista', { usuarios: result.rows, erro: null, sucesso: null });
+    } catch (err) {
+        res.status(500).send('Erro interno');
+    }
+});
+
+app.get('/usuarios/novo', verificarAdmin, (req, res) => {
+    res.render('usuario-form', { usuario: null });
+});
+
+app.post('/usuarios/novo', verificarAdmin, async (req, res) => {
+    const { nome, usuario, senha, nivel } = req.body;
+    try {
+        const hash = await bcrypt.hash(senha, 10);
+        const sql = 'INSERT INTO usuarios (nome, usuario, senha, nivel) VALUES ($1, $2, $3, $4)';
+        await pool.query(sql, [formatarCapitalizacao(nome), usuario ? usuario.trim().toLowerCase() : '', hash, nivel]);
+        res.redirect('/usuarios?sucesso=Utilizador cadastrado com sucesso!');
+    } catch (err) {
+        res.redirect('/usuarios?erro=Erro ao cadastrar.');
+    }
+});
+
+app.get('/usuarios/editar/:id', verificarAdmin, async (req, res) => {
+    try {
+        const result = await pool.query('SELECT id, nome, usuario, nivel FROM usuarios WHERE id = $1', [req.params.id]);
+        if (result.rows.length === 0) return res.redirect('/usuarios?erro=Não encontrado.');
+        res.render('usuario-form', { usuario: result.rows[0] });
+    } catch (err) {
+        res.redirect('/usuarios?erro=Erro ao carregar.');
+    }
+});
+
+app.post('/usuarios/editar/:id', verificarAdmin, async (req, res) => {
+    const { nome, usuario, senha, nivel } = req.body;
+    try {
+        if (senha && senha.trim() !== '') {
+            const hash = await bcrypt.hash(senha, 10);
+            const sql = 'UPDATE usuarios SET nome = $1, usuario = $2, senha = $3, nivel = $4 WHERE id = $5';
+            await pool.query(sql, [formatarCapitalizacao(nome), usuario ? usuario.trim().toLowerCase() : '', hash, nivel, req.params.id]);
+        } else {
+            const sql = 'UPDATE usuarios SET nome = $1, usuario = $2, nivel = $3 WHERE id = $4';
+            await pool.query(sql, [formatarCapitalizacao(nome), usuario ? usuario.trim().toLowerCase() : '', nivel, req.params.id]);
+        }
+        res.redirect('/usuarios?sucesso=Utilizador atualizado com sucesso!');
+    } catch (err) {
+        res.redirect('/usuarios?erro=Erro ao atualizar.');
+    }
+});
+
+app.post('/usuarios/excluir/:id', verificarAdmin, async (req, res) => {
+    try {
+        await pool.query('DELETE FROM usuarios WHERE id = $1', [req.params.id]);
+        res.redirect('/usuarios?sucesso=Excluído!');
+    } catch (err) {
+        res.redirect('/usuarios?erro=Erro ao excluir.');
+    }
+});
+
 // TRANSPORTADORAS
 app.get('/transportadoras', verificarAutenticacao, async (req, res) => {
     try {
@@ -195,7 +257,7 @@ app.get('/ocorrencias', verificarAutenticacao, async (req, res) => {
         let idx = 1;
 
         if (busca && busca.trim() !== '') {
-            queryText += ' AND (o.numero ILIKE $' + idx + ' OR o.nf_origem ILIKE $' + idx + ' OR o.nfd ILIKE $' + idx + ' OR o.cliente_nome ILIKE $' + idx + ' OR tr.nome ILIKE $' + idx + ')';
+            queryText += ' AND (o.numero ILIKE $' + idx + ' OR o.nf_origem ILIKE $' + idx + ' OR o.nfd ILIKE$' + idx + ' OR o.cliente_nome ILIKE $' + idx + ' OR tr.nome ILIKE$' + idx + ')';
             queryParams.push('%' + busca.trim() + '%');
             idx++;
         }
@@ -331,27 +393,4 @@ app.post('/ocorrencias/editar/:id', verificarAutenticacao, async (req, res) => {
     }
 });
 
-app.post('/ocorrencias/excluir/:id', verificarAutenticacao, async (req, res) => {
-    try {
-        await pool.query('DELETE FROM ocorrencias WHERE id = $1', [req.params.id]);
-        res.redirect('/ocorrencias?sucesso=Excluída!');
-    } catch (err) {
-        res.redirect('/ocorrencias?erro=Erro ao excluir.');
-    }
-});
-
-app.get('/logout', (req, res) => {
-    req.session.destroy();
-    res.redirect('/login');
-});
-
-app.get('/', (req, res) => {
-    if (req.session.usuario) {
-        return res.redirect('/dashboard');
-    }
-    res.redirect('/login');
-});
-
-app.listen(PORT, () => {
-    console.log(`Servidor Omnia a correr na porta ${PORT}`);
-});
+app.post('/ocorrencias/excluir/:id', verificarAutenticacao, async (req,
