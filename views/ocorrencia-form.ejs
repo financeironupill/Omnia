@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Omnia - <%= ocorrencia ? 'Editar Ocorrência' : 'Abrir Nova Ocorrência' %></title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; }
+        .container { max-width: 900px; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin: 0 auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        h2 { color: #333; margin: 0; }
+        
+        .form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 15px; }
+        .form-group { display: flex; flex-direction: column; }
+        .form-group.span-2 { grid-column: span 2; }
+        .form-group.full { grid-column: span 3; }
+        
+        label { font-size: 13px; font-weight: bold; color: #555; margin-bottom: 5px; }
+        input[type="text"], input[type="number"], input[type="date"], select, textarea { padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; font-size: 14px; }
+        textarea { resize: vertical; min-height: 80px; }
+        input.uppercase { text-transform: uppercase; }
+        input.titlecase { text-transform: capitalize; }
+        
+        .btn-save { background-color: #28a745; color: white; border: none; padding: 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 15px; }
+        .btn-save:hover { background-color: #218838; }
+        .btn-cancel { background: #6c757d; color: white; padding: 12px; border-radius: 4px; text-decoration: none; font-weight: bold; font-size: 15px; text-align: center; display: inline-block; }
+        .btn-cancel:hover { background-color: #5a6268; }
+
+        .back-link { color: #007bff; text-decoration: none; font-weight: bold; }
+        .back-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2><%= ocorrencia ? 'Editar Ocorrência Nº ' + ocorrencia.numero : 'Abrir Nova Ocorrência' %></h2>
+            <a href="/ocorrencias" class="back-link">← Voltar à Lista</a>
+        </div>
+
+        <form action="<%= ocorrencia ? '/ocorrencias/editar/' + ocorrencia.id : '/ocorrencias/novo' %>" method="POST">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Número da Ocorrência:</label>
+                    <input type="text" value="<%= ocorrencia ? ocorrencia.numero : numeroSugerido %>" disabled style="background-color: #e9ecef;">
+                </div>
+
+                <div class="form-group span-2">
+                    <label for="tipo_ocorrencia_id">Tipo de Ocorrência:</label>
+                    <select id="tipo_ocorrencia_id" name="tipo_ocorrencia_id" required>
+                        <option value="">Selecione o tipo...</option>
+                        <% tipos.forEach(t => { %>
+                            <option value="<%= t.id %>" <%= ocorrencia && ocorrencia.tipo_ocorrencia_id === t.id ? 'selected' : '' %>><%= t.descricao %></option>
+                        <% }); %>
+                    </select>
+                </div>
+
+                <div class="form-group span-2">
+                    <label for="cliente_id">Cliente:</label>
+                    <select id="cliente_id" name="cliente_id" required>
+                        <option value="">Selecione o cliente...</option>
+                        <% clientes.forEach(c => { %>
+                            <option value="<%= c.id %>" <%= ocorrencia && ocorrencia.cliente_id === c.id ? 'selected' : '' %>><%= c.nome %></option>
+                        <% }); %>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="transportadora_id">Transportadora:</label>
+                    <select id="transportadora_id" name="transportadora_id">
+                        <option value="">Selecione a transportadora...</option>
+                        <% transportadoras.forEach(tr => { %>
+                            <option value="<%= tr.id %>" <%= ocorrencia && ocorrencia.transportadora_id === tr.id ? 'selected' : '' %>><%= tr.nome %></option>
+                        <% }); %>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="nf_origem">NF Origem:</label>
+                    <input type="text" id="nf_origem" name="nf_origem" class="uppercase" value="<%= ocorrencia ? ocorrencia.nf_origem : '' %>" placeholder="Número da NF">
+                </div>
+
+                <div class="form-group">
+                    <label for="valor_nf_origem">Valor NF Origem (R$):</label>
+                    <input type="number" step="0.01" id="valor_nf_origem" name="valor_nf_origem" value="<%= ocorrencia ? ocorrencia.valor_nf_origem : '' %>" placeholder="0.00">
+                </div>
+
+                <div class="form-group">
+                    <label for="vencimento_atual">Vencimento Atual:</label>
+                    <input type="date" id="vencimento_atual" name="vencimento_atual" value="<%= ocorrencia && ocorrencia.vencimento_atual ? new Date(ocorrencia.vencimento_atual).toISOString().split('T')[0] : '' %>">
+                </div>
+
+                <div class="form-group">
+                    <label for="nfd">NFD (Nota de Devolução):</label>
+                    <input type="text" id="nfd" name="nfd" class="uppercase" value="<%= ocorrencia ? ocorrencia.nfd : '' %>" placeholder="Número da NFD">
+                </div>
+
+                <div class="form-group">
+                    <label for="tipo_financeiro">Lançamento Financeiro:</label>
+                    <select id="tipo_financeiro" name="tipo_financeiro" required>
+                        <option value="">Selecione (A Pagar / A Receber)...</option>
+                        <option value="A Pagar" <%= ocorrencia && ocorrencia.tipo_financeiro === 'A Pagar' ? 'selected' : '' %>>A Pagar</option>
+                        <option value="A Receber" <%= ocorrencia && ocorrencia.tipo_financeiro === 'A Receber' ? 'selected' : '' %>>A Receber</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="valor_financeiro">Valor Financeiro (R$):</label>
+                    <input type="number" step="0.01" id="valor_financeiro" name="valor_financeiro" value="<%= ocorrencia ? ocorrencia.valor_financeiro : '' %>" placeholder="0.00">
+                </div>
+
+                <% if (ocorrencia) { %>
+                    <div class="form-group span-2">
+                        <label for="status">Status da Ocorrência:</label>
+                        <select id="status" name="status" required>
+                            <option value="Em Aberto" <%= ocorrencia.status === 'Em Aberto' ? 'selected' : '' %>>Em Aberto</option>
+                            <option value="Resolvido" <%= ocorrencia.status === 'Resolvido' ? 'selected' : '' %>>Resolvido</option>
+                        </select>
+                    </div>
+                <% } %>
+
+                <div class="form-group full">
+                    <label for="descricao_problema">Descrição do Problema:</label>
+                    <textarea id="descricao_problema" name="descricao_problema" class="titlecase" required placeholder="Descreva detalhadamente o ocorrido..."><%= ocorrencia ? ocorrencia.descricao_problema : '' %></textarea>
+                </div>
+
+                <% if (ocorrencia) { %>
+                    <div class="form-group full">
+                        <label for="solucao_aplicada">Solução Aplicada:</label>
+                        <textarea id="solucao_aplicada" name="solucao_aplicada" class="titlecase" placeholder="Descreva a solução adotada..."><%= ocorrencia.solucao_aplicada || '' %></textarea>
+                    </div>
+                <% } %>
+
+                <div class="form-group full" style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button type="submit" class="btn-save" style="flex: 1;"><%= ocorrencia ? 'Salvar Alterações' : 'Registrar Ocorrência' %></button>
+                    <a href="/ocorrencias" class="btn-cancel" style="flex: 1;">Cancelar</a>
+                </div>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

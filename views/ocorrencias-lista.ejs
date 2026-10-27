@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Omnia - Lista de Ocorrências</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; }
+        .container { max-width: 1250px; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin: 0 auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        h2 { color: #333; margin: 0; }
+        .alert-error { background-color: #f8d7da; color: #721c24; padding: 12px; border-radius: 4px; margin-bottom: 15px; border: 1px solid #f5c6cb; }
+        .alert-success { background-color: #d4edda; color: #155724; padding: 12px; border-radius: 4px; margin-bottom: 15px; border: 1px solid #c3e6cb; }
+        
+        .btn-novo { background-color: #28a745; color: white; padding: 10px 15px; border-radius: 4px; text-decoration: none; font-weight: bold; font-size: 14px; }
+        .btn-novo:hover { background-color: #218838; }
+
+        .filter-panel { background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px; padding: 15px; margin-bottom: 20px; }
+        .filter-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 10px; }
+        .filter-group { display: flex; flex-direction: column; }
+        .filter-group label { font-size: 12px; font-weight: bold; color: #555; margin-bottom: 4px; }
+        .filter-group input, .filter-group select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+        
+        .filter-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px; }
+        .btn-filter { background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold; font-size: 13px; cursor: pointer; }
+        .btn-filter:hover { background: #0056b3; }
+        .btn-clear { background: #6c757d; color: white; text-decoration: none; padding: 8px 16px; border-radius: 4px; font-weight: bold; font-size: 13px; display: inline-block; }
+        .btn-clear:hover { background: #5a6268; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 13px; }
+        th { background-color: #f8f9fa; color: #333; }
+        th a { color: #333; text-decoration: none; display: flex; align-items: center; justify-content: space-between; }
+        th a:hover { color: #007bff; }
+
+        .back-link { color: #007bff; text-decoration: none; font-weight: bold; }
+        .back-link:hover { text-decoration: underline; }
+        
+        .btn-view { background: #007bff; color: white; padding: 6px 10px; border-radius: 4px; text-decoration: none; font-size: 12px; font-weight: bold; }
+        .btn-view:hover { background: #0056b3; }
+        .btn-edit { background: #ffc107; color: #212529; padding: 6px 10px; border-radius: 4px; text-decoration: none; font-size: 12px; font-weight: bold; }
+        .btn-edit:hover { background: #e0a800; }
+        .btn-delete { background: #dc3545; color: white; padding: 6px 10px; border-radius: 4px; border: none; font-size: 12px; font-weight: bold; cursor: pointer; }
+        .btn-delete:hover { background: #c82333; }
+        
+        .badge-status { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; color: white; display: inline-block; }
+        .badge-aberto { background-color: #17a2b8; }
+        .badge-resolvido { background-color: #28a745; }
+        .badge-financeiro { padding: 3px 6px; border-radius: 3px; font-size: 11px; font-weight: bold; color: white; background-color: #dc3545; }
+
+        .actions-cell { display: flex; align-items: center; gap: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h2>Gestão de Ocorrências</h2>
+                <a href="/solucao" class="back-link">← Voltar ao Módulo Solução</a>
+            </div>
+            <a href="/ocorrencias/nova" class="btn-novo">+ Abrir Nova Ocorrência</a>
+        </div>
+
+        <% if (erro) { %>
+            <div class="alert-error"><%= erro %></div>
+        <% } %>
+        <% if (sucesso) { %>
+            <div class="alert-success"><%= sucesso %></div>
+        <% } %>
+
+        <!-- PAINEL DE BUSCA E FILTROS -->
+        <form action="/ocorrencias" method="GET" class="filter-panel">
+            <div class="filter-grid">
+                <div class="filter-group">
+                    <label for="busca">Busca Geral (Nº, NF, NFD):</label>
+                    <input type="text" id="busca" name="busca" value="<%= buscaAtual %>" placeholder="Digite número, NF...">
+                </div>
+
+                <div class="filter-group">
+                    <label for="tipo_id">Tipo de Ocorrência:</label>
+                    <select id="tipo_id" name="tipo_id">
+                        <option value="">Todos os tipos</option>
+                        <% tipos.forEach(t => { %>
+                            <option value="<%= t.id %>" <%= tipoAtual == t.id ? 'selected' : '' %>><%= t.descricao %></option>
+                        <% }) %>
+                    </select>
+                </div>
+
+                <!-- FILTRO CLIENTE COM BUSCA EM TEMPO REAL -->
+                <div class="filter-group">
+                    <label for="cliente_busca">Cliente:</label>
+                    <% 
+                        let nomeClienteAtual = '';
+                        if (clienteAtual) {
+                            let cliFound = clientes.find(c => c.id == clienteAtual);
+                            if (cliFound) nomeClienteAtual = cliFound.nome;
+                        }
+                    %>
+                    <input type="text" id="cliente_busca" name="cliente_nome_busca" list="lista_clientes" value="<%= nomeClienteAtual %>" placeholder="Digite para filtrar...">
+                    <datalist id="lista_clientes">
+                        <% clientes.forEach(c => { %>
+                            <option value="<%= c.nome %>">
+                        <% }) %>
+                    </datalist>
+                </div>
+
+                <!-- FILTRO TRANSPORTADORA COM BUSCA EM TEMPO REAL -->
+                <div class="filter-group">
+                    <label for="transportadora_busca">Transportadora:</label>
+                    <% 
+                        let nomeTranspAtual = '';
+                        if (transportadoraAtual) {
+                            let transpFound = transportadoras.find(tr => tr.id == transportadoraAtual);
+                            if (transpFound) nomeTranspAtual = transpFound.nome;
+                        }
+                    %>
+                    <input type="text" id="transportadora_busca" name="transportadora_nome_busca" list="lista_transportadoras" value="<%= nomeTranspAtual %>" placeholder="Digite para filtrar...">
+                    <datalist id="lista_transportadoras">
+                        <% transportadoras.forEach(tr => { %>
+                            <option value="<%= tr.nome %>">
+                        <% }) %>
+                    </datalist>
+                </div>
+
+                <div class="filter-group">
+                    <label for="status">Status:</label>
+                    <select id="status" name="status">
+                        <option value="">Todos os status</option>
+                        <option value="Em Aberto" <%= statusAtual === 'Em Aberto' ? 'selected' : '' %>>Em Aberto</option>
+                        <option value="Resolvido" <%= statusAtual === 'Resolvido' ? 'selected' : '' %>>Resolvido</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="filter-actions">
+                <button type="submit" class="btn-filter">Filtrar</button>
+                <a href="/ocorrencias" class="btn-clear">Limpar Filtros</a>
+            </div>
+        </form>
+
+        <h3>Ocorrências Registradas</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 100px;">
+                        <a href="/ocorrencias?busca=<%= encodeURIComponent(buscaAtual) %>&tipo_id=<%= tipoAtual %>&cliente_id=<%= clienteAtual %>&transportadora_id=<%= transportadoraAtual %>&status=<%= encodeURIComponent(statusAtual) %>&ordenar=id&ordem=<%= ordemAtual === 'ASC' ? 'DESC' : 'ASC' %>">
+                            Nº <%- ordenarAtual === 'id' ? (ordemAtual === 'ASC' ? '▲' : '▼') : '' %>
+                        </a>
+                    </th>
+                    <th>
+                        <a href="/ocorrencias?busca=<%= encodeURIComponent(buscaAtual) %>&tipo_id=<%= tipoAtual %>&cliente_id=<%= clienteAtual %>&transportadora_id=<%= transportadoraAtual %>&status=<%= encodeURIComponent(statusAtual) %>&ordenar=tipo&ordem=<%= ordemAtual === 'ASC' ? 'DESC' : 'ASC' %>">
+                            Tipo <%- ordenarAtual === 'tipo' ? (ordemAtual === 'ASC' ? '▲' : '▼') : '' %>
+                        </a>
+                    </th>
+                    <th>
+                        <a href="/ocorrencias?busca=<%= encodeURIComponent(buscaAtual) %>&tipo_id=<%= tipoAtual %>&cliente_id=<%= clienteAtual %>&transportadora_id=<%= transportadoraAtual %>&status=<%= encodeURIComponent(statusAtual) %>&ordenar=cliente&ordem=<%= ordemAtual === 'ASC' ? 'DESC' : 'ASC' %>">
+                            Cliente / Transp. <%- ordenarAtual === 'cliente' ? (ordemAtual === 'ASC' ? '▲' : '▼') : '' %>
+                        </a>
+                    </th>
+                    <th>
+                        <a href="/ocorrencias?busca=<%= encodeURIComponent(buscaAtual) %>&tipo_id=<%= tipoAtual %>&cliente_id=<%= clienteAtual %>&transportadora_id=<%= transportadoraAtual %>&status=<%= encodeURIComponent(statusAtual) %>&ordenar=nf&ordem=<%= ordemAtual === 'ASC' ? 'DESC' : 'ASC' %>">
+                            NF / NFD <%- ordenarAtual === 'nf' ? (ordemAtual === 'ASC' ? '▲' : '▼') : '' %>
+                        </a>
+                    </th>
+                    <th>Financeiro</th>
+                    <th>
+                        <a href="/ocorrencias?busca=<%= encodeURIComponent(buscaAtual) %>&tipo_id=<%= tipoAtual %>&cliente_id=<%= clienteAtual %>&transportadora_id=<%= transportadoraAtual %>&status=<%= encodeURIComponent(statusAtual) %>&ordenar=status&ordem=<%= ordemAtual === 'ASC' ? 'DESC' : 'ASC' %>">
+                            Status <%- ordenarAtual === 'status' ? (ordemAtual === 'ASC' ? '▲' : '▼') : '' %>
+                        </a>
+                    </th>
+                    <th>Abertura / Atualização</th>
+                    <th style="width: 200px;">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% if (ocorrencias.length === 0) { %>
+                    <tr>
+                        <td colspan="8" style="text-align: center; color: #777; padding: 20px;">Nenhuma ocorrência encontrada.</td>
+                    </tr>
+                <% } else { %>
+                    <% ocorrencias.forEach(o => { %>
+                        <tr>
+                            <td><strong><%= o.numero %></strong></td>
+                            <td><%= o.tipo_descricao || 'N/A' %></td>
+                            <td>
+                                <strong><%= o.cliente_nome || 'N/A' %></strong><br>
+                                <small style="color: #666;">Transp: <%= o.transportadora_nome || 'N/A' %></small>
+                            </td>
+                            <td>
+                                <strong>NF: <%= o.nf_origem || '-' %></strong><br>
+                                <small style="color: #666;">NFD: <%= o.nfd || '-' %></small>
+                            </td>
+                            <td>
+                                <% if (o.tipo_financeiro) { %>
+                                    <span class="badge-financeiro"><%= o.tipo_financeiro %></span><br>
+                                    <small><strong>R$ <%= o.valor_financeiro ? Number(o.valor_financeiro).toFixed(2) : '0.00' %></strong></small>
+                                <% } else { %>
+                                    <small style="color: #777;">- -</small>
+                                <% } %>
+                            </td>
+                            <td>
+                                <span class="badge-status <%= o.status === 'Resolvido' ? 'badge-resolvido' : 'badge-aberto' %>">
+                                    <%= o.status %>
+                                </span>
+                            </td>
+                            <td>
+                                <small style="color: #555;">
+                                    <strong>Por:</strong> <%= o.usuario_nome || 'Sistema' %><br>
+                                    <strong>Criado:</strong> <%= new Date(o.criado_em).toLocaleString('pt-BR') %><br>
+                                    <strong>Atua:</strong> <%= new Date(o.atualizado_em).toLocaleString('pt-BR') %>
+                                </small>
+                            </td>
+                            <td class="actions-cell">
+                                <a href="/ocorrencias/detalhes/<%= o.id %>" class="btn-view">Ver / E-mail</a>
+                                <a href="/ocorrencias/editar/<%= o.id %>" class="btn-edit">Editar</a>
+                                <form action="/ocorrencias/excluir/<%= o.id %>" method="POST" style="display: inline;" onsubmit="return confirm('Tem certeza que deseja excluir esta ocorrência?');">
+                                    <button type="submit" class="btn-delete">Excluir</button>
+                                </form>
+                            </td>
+                        </tr>
+                    <% }) %>
+                <% } %>
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Omnia - Tipos de Ocorrência</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; }
+        .container { max-width: 900px; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin: 0 auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        h2, h3 { color: #333; margin: 0; }
+        .alert-error { background-color: #f8d7da; color: #721c24; padding: 12px; border-radius: 4px; margin-bottom: 15px; border: 1px solid #f5c6cb; }
+        .alert-success { background-color: #d4edda; color: #155724; padding: 12px; border-radius: 4px; margin-bottom: 15px; border: 1px solid #c3e6cb; }
+        
+        .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 15px; margin-bottom: 25px; }
+        .form-group { display: flex; flex-direction: column; }
+        .form-group.full { grid-column: span 2; }
+        
+        label { font-size: 13px; font-weight: bold; color: #555; margin-bottom: 5px; }
+        input[type="text"] { padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; }
+        input.uppercase { text-transform: uppercase; }
+        input.titlecase { text-transform: capitalize; }
+        
+        button.btn-save { background-color: #28a745; color: white; border: none; padding: 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 15px; }
+        button.btn-save:hover { background-color: #218838; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 14px; }
+        th { background-color: #f8f9fa; }
+        th a { color: #333; text-decoration: none; display: flex; justify-content: space-between; align-items: center; }
+        th a:hover { color: #007bff; }
+        
+        .back-link { display: inline-block; color: #007bff; text-decoration: none; font-weight: bold; }
+        .back-link:hover { text-decoration: underline; }
+        .btn-edit { background: #ffc107; color: #212529; padding: 6px 10px; border-radius: 4px; text-decoration: none; font-size: 12px; font-weight: bold; margin-right: 5px; }
+        .btn-delete { background: #dc3545; color: white; padding: 6px 10px; border-radius: 4px; border: none; font-size: 12px; font-weight: bold; cursor: pointer; }
+        .actions-cell { display: flex; align-items: center; }
+        .modal-edit { background: #f8f9fa; border: 1px solid #ccc; padding: 15px; border-radius: 6px; margin-top: 15px; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>Gestão de Tipos de Ocorrência</h2>
+            <a href="/solucao" class="back-link">← Voltar ao Módulo Solução</a>
+        </div>
+
+        <% if (erro) { %>
+            <div class="alert-error"><%= erro %></div>
+        <% } %>
+        <% if (sucesso) { %>
+            <div class="alert-success"><%= sucesso %></div>
+        <% } %>
+
+        <% if (tipoEditando) { %>
+            <div class="modal-edit">
+                <h3>Editar Tipo de Ocorrência</h3>
+                <form action="/tipos-ocorrencia/editar/<%= tipoEditando.id %>" method="POST">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="codigo">Código:</label>
+                            <input type="text" id="codigo" name="codigo" class="uppercase" value="<%= tipoEditando.codigo %>" required oninput="this.value = this.value.toUpperCase()">
+                        </div>
+                        <div class="form-group">
+                            <label for="descricao">Descrição:</label>
+                            <input type="text" id="descricao" name="descricao" class="titlecase" value="<%= tipoEditando.descricao %>" required>
+                        </div>
+                        <div class="form-group full" style="display: flex; gap: 10px;">
+                            <button type="submit" class="btn-save" style="background-color: #007bff; flex: 1;">Salvar Alterações</button>
+                            <a href="/tipos-ocorrencia" style="padding: 12px; background: #6c757d; color: white; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 15px; text-align: center;">Cancelar</a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        <% } else { %>
+            <h3>Cadastrar Novo Tipo de Ocorrência</h3>
+            <form action="/tipos-ocorrencia/novo" method="POST">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="codigo">Código:</label>
+                        <input type="text" id="codigo" name="codigo" class="uppercase" placeholder="EX: AVAL" required oninput="this.value = this.value.toUpperCase()">
+                    </div>
+                    <div class="form-group">
+                        <label for="descricao">Descrição:</label>
+                        <input type="text" id="descricao" name="descricao" class="titlecase" placeholder="EX: Avaria de Transporte" required>
+                    </div>
+                    <div class="form-group full">
+                        <button type="submit" class="btn-save">Cadastrar Tipo</button>
+                    </div>
+                </div>
+            </form>
+        <% } %>
+
+        <hr>
+
+        <h3>Tipos Cadastrados</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 80px;">ID</th>
+                    <th>
+                        <a href="/tipos-ocorrencia?ordenar=codigo&ordem=<%= (ordenarAtual === 'codigo' && ordemAtual === 'ASC') ? 'DESC' : 'ASC' %>">
+                            Código 
+                            <span><%= ordenarAtual === 'codigo' ? (ordemAtual === 'ASC' ? '▲ (A-Z)' : '▼ (Z-A)') : '↕' %></span>
+                        </a>
+                    </th>
+                    <th>
+                        <a href="/tipos-ocorrencia?ordenar=descricao&ordem=<%= (ordenarAtual === 'descricao' && ordemAtual === 'ASC') ? 'DESC' : 'ASC' %>">
+                            Descrição 
+                            <span><%= ordenarAtual === 'descricao' ? (ordemAtual === 'ASC' ? '▲ (A-Z)' : '▼ (Z-A)') : '↕' %></span>
+                        </a>
+                    </th>
+                    <th style="width: 150px;">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% if (tipos.length === 0) { %>
+                    <tr>
+                        <td colspan="4" style="text-align: center; color: #777; padding: 20px;">Nenhum tipo de ocorrência cadastrado.</td>
+                    </tr>
+                <% } else { %>
+                    <% tipos.forEach(t => { %>
+                        <tr>
+                            <td><%= t.id %></td>
+                            <td><strong><%= t.codigo %></strong></td>
+                            <td><%= t.descricao %></td>
+                            <td class="actions-cell">
+                                <a href="/tipos-ocorrencia/editar/<%= t.id %>" class="btn-edit">Editar</a>
+                                <form action="/tipos-ocorrencia/excluir/<%= t.id %>" method="POST" style="display: inline;" onsubmit="return confirm('Tem certeza que deseja excluir este tipo?');">
+                                    <button type="submit" class="btn-delete">Excluir</button>
+                                </form>
+                            </td>
+                        </tr>
+                    <% }); %>
+                <% } %>
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
