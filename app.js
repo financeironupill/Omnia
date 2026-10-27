@@ -257,7 +257,7 @@ app.get('/ocorrencias', verificarAutenticacao, async (req, res) => {
         let idx = 1;
 
         if (busca && busca.trim() !== '') {
-            queryText += ' AND (o.numero ILIKE $' + idx + ' OR o.nf_origem ILIKE $' + idx + ' OR o.nfd ILIKE$' + idx + ' OR o.cliente_nome ILIKE $' + idx + ' OR tr.nome ILIKE$' + idx + ')';
+            queryText += ' AND (o.numero ILIKE $' + idx + ' OR o.nf_origem ILIKE $' + idx + ' OR o.nfd ILIKE $' + idx + ' OR o.cliente_nome ILIKE $' + idx + ' OR tr.nome ILIKE $' + idx + ')';
             queryParams.push('%' + busca.trim() + '%');
             idx++;
         }
@@ -393,4 +393,27 @@ app.post('/ocorrencias/editar/:id', verificarAutenticacao, async (req, res) => {
     }
 });
 
-app.post('/ocorrencias/excluir/:id', verificarAutenticacao, async (req,
+app.post('/ocorrencias/excluir/:id', verificarAutenticacao, async (req, res) => {
+    try {
+        await pool.query('DELETE FROM ocorrencias WHERE id = $1', [req.params.id]);
+        res.redirect('/ocorrencias?sucesso=Excluída!');
+    } catch (err) {
+        res.redirect('/ocorrencias?erro=Erro ao excluir.');
+    }
+});
+
+app.get('/logout', (req, res) => {
+    req.session.destroy();
+    res.redirect('/login');
+});
+
+app.get('/', (req, res) => {
+    if (req.session.usuario) {
+        return res.redirect('/dashboard');
+    }
+    res.redirect('/login');
+});
+
+app.listen(PORT, () => {
+    console.log(`Servidor Omnia a correr na porta ${PORT}`);
+});
