@@ -5,32 +5,25 @@
     <title>Registar Nova Cobrança - Omnia</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        body { background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-    </style>
+    <style>body { background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }</style>
 </head>
 <body>
-    <!-- Barra Superior de Navegação Desktop -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-4 shadow-sm mb-4">
         <div class="container-fluid">
             <a class="navbar-brand fw-bold" href="/dashboard"><i class="fa-solid fa-cube me-2"></i>OMNIA <small class="text-muted fs-6">Enterprise</small></a>
-            <a href="/cobranca" class="btn btn-outline-light btn-sm">
-                <i class="fa-solid fa-arrow-left me-1"></i> Voltar à Cobrança
-            </a>
+            <a href="/cobranca" class="btn btn-outline-light btn-sm"><i class="fa-solid fa-arrow-left me-1"></i> Voltar à Cobrança</a>
         </div>
     </nav>
 
-    <!-- Conteúdo em Largura Total -->
-    <div class="container-fluid px-4" style="max-width: 900px;">
+    <div class="container-fluid px-4" style="max-width: 1100px;">
         <div class="card shadow-sm border-0 rounded-3 p-4 bg-white">
             <h3 class="fw-bold text-dark mb-1"><i class="fa-solid fa-file-invoice-dollar text-warning me-2"></i>Registar Nova Cobrança</h3>
-            <p class="text-muted small mb-3">Preencha os dados do documento, banco e prazos para lançamento no contas a receber.</p>
-
+            <p class="text-muted small mb-3">Preencha todos os parâmetros detalhados para o controlo financeiro e de cobrança.</p>
             <hr class="text-muted mb-4">
 
             <form action="/cobranca/novo" method="POST">
                 <div class="row g-3">
-                    <div class="col-md-8">
+                    <div class="col-md-6">
                         <label class="form-label fw-semibold">Cliente <span class="text-danger">*</span></label>
                         <select name="cliente_id" class="form-select" required>
                             <option value="">Selecione o cliente...</option>
@@ -40,22 +33,39 @@
                         </select>
                     </div>
 
-                    <div class="col-md-4">
-                        <label class="form-label fw-semibold">Número do Documento / Boleto <span class="text-danger">*</span></label>
-                        <input type="text" name="numero_documento" class="form-control" placeholder="Ex: BOL-2026/001" required>
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">Número do Documento <span class="text-danger">*</span></label>
+                        <input type="text" name="numero_documento" class="form-control" placeholder="Ex: BOL-001" required>
                     </div>
 
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="form-label fw-semibold">Banco <span class="text-danger">*</span></label>
-                        <input type="text" name="banco" class="form-control" placeholder="Ex: Itaú, Bradesco, Banco do Brasil..." required>
+                        <select name="banco" class="form-select" required>
+                            <option value="">Selecione o banco...</option>
+                            <option value="Banco do Brasil">Banco do Brasil</option>
+                            <option value="Bradesco">Bradesco</option>
+                            <option value="Caixa Econômica">Caixa Econômica</option>
+                            <option value="Itaú">Itaú</option>
+                            <option value="Santander">Santander</option>
+                        </select>
                     </div>
 
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="form-label fw-semibold">Valor Original (R$) <span class="text-danger">*</span></label>
                         <input type="number" step="0.01" name="valor_original" class="form-control" placeholder="0.00" required>
                     </div>
 
-                    <div class="col-md-4">
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">Data de Emissão <span class="text-danger">*</span></label>
+                        <input type="date" name="data_emissao" class="form-control" required>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">Data de Vencimento <span class="text-danger">*</span></label>
+                        <input type="date" name="data_vencimento" class="form-control" required>
+                    </div>
+
+                    <div class="col-md-3">
                         <label class="form-label fw-semibold">Tipo de Cobrança <span class="text-danger">*</span></label>
                         <select name="tipo_cobranca" class="form-select" required>
                             <option value="Boleto Bancário">Boleto Bancário</option>
@@ -65,19 +75,86 @@
                         </select>
                     </div>
 
-                    <div class="col-md-6">
-                        <label class="form-label fw-semibold">Data de Emissão <span class="text-danger">*</span></label>
-                        <input type="date" name="data_emissao" class="form-control" required>
+                    <!-- NOVOS CAMPOS SOLICITADOS -->
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">Status do Boleto</label>
+                        <select name="status_boleto" class="form-select">
+                            <option value="Vencido">Vencido</option>
+                            <option value="Custas">Custas</option>
+                            <option value="Pago">Pago</option>
+                        </select>
                     </div>
 
-                    <div class="col-md-6">
-                        <label class="form-label fw-semibold">Data de Vencimento <span class="text-danger">*</span></label>
-                        <input type="date" name="data_vencimento" class="form-control" required>
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">Data do Pagamento</label>
+                        <input type="date" name="data_pagamento" class="form-control">
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">Status da Cobrança</label>
+                        <select name="status_cobranca" class="form-select">
+                            <option value="Iniciar">Iniciar</option>
+                            <option value="Em Cobrança">Em Cobrança</option>
+                            <option value="Protestar">Protestar</option>
+                            <option value="Cartório">Cartório</option>
+                            <option value="Custas">Custas</option>
+                            <option value="Pago">Pago</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">Valor das Custas (R$)</label>
+                        <input type="number" step="0.01" name="valor_custas" class="form-control" value="0.00">
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">Carteira</label>
+                        <select name="carteira" class="form-select">
+                            <option value="Simples">Simples</option>
+                            <option value="Descontado">Descontado</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">Débito em Conta Corrente</label>
+                        <input type="date" name="debito_conta_corrente" class="form-control">
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">Cadastro</label>
+                        <select name="cadastro_tipo" class="form-select">
+                            <option value="Normal">Normal</option>
+                            <option value="Bloqueado">Bloqueado</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">Data Cartório</label>
+                        <input type="date" name="data_cartorio" class="form-control">
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">Comissão</label>
+                        <select name="comissao" class="form-select">
+                            <option value="Não Estornada">Não Estornada</option>
+                            <option value="Estornada">Estornada</option>
+                            <option value="Estornada e Paga">Estornada e Paga</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">Data do Estorno</label>
+                        <input type="date" name="data_estorno" class="form-control">
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">Data da Reposição</label>
+                        <input type="date" name="data_reposicao" class="form-control">
                     </div>
 
                     <div class="col-12">
                         <label class="form-label fw-semibold">Observações</label>
-                        <textarea name="observacoes" class="form-control" rows="3" placeholder="Informações adicionais sobre a cobrança..."></textarea>
+                        <textarea name="observacoes" class="form-control" rows="3" placeholder="Informações adicionais..."></textarea>
                     </div>
 
                     <div class="col-12 mt-4">

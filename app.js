@@ -296,7 +296,6 @@ app.post('/gerentes/novo', verificarAutenticacao, async (req, res) => {
         ]);
         res.redirect('/gerentes?sucesso=Gerente cadastrado com sucesso!');
     } catch (err) {
-        console.error(err);
         res.redirect('/gerentes?erro=Erro ao cadastrar (Nome Resumido duplicado?).');
     }
 });
@@ -339,7 +338,7 @@ app.post('/gerentes/excluir/:id', verificarAutenticacao, async (req, res) => {
         await pool.query('DELETE FROM gerentes WHERE id = $1', [req.params.id]);
         res.redirect('/gerentes?sucesso=Gerente excluído!');
     } catch (err) {
-        res.redirect('/gerentes?erro=Erro ao excluir (pode estar vinculado a vendedores).');
+        res.redirect('/gerentes?erro=Erro ao excluir.');
     }
 });
 
@@ -375,7 +374,7 @@ app.post('/vendedores/novo', verificarAutenticacao, async (req, res) => {
     try {
         const sql = 'INSERT INTO vendedores (gerente_id, nome_resumido, nome_completo, telefone, email, banco, agencia, conta, tipo_chave_pix, chave_pix, ativo) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)';
         await pool.query(sql, [
-            gererente_id = gerente_id ? parseInt(gerente_id, 10) : null,
+            gerente_id ? parseInt(gerente_id, 10) : null,
             nome_resumido ? nome_resumido.trim().toUpperCase() : '',
             formatarCapitalizacao(nome_completo),
             telefone,
@@ -389,8 +388,7 @@ app.post('/vendedores/novo', verificarAutenticacao, async (req, res) => {
         ]);
         res.redirect('/vendedores?sucesso=Vendedor cadastrado com sucesso!');
     } catch (err) {
-        console.error(err);
-        res.redirect('/vendedores?erro=Erro ao cadastrar (Nome Resumido duplicado?).');
+        res.redirect('/vendedores?erro=Erro ao cadastrar.');
     }
 });
 
@@ -483,11 +481,7 @@ app.get('/ocorrencias', verificarAutenticacao, async (req, res) => {
             }
         }
 
-        let statusFiltro = status;
-        if (status === undefined) {
-            statusFiltro = 'Em Aberto';
-        }
-
+        let statusFiltro = status !== undefined ? status : 'Em Aberto';
         if (statusFiltro && statusFiltro !== '') {
             queryText += ' AND o.status = $' + idx; 
             queryParams.push(statusFiltro); 
@@ -511,7 +505,7 @@ app.get('/ocorrencias', verificarAutenticacao, async (req, res) => {
         res.render('ocorrencias-lista', { 
             ocorrencias: result.rows, tipos: tipos.rows, clientes: clientes.rows, transportadoras: transportadoras.rows,
             buscaAtual: busca || '', tipoAtual: tipo_id || '', clienteAtual: clienteIdFiltro, 
-            transportadoraAtual: transportadoraIdFiltro, statusAtual: status !== undefined ? status : 'Em Aberto', 
+            transportadoraAtual: transportadoraIdFiltro, statusAtual: statusFiltro, 
             ordenarAtual: ordenar || 'id', ordemAtual: dir, erro: null, sucesso: null 
         });
     } catch (err) {
@@ -616,6 +610,23 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
         queryText += ' ORDER BY c.data_vencimento ASC';
 
         const result = await pool.query(queryText, queryParams);
+        
+        // Cálculo automático de dias vencidos para exibição
+        const hoje = new Date();
+        result.rows.forEach(c => {
+            let dataFim = hoje;
+            if ((c.status_boleto === 'Custas' || c.status_boleto === 'Pago') && c.data_pagamento) {
+                dataFim = new Date(c.data_pagamento);
+            }
+            if (c.data_vencimento) {
+                const diffTime = dataFim - new Date(c.data_vencimento);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                c.dias_vencidos_calc = diffDays > 0 ? diffDays : 0;
+            } else {
+                c.dias_vencidos_calc = 0;
+            }
+        });
+
         res.render('cobranca-lista', { 
             contas: result.rows, 
             buscaAtual: busca || '', 
@@ -639,19 +650,59 @@ app.get('/cobranca/nova', verificarAutenticacao, async (req, res) => {
 });
 
 app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
-    const { cliente_id, numero_documento, banco, valor_original, data_emissao, data_vencimento, tipo_cobranca, observacoes } = req.body;
+    const { 
+        cliente_id, numero_documento, banco, valor_original, data_emissao, data_vencimento, 
+        tipo_cobranca, observacoes, status_boleto, data_pagamento, status_cobranca, 
+        valor_custas, carteira, debito_conta_corrente, cadastro_tipo, data_cartorio, 
+        comissao, data_estorno, data_reposicao 
+    } = req.body;
+
     try {
-        const sql = 'INSERT INTO contas_receber (cliente_id, numero_documento, banco, valor_original, valor_recebido, data_emissao, data_vencimento, status, tipo_cobranca, observacoes, criado_em, atualizado_em) VALUES ($1, $2, $3, $4, 0.00, $5, $6, \'Em Aberto\', $7, $8, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)';
+        // Cálculo dos dias vencidos conforme a regra de negócio solicitada
+        let diasVencidos = 0;
+        const dataVenc = new Date(data_vencimento);
+        let dataFim = new Date(); // dia atual
+
+        if ((status_boleto === 'Custas' || status_boleto === 'Pago') && data_pagamento) {
+            dataFim = new Date(data_pagamento);
+        }
+
+        if (dataVenc && dataFim) {
+            const diffTime = dataFim - dataVenc;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            diasVencidos = diffDays > 0 ? diffDays : 0;
+        }
+
+        const sql = `INSERT INTO contas_receber (
+            cliente_id, numero_documento, banco, valor_original, valor_recebido, data_emissao, 
+            data_vencimento, status, tipo_cobranca, observacoes, status_boleto, data_pagamento, 
+            dias_vencidos, status_cobranca, valor_custas, carteira, debito_conta_corrente, 
+            cadastro_tipo, data_cartorio, comissao, data_estorno, data_reposicao, criado_em, atualizado_em
+        ) VALUES ($1, $2, $3, $4, 0.00, $5, $6, 'Em Aberto', $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`;
+
         await pool.query(sql, [
             parseInt(cliente_id, 10),
             numero_documento ? numero_documento.trim().toUpperCase() : '',
-            formatarCapitalizacao(banco),
+            banco,
             parseFloat(valor_original) || 0,
             data_emissao,
             data_vencimento,
             tipo_cobranca,
-            formatarCapitalizacao(observacoes)
+            formatarCapitalizacao(observacoes),
+            status_boleto || 'Vencido',
+            data_pagamento || null,
+            diasVencidos,
+            status_cobranca || 'Iniciar',
+            parseFloat(valor_custas) || 0.00,
+            carteira || 'Simples',
+            debito_conta_corrente || null,
+            cadastro_tipo || 'Normal',
+            data_cartorio || null,
+            comissao || 'Não Estornada',
+            data_estorno || null,
+            data_reposicao || null
         ]);
+
         res.redirect('/cobranca?sucesso=Cobrança cadastrada com sucesso!');
     } catch (err) {
         console.error(err);
