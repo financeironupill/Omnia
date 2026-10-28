@@ -216,7 +216,7 @@ app.get('/clientes/novo', verificarAutenticacao, async (req, res) => {
     try {
         const gerentes = await pool.query('SELECT id, nome_resumido FROM gerentes WHERE ativo = 1 ORDER BY nome_resumido ASC');
         const vendedores = await pool.query('SELECT v.id, v.nome_resumido, v.gerente_id FROM vendedores v WHERE v.ativo = 1 ORDER BY v.nome_resumido ASC');
-        res.render('cliente-form', { cliente: null, gerentes: gerentes.rows, vendedores: vendedores.rows });
+        res.render('cliente-form', { cliente: null, gerentes: gerentes.rows, vendedores: vendedores.rows, erro: null });
     } catch (err) {
         res.redirect('/clientes?erro=Erro ao carregar formulário.');
     }
@@ -246,8 +246,15 @@ app.post('/clientes/novo', verificarAutenticacao, async (req, res) => {
         ]);
         res.redirect('/clientes?sucesso=Cadastrado com sucesso!');
     } catch (err) {
-        console.error(err);
-        res.redirect('/clientes?erro=Erro ao cadastrar.');
+        console.error('ERRO AO CADASTRAR CLIENTE:', err);
+        const gerentes = await pool.query('SELECT id, nome_resumido FROM gerentes WHERE ativo = 1 ORDER BY nome_resumido ASC');
+        const vendedores = await pool.query('SELECT v.id, v.nome_resumido, v.gerente_id FROM vendedores v WHERE v.ativo = 1 ORDER BY v.nome_resumido ASC');
+        res.render('cliente-form', { 
+            cliente: req.body, 
+            gerentes: gerentes.rows, 
+            vendedores: vendedores.rows, 
+            erro: 'Erro ao cadastrar cliente: ' + err.message 
+        });
     }
 });
 
@@ -257,7 +264,7 @@ app.get('/clientes/editar/:id', verificarAutenticacao, async (req, res) => {
         if (result.rows.length === 0) return res.redirect('/clientes?erro=Não encontrado.');
         const gerentes = await pool.query('SELECT id, nome_resumido FROM gerentes WHERE ativo = 1 ORDER BY nome_resumido ASC');
         const vendedores = await pool.query('SELECT v.id, v.nome_resumido, v.gerente_id FROM vendedores v WHERE v.ativo = 1 ORDER BY v.nome_resumido ASC');
-        res.render('cliente-form', { cliente: result.rows[0], gerentes: gerentes.rows, vendedores: vendedores.rows });
+        res.render('cliente-form', { cliente: result.rows[0], gerentes: gerentes.rows, vendedores: vendedores.rows, erro: null });
     } catch (err) {
         res.redirect('/clientes?erro=Erro ao carregar.');
     }
@@ -703,7 +710,7 @@ app.post('/ocorrencias/excluir/:id', verificarAutenticacao, async (req, res) => 
     }
 });
 
-// OMNIA COBRANÇA (Com filtros de Gerente e Vendedor)
+// OMNIA COBRANÇA
 app.get('/cobranca', verificarAutenticacao, async (req, res) => {
     try {
         const { busca, status, gerente_id, vendedor_id } = req.query;
@@ -784,7 +791,6 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
 
 app.get('/cobranca/nova', verificarAutenticacao, async (req, res) => {
     try {
-        // Busca clientes junto com seus gerentes e vendedores para preenchimento automático
         const clientes = await pool.query(`
             SELECT c.id, c.nome, c.gerente_id, c.vendedor_id, 
                    g.nome_resumido AS gerente_nome, v.nome_resumido AS vendedor_nome 
@@ -810,7 +816,6 @@ app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
     } = req.body;
 
     try {
-        // Busca automática do gerente e vendedor associados ao cliente para gravar na cobrança
         const cliRes = await pool.query('SELECT gerente_id, vendedor_id FROM clientes WHERE id = $1', [cliente_id]);
         let gerenteId = null;
         let vendedorId = null;
