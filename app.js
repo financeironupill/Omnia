@@ -156,3 +156,451 @@ app.post('/transportadoras/novo', verificarAutenticacao, async (req, res) => {
 
 app.get('/transportadoras/editar/:id', verificarAutenticacao, async (req, res) => {
     try {
+        const result = await pool.query('SELECT * FROM transportadoras WHERE id = $1', [req.params.id]);
+        res.render('transportadora-form', { transportadora: result.rows[0] });
+    } catch (err) {
+        res.redirect('/transportadoras?erro=Erro ao carregar.');
+    }
+});
+
+app.post('/transportadoras/editar/:id', verificarAutenticacao, async (req, res) => {
+    const { cnpj, nome, nome_fantasia, contato, email, telefone, cidade, uf } = req.body;
+    try {
+        const sql = 'UPDATE transportadoras SET cnpj = $1, nome = $2, nome_fantasia = $3, contato = $4, email = $5, telefone = $6, cidade = $7, uf = $8 WHERE id = $9';
+        await pool.query(sql, [cnpj ? cnpj.replace(/\D/g, '') : '', formatarCapitalizacao(nome), formatarCapitalizacao(nome_fantasia), formatarCapitalizacao(contato), email ? email.trim().toLowerCase() : '', telefone, formatarCapitalizacao(cidade), uf ? uf.trim().toUpperCase() : '', req.params.id]);
+        res.redirect('/transportadoras?sucesso=Atualizada com sucesso!');
+    } catch (err) {
+        res.redirect('/transportadoras?erro=Erro ao atualizar.');
+    }
+});
+
+app.post('/transportadoras/excluir/:id', verificarAutenticacao, async (req, res) => {
+    try {
+        await pool.query('DELETE FROM transportadoras WHERE id = $1', [req.params.id]);
+        res.redirect('/transportadoras?sucesso=Excluída!');
+    } catch (err) {
+        res.redirect('/transportadoras?erro=Erro ao excluir.');
+    }
+});
+
+// CLIENTES
+app.get('/clientes', verificarAutenticacao, async (req, res) => {
+    try {
+        const { busca, ordenar, ordem, origem } = req.query;
+        let col = ordenar === 'cnpj_cpf' ? 'cnpj_cpf' : (ordenar === 'nome' ? 'nome' : 'id');
+        let dir = ordem === 'ASC' ? 'ASC' : 'DESC';
+        let query = 'SELECT c.*, g.nome_resumido AS gerente_nome, v.nome_resumido AS vendedor_nome FROM clientes c LEFT JOIN gerentes g ON c.gerente_id = g.id LEFT JOIN vendedores v ON c.vendedor_id = v.id';
+        let params = [];
+        if (busca && busca.trim() !== '') {
+            query += ' WHERE c.nome ILIKE $1 OR c.nome_fantasia ILIKE $1 OR c.cnpj_cpf ILIKE $1';
+            params.push('%' + busca.trim() + '%');
+        }
+        query += ' ORDER BY c.' + col + ' ' + dir;
+        const result = await pool.query(query, params);
+        res.render('clientes-lista', { 
+            clientes: result.rows, 
+            buscaAtual: busca || '', 
+            ordenarAtual: col, 
+            ordemAtual: dir, 
+            origemAtual: origem || 'dashboard', 
+            erro: null, 
+            sucesso: null 
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Erro interno');
+    }
+});
+
+app.get('/clientes/novo', verificarAutenticacao, async (req, res) => {
+    try {
+        const gerentes = await pool.query('SELECT id, nome_resumido FROM gerentes WHERE ativo = 1 ORDER BY nome_resumido ASC');
+        const vendedores = await pool.query('SELECT v.id, v.nome_resumido, v.gerente_id FROM vendedores v WHERE v.ativo = 1 ORDER BY v.nome_resumido ASC');
+        res.render('cliente-form', { cliente: null, gerentes: gerentes.rows, vendedores: vendedores.rows });
+    } catch (err) {
+        res.redirect('/clientes?erro=Erro ao carregar formulário.');
+    }
+});
+
+app.post('/clientes/novo', verificarAutenticacao, async (req, res) => {
+    const { tipo_pessoa, cnpj_cpf, nome, nome_fantasia, contato, email, telefone, cidade, uf, banco, agencia, conta, tipo_chave_pix, chave_pix, gerente_id, vendedor_id } = req.body;
+    try {
+        const sql = 'INSERT INTO clientes (tipo_pessoa, cnpj_cpf, nome, nome_fantasia, contato, email, telefone, cidade, uf, banco, agencia, conta, tipo_chave_pix, chave_pix, gerente_id, vendedor_id, ativo) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 1)';
+        await pool.query(sql, [
+            tipo_pessoa, 
+            cnpj_cpf ? cnpj_cpf.replace(/\D/g, '') : '', 
+            formatarCapitalizacao(nome), 
+            formatarCapitalizacao(nome_fantasia), 
+            formatarCapitalizacao(contato), 
+            email ? email.trim().toLowerCase() : '', 
+            telefone, 
+            formatarCapitalizacao(cidade), 
+            uf ? uf.trim().toUpperCase() : '', 
+            formatarCapitalizacao(banco), 
+            agencia, 
+            conta, 
+            tipo_chave_pix, 
+            chave_pix,
+            gerente_id ? parseInt(gerente_id, 10) : null,
+            vendedor_id ? parseInt(vendedor_id, 10) : null
+        ]);
+        res.redirect('/clientes?sucesso=Cadastrado com sucesso!');
+    } catch (err) {
+        console.error(err);
+        res.redirect('/clientes?erro=Erro ao cadastrar.');
+    }
+});
+
+app.get('/clientes/editar/:id', verificarAutenticacao, async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM clientes WHERE id = $1', [req.params.id]);
+        if (result.rows.length === 0) return res.redirect('/clientes?erro=Não encontrado.');
+        const gerentes = await pool.query('SELECT id, nome_resumido FROM gerentes WHERE ativo = 1 ORDER BY nome_resumido ASC');
+        const vendedores = await pool.query('SELECT v.id, v.nome_resumido, v.gerente_id FROM vendedores v WHERE v.ativo = 1 ORDER BY v.nome_resumido ASC');
+        res.render('cliente-form', { cliente: result.rows[0], gerentes: gerentes.rows, vendedores: vendedores.rows });
+    } catch (err) {
+        res.redirect('/clientes?erro=Erro ao carregar.');
+    }
+});
+
+app.post('/clientes/editar/:id', verificarAutenticacao, async (req, res) => {
+    const { tipo_pessoa, cnpj_cpf, nome, nome_fantasia, contato, email, telefone, cidade, uf, banco, agencia, conta, tipo_chave_pix, chave_pix, gerente_id, vendedor_id } = req.body;
+    try {
+        const sql = 'UPDATE clientes SET tipo_pessoa = $1, cnpj_cpf = $2, nome = $3, nome_fantasia = $4, contato = $5, email = $6, telefone = $7, cidade = $8, uf = $9, banco = $10, agencia = $11, conta = $12, tipo_chave_pix = $13, chave_pix = $14, gerente_id = $15, vendedor_id = $16 WHERE id = $17';
+        await pool.query(sql, [
+            tipo_pessoa, 
+            cnpj_cpf ? cnpj_cpf.replace(/\D/g, '') : '', 
+            formatarCapitalizacao(nome), 
+            formatarCapitalizacao(nome_fantasia), 
+            formatarCapitalizacao(contato), 
+            email ? email.trim().toLowerCase() : '', 
+            telefone, 
+            formatarCapitalizacao(cidade), 
+            uf ? uf.trim().toUpperCase() : '', 
+            formatarCapitalizacao(banco), 
+            agencia, 
+            conta, 
+            tipo_chave_pix, 
+            chave_pix,
+            gerente_id ? parseInt(gerente_id, 10) : null,
+            vendedor_id ? parseInt(vendedor_id, 10) : null,
+            req.params.id
+        ]);
+        res.redirect('/clientes?sucesso=Atualizado com sucesso!');
+    } catch (err) {
+        console.error(err);
+        res.redirect('/clientes?erro=Erro ao atualizar.');
+    }
+});
+
+app.post('/clientes/excluir/:id', verificarAutenticacao, async (req, res) => {
+    try {
+        await pool.query('DELETE FROM clientes WHERE id = $1', [req.params.id]);
+        res.redirect('/clientes?sucesso=Excluído!');
+    } catch (err) {
+        res.redirect('/clientes?erro=Erro ao excluir.');
+    }
+});
+
+// GERENTES
+app.get('/gerentes', verificarAutenticacao, async (req, res) => {
+    try {
+        const { busca } = req.query;
+        let query = 'SELECT * FROM gerentes';
+        let params = [];
+        if (busca && busca.trim() !== '') {
+            query += ' WHERE nome_resumido ILIKE $1 OR nome_completo ILIKE $1';
+            params.push('%' + busca.trim() + '%');
+        }
+        query += ' ORDER BY nome_resumido ASC';
+        const result = await pool.query(query, params);
+        res.render('gerentes-lista', { gerentes: result.rows, buscaAtual: busca || '', erro: null, sucesso: null });
+    } catch (err) {
+        res.status(500).send('Erro interno');
+    }
+});
+
+// RELATÓRIO DE VENDEDORES POR GERENTE
+app.get('/gerentes/relatorio-vendedores/:id', verificarAutenticacao, async (req, res) => {
+    try {
+        const gerenteId = req.params.id;
+        const gerenteRes = await pool.query('SELECT * FROM gerentes WHERE id = $1', [gerenteId]);
+        if (gerenteRes.rows.length === 0) {
+            return res.redirect('/gerentes?erro=Gerente não encontrado.');
+        }
+        const vendedoresRes = await pool.query(
+            'SELECT * FROM vendedores WHERE gerente_id = $1 ORDER BY nome_resumido ASC', 
+            [gerenteId]
+        );
+        res.render('gerente-relatorio-vendedores', {
+            gerente: gerenteRes.rows[0],
+            vendedores: vendedoresRes.rows,
+            erro: null,
+            sucesso: null
+        });
+    } catch (err) {
+        console.error(err);
+        res.redirect('/gerentes?erro=Erro ao gerar relatório de vendedores.');
+    }
+});
+
+app.get('/gerentes/novo', verificarAutenticacao, (req, res) => {
+    res.render('gerente-form', { gerente: null, erro: null });
+});
+
+app.post('/gerentes/novo', verificarAutenticacao, async (req, res) => {
+    const { nome_resumido, nome_completo, telefone, email, banco, agencia, conta, tipo_chave_pix, chave_pix, ativo } = req.body;
+    try {
+        const sql = 'INSERT INTO gerentes (nome_resumido, nome_completo, telefone, email, banco, agencia, conta, tipo_chave_pix, chave_pix, ativo) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)';
+        await pool.query(sql, [
+            nome_resumido ? nome_resumido.trim().toUpperCase() : '',
+            formatarCapitalizacao(nome_completo),
+            telefone,
+            email ? email.trim().toLowerCase() : '',
+            formatarCapitalizacao(banco),
+            agencia,
+            conta,
+            tipo_chave_pix,
+            chave_pix,
+            ativo ? parseInt(ativo, 10) : 1
+        ]);
+        res.redirect('/gerentes?sucesso=Gerente cadastrado com sucesso!');
+    } catch (err) {
+        res.redirect('/gerentes?erro=Erro ao cadastrar.');
+    }
+});
+
+app.get('/gerentes/editar/:id', verificarAutenticacao, async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM gerentes WHERE id = $1', [req.params.id]);
+        if (result.rows.length === 0) return res.redirect('/gerentes?erro=Não encontrado.');
+        res.render('gerente-form', { gerente: result.rows[0], erro: null });
+    } catch (err) {
+        res.redirect('/gerentes?erro=Erro ao carregar.');
+    }
+});
+
+app.post('/gerentes/editar/:id', verificarAutenticacao, async (req, res) => {
+    const { nome_resumido, nome_completo, telefone, email, banco, agencia, conta, tipo_chave_pix, chave_pix, ativo } = req.body;
+    try {
+        const sql = 'UPDATE gerentes SET nome_resumido = $1, nome_completo = $2, telefone = $3, email = $4, banco = $5, agencia = $6, conta = $7, tipo_chave_pix = $8, chave_pix = $9, ativo = $10 WHERE id = $11';
+        await pool.query(sql, [
+            nome_resumido ? nome_resumido.trim().toUpperCase() : '',
+            formatarCapitalizacao(nome_completo),
+            telefone,
+            email ? email.trim().toLowerCase() : '',
+            formatarCapitalizacao(banco),
+            agencia,
+            conta,
+            tipo_chave_pix,
+            chave_pix,
+            ativo ? parseInt(ativo, 10) : 1,
+            req.params.id
+        ]);
+        res.redirect('/gerentes?sucesso=Gerente atualizado com sucesso!');
+    } catch (err) {
+        res.redirect('/gerentes?erro=Erro ao atualizar.');
+    }
+});
+
+app.post('/gerentes/excluir/:id', verificarAutenticacao, async (req, res) => {
+    try {
+        await pool.query('DELETE FROM gerentes WHERE id = $1', [req.params.id]);
+        res.redirect('/gerentes?sucesso=Gerente excluído!');
+    } catch (err) {
+        res.redirect('/gerentes?erro=Erro ao excluir.');
+    }
+});
+
+// VENDEDORES
+app.get('/vendedores', verificarAutenticacao, async (req, res) => {
+    try {
+        const { busca } = req.query;
+        let query = 'SELECT v.*, g.nome_resumido AS gerente_nome FROM vendedores v LEFT JOIN gerentes g ON v.gerente_id = g.id WHERE 1=1';
+        let params = [];
+        if (busca && busca.trim() !== '') {
+            query += ' AND (v.nome_resumido ILIKE $1 OR v.nome_completo ILIKE $1 OR g.nome_resumido ILIKE $1)';
+            params.push('%' + busca.trim() + '%');
+        }
+        query += ' ORDER BY v.nome_resumido ASC';
+        const result = await pool.query(query, params);
+        res.render('vendedores-lista', { vendedores: result.rows, buscaAtual: busca || '', erro: null, sucesso: null });
+    } catch (err) {
+        res.status(500).send('Erro interno');
+    }
+});
+
+app.get('/vendedores/novo', verificarAutenticacao, async (req, res) => {
+    try {
+        const gerentes = await pool.query('SELECT id, nome_resumido, nome_completo FROM gerentes WHERE ativo = 1 ORDER BY nome_resumido ASC');
+        res.render('vendedor-form', { vendedor: null, gerentes: gerentes.rows, erro: null });
+    } catch (err) {
+        res.redirect('/vendedores?erro=Erro ao carregar.');
+    }
+});
+
+app.post('/vendedores/novo', verificarAutenticacao, async (req, res) => {
+    const { gerente_id, nome_resumido, nome_completo, telefone, email, banco, agencia, conta, tipo_chave_pix, chave_pix, ativo } = req.body;
+    try {
+        const sql = 'INSERT INTO vendedores (gerente_id, nome_resumido, nome_completo, telefone, email, banco, agencia, conta, tipo_chave_pix, chave_pix, ativo) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)';
+        await pool.query(sql, [
+            gerente_id ? parseInt(gerente_id, 10) : null,
+            nome_resumido ? nome_resumido.trim().toUpperCase() : '',
+            formatarCapitalizacao(nome_completo),
+            telefone,
+            email ? email.trim().toLowerCase() : '',
+            formatarCapitalizacao(banco),
+            agencia,
+            conta,
+            tipo_chave_pix,
+            chave_pix,
+            ativo ? parseInt(ativo, 10) : 1
+        ]);
+        res.redirect('/vendedores?sucesso=Vendedor cadastrado com sucesso!');
+    } catch (err) {
+        res.redirect('/vendedores?erro=Erro ao cadastrar.');
+    }
+});
+
+app.get('/vendedores/editar/:id', verificarAutenticacao, async (req, res) => {
+    try {
+        const vendedorRes = await pool.query('SELECT * FROM vendedores WHERE id = $1', [req.params.id]);
+        if (vendedorRes.rows.length === 0) return res.redirect('/vendedores?erro=Não encontrado.');
+        const gerentes = await pool.query('SELECT id, nome_resumido, nome_completo FROM gerentes ORDER BY nome_resumido ASC');
+        res.render('vendedor-form', { vendedor: vendedorRes.rows[0], gerentes: gerentes.rows, erro: null });
+    } catch (err) {
+        res.redirect('/vendedores?erro=Erro ao carregar.');
+    }
+});
+
+app.post('/vendedores/editar/:id', verificarAutenticacao, async (req, res) => {
+    const { gerente_id, nome_resumido, nome_completo, telefone, email, banco, agencia, conta, tipo_chave_pix, chave_pix, ativo } = req.body;
+    try {
+        const sql = 'UPDATE vendedores SET gerente_id = $1, nome_resumido = $2, nome_completo = $3, telefone = $4, email = $5, banco = $6, agencia = $7, conta = $8, tipo_chave_pix = $9, chave_pix = $10, ativo = $11 WHERE id = $12';
+        await pool.query(sql, [
+            gerente_id ? parseInt(gerente_id, 10) : null,
+            nome_resumido ? nome_resumido.trim().toUpperCase() : '',
+            formatarCapitalizacao(nome_completo),
+            telefone,
+            email ? email.trim().toLowerCase() : '',
+            formatarCapitalizacao(banco),
+            agencia,
+            conta,
+            tipo_chave_pix,
+            chave_pix,
+            ativo ? parseInt(ativo, 10) : 1,
+            req.params.id
+        ]);
+        res.redirect('/vendedores?sucesso=Vendedor atualizado com sucesso!');
+    } catch (err) {
+        res.redirect('/vendedores?erro=Erro ao atualizar.');
+    }
+});
+
+app.post('/vendedores/excluir/:id', verificarAutenticacao, async (req, res) => {
+    try {
+        await pool.query('DELETE FROM vendedores WHERE id = $1', [req.params.id]);
+        res.redirect('/vendedores?sucesso=Vendedor excluído!');
+    } catch (err) {
+        res.redirect('/vendedores?erro=Erro ao excluir.');
+    }
+});
+
+// OCORRÊNCIAS
+app.get('/ocorrencias', verificarAutenticacao, async (req, res) => {
+    try {
+        const { busca, tipo_id, cliente_nome_busca, transportadora_nome_busca, status, ordenar, ordem } = req.query;
+        let queryText = 'SELECT o.*, t.descricao AS tipo_descricao, tr.nome AS transportadora_nome, u.nome AS usuario_nome FROM ocorrencias o LEFT JOIN tipos_ocorrencia t ON o.tipo_ocorrencia_id = t.id LEFT JOIN transportadoras tr ON o.transportadora_id = tr.id LEFT JOIN usuarios u ON o.usuario_id = u.id WHERE 1=1';
+        let queryParams = [];
+        let idx = 1;
+
+        if (busca && busca.trim() !== '') {
+            queryText += ' AND (o.numero ILIKE $' + idx + ' OR o.nf_origem ILIKE $' + idx + ' OR o.nfd ILIKE$' + idx + ' OR o.cliente_nome ILIKE $' + idx + ' OR tr.nome ILIKE$' + idx + ')';
+            queryParams.push('%' + busca.trim() + '%');
+            idx++;
+        }
+        if (tipo_id) { 
+            queryText += ' AND o.tipo_ocorrencia_id = $' + idx; 
+            queryParams.push(parseInt(tipo_id, 10)); 
+            idx++; 
+        }
+
+        let clienteIdFiltro = '';
+        if (cliente_nome_busca && cliente_nome_busca.trim() !== '') {
+            const cliRes = await pool.query('SELECT id FROM clientes WHERE UPPER(TRIM(nome)) = UPPER(TRIM($1))', [cliente_nome_busca]);
+            if (cliRes.rows.length > 0) {
+                clienteIdFiltro = cliRes.rows[0].id;
+                queryText += ' AND o.cliente_id = $' + idx;
+                queryParams.push(clienteIdFiltro);
+                idx++;
+            } else {
+                queryText += ' AND 1 = 0'; 
+            }
+        }
+
+        let transportadoraIdFiltro = '';
+        if (transportadora_nome_busca && transportadora_nome_busca.trim() !== '') {
+            const transpRes = await pool.query('SELECT id FROM transportadoras WHERE UPPER(TRIM(nome)) = UPPER(TRIM($1))', [transportadora_nome_busca]);
+            if (transpRes.rows.length > 0) {
+                transportadoraIdFiltro = transpRes.rows[0].id;
+                queryText += ' AND o.transportadora_id = $' + idx;
+                queryParams.push(transportadoraIdFiltro);
+                idx++;
+            } else {
+                queryText += ' AND 1 = 0'; 
+            }
+        }
+
+        let statusFiltro = status !== undefined ? status : 'Em Aberto';
+        if (statusFiltro && statusFiltro !== '') {
+            queryText += ' AND o.status = $' + idx; 
+            queryParams.push(statusFiltro); 
+            idx++; 
+        }
+
+        let col = 'o.id';
+        if (ordenar === 'tipo') col = 't.descricao';
+        if (ordenar === 'cliente') col = 'o.cliente_nome';
+        if (ordenar === 'nf') col = 'o.nf_origem';
+        if (ordenar === 'status') col = 'o.status';
+
+        let dir = ordem === 'ASC' ? 'ASC' : 'DESC';
+        queryText += ' ORDER BY ' + col + ' ' + dir;
+
+        const result = await pool.query(queryText, queryParams);
+        const tipos = await pool.query('SELECT id, descricao FROM tipos_ocorrencia ORDER BY descricao ASC');
+        const clientes = await pool.query('SELECT id, nome FROM clientes ORDER BY nome ASC');
+        const transportadoras = await pool.query('SELECT id, nome FROM transportadoras ORDER BY nome ASC');
+
+        res.render('ocorrencias-lista', { 
+            ocorrencias: result.rows, tipos: tipos.rows, clientes: clientes.rows, transportadoras: transportadoras.rows,
+            buscaAtual: busca || '', tipoAtual: tipo_id || '', clienteAtual: clienteIdFiltro, 
+            transportadoraAtual: transportadoraIdFiltro, statusAtual: statusFiltro, 
+            ordenarAtual: ordenar || 'id', ordemAtual: dir, erro: null, sucesso: null 
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Erro interno');
+    }
+});
+
+app.get('/ocorrencias/nova', verificarAutenticacao, async (req, res) => {
+    try {
+        const tipos = await pool.query('SELECT id, descricao FROM tipos_ocorrencia ORDER BY descricao ASC');
+        const clientes = await pool.query('SELECT id, nome FROM clientes ORDER BY nome ASC');
+        const transportadoras = await pool.query('SELECT id, nome FROM transportadoras ORDER BY nome ASC');
+        res.render('ocorrencia-form', { ocorrencia: null, tipos: tipos.rows, clientes: clientes.rows, transportadoras: transportadoras.rows, numeroSugerido: gerarNumeroOcorrencia() });
+    } catch (err) {
+        res.redirect('/ocorrencias?erro=Erro ao carregar.');
+    }
+});
+
+app.post('/ocorrencias/novo', verificarAutenticacao, async (req, res) => {
+    const { tipo_ocorrencia_id, cliente_id, transportadora_id, nf_origem, valor_nf_origem, vencimento_atual, nfd, tipo_financeiro, valor_financeiro, descricao_problema } = req.body;
+    try {
+        const cli = await pool.query('SELECT nome FROM clientes WHERE id = $1', [cliente_id]);
+        const cliNome = cli.rows.length > 0 ? cli.rows[0].nome : '';
+        const sql = 'INSERT INTO ocorrencias (numero, tipo_ocorrencia_id, cliente_id, transportadora_id, usuario_id, cliente_nome, nf_origem, valor_nf_origem, vencimento_atual, nfd, tipo_financeiro, valor_financeiro, descricao_problema, status, criado_em, atualizado_em) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, \'Em Aberto\', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)';
+        await pool.query(sql, [gerarNumeroOcorrencia(), parseInt(tipo_ocorrencia_id, 10), parseInt(cliente_id, 10), transportadora_id ? parseInt(transportadora_id, 10) : null, req.session.usuario.id, cliNome, nf_origem ? nf_origem.trim().toUpperCase() : '', valor_nf_origem ? parseFloat(valor_nf_origem) : null, vencimento_atual || null, nfd ? nfd.trim().toUpperCase() : '', tipo_financeiro || null, valor_financeiro ? parseFloat(valor_financeiro) : null, formatarCapitalizacao(descricao_problema)]);
+        res.redirect('/ocorrencias?sucesso=Ocorrência registrada!');
+    } catch (err) {
