@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title><%= vendedor ? 'Editar Vendedor' : 'Novo Vendedor' %> - Omnia</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>body { background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }</style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-4 shadow-sm mb-4">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold" href="/dashboard"><i class="fa-solid fa-cube me-2"></i>OMNIA <small class="text-muted fs-6">Enterprise</small></a>
+            <a href="/vendedores" class="btn btn-outline-light btn-sm"><i class="fa-solid fa-arrow-left me-1"></i> Voltar aos Vendedores</a>
+        </div>
+    </nav>
+
+    <div class="container-fluid px-4" style="max-width: 900px;">
+        <div class="card shadow-sm border-0 rounded-3 p-4 bg-white">
+            <h3 class="fw-bold mb-1" style="color: #20c997;"><i class="fa-solid fa-user-tag me-2"></i><%= vendedor ? 'Editar Vendedor' : 'Registar Novo Vendedor' %></h3>
+            <p class="text-muted small mb-3">Preencha os dados do vendedor, vincule o gerente responsável e informe os dados bancários.</p>
+            <hr class="text-muted mb-4">
+
+            <form action="<%= vendedor ? '/vendedores/editar/' + vendedor.id : '/vendedores/novo' %>" method="POST">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Gerente Responsável <span class="text-danger">*</span></label>
+                        <select name="gerente_id" class="form-select" required>
+                            <option value="">Selecione o gerente...</option>
+                            <% gerentes.forEach(g => { %>
+                                <option value="<%= g.id %>" <%= (vendedor && vendedor.gerente_id === g.id) ? 'selected' : '' %>><%= g.nome_resumido %> - <%= g.nome_completo %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Nome Resumido (Chave Única) <span class="text-danger">*</span></label>
+                        <input type="text" name="nome_resumido" class="form-control" placeholder="Ex: JOAO.S" value="<%= vendedor ? vendedor.nome_resumido : '' %>" required style="text-transform: uppercase;">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-semibold">Status <span class="text-danger">*</span></label>
+                        <select name="ativo" class="form-select" required>
+                            <option value="1" <%= (!vendedor || vendedor.ativo === 1) ? 'selected' : '' %>>Ativo</option>
+                            <option value="0" <%= (vendedor && vendedor.ativo === 0) ? 'selected' : '' %>>Inativo</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-12">
+                        <label class="form-label fw-semibold">Nome Completo <span class="text-danger">*</span></label>
+                        <input type="text" name="nome_completo" class="form-control" placeholder="Nome completo do vendedor" value="<%= vendedor ? vendedor.nome_completo : '' %>" required>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Telefone</label>
+                        <input type="text" name="telefone" class="form-control" placeholder="(00) 00000-0000" value="<%= vendedor ? vendedor.telefone : '' %>">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">E-mail</label>
+                        <input type="email" name="email" class="form-control" placeholder="vendedor@email.com" value="<%= vendedor ? vendedor.email : '' %>">
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Banco</label>
+                        <input type="text" name="banco" class="form-control" placeholder="Ex: Itaú, Bradesco..." value="<%= vendedor ? vendedor.banco : '' %>">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Agência</label>
+                        <input type="text" name="agencia" class="form-control" placeholder="Número da agência" value="<%= vendedor ? vendedor.agencia : '' %>">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Conta</label>
+                        <input type="text" name="conta" class="form-control" placeholder="Número da conta" value="<%= vendedor ? vendedor.conta : '' %>">
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Tipo de Chave PIX</label>
+                        <select name="tipo_chave_pix" class="form-select">
+                            <option value="">Selecione...</option>
+                            <option value="CPF" <%= (vendedor && vendedor.tipo_chave_pix === 'CPF') ? 'selected' : '' %>>CPF</option>
+                            <option value="CNPJ" <%= (vendedor && vendedor.tipo_chave_pix === 'CNPJ') ? 'selected' : '' %>>CNPJ</option>
+                            <option value="E-mail" <%= (vendedor && vendedor.tipo_chave_pix === 'E-mail') ? 'selected' : '' %>>E-mail</option>
+                            <option value="Telefone" <%= (vendedor && vendedor.tipo_chave_pix === 'Telefone') ? 'selected' : '' %>>Telefone</option>
+                            <option value="Aleatória" <%= (vendedor && vendedor.tipo_chave_pix === 'Aleatória') ? 'selected' : '' %>>Aleatória</option>
+                        </select>
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label fw-semibold">Chave PIX</label>
+                        <input type="text" name="chave_pix" class="form-control" placeholder="Insira a chave PIX" value="<%= vendedor ? vendedor.chave_pix : '' %>">
+                    </div>
+
+                    <div class="col-12 mt-4">
+                        <button type="submit" class="btn text-white fw-semibold px-4" style="background-color: #20c997;"><i class="fa-solid fa-check me-1"></i> Gravar Vendedor</button>
+                        <a href="/vendedores" class="btn btn-secondary ms-2">Cancelar</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

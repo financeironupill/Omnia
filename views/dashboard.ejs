@@ -14,10 +14,11 @@
         .card-cobranca { border-left-color: #fd7e14; }
         .card-admin { border-left-color: #212529; }
         .card-clientes { border-left-color: #0d6efd; }
+        .card-gerentes { border-left-color: #6f42c1; }
+        .card-vendedores { border-left-color: #20c997; }
     </style>
 </head>
 <body>
-    <!-- Barra Superior de Navegação Desktop -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-4 shadow-sm">
         <div class="container-fluid">
             <a class="navbar-brand" href="/dashboard"><i class="fa-solid fa-cube me-2"></i>OMNIA <small class="text-muted fs-6">Enterprise</small></a>
@@ -28,7 +29,6 @@
         </div>
     </nav>
 
-    <!-- Conteúdo Principal em Largura Total (Ideal para Desktop) -->
     <div class="container-fluid px-4 py-4">
         <div class="row mb-4">
             <div class="col-12">
@@ -40,7 +40,6 @@
 
         <h5 class="mb-3 text-secondary text-uppercase fs-6 fw-bold">Módulos do Sistema</h5>
         <div class="row g-4 mb-4">
-            <!-- Módulo Solução -->
             <div class="col-md-6">
                 <div class="card card-modulo card-solucao shadow-sm h-100 p-3 bg-white rounded-3">
                     <div class="card-body d-flex flex-column justify-content-between">
@@ -56,7 +55,6 @@
                 </div>
             </div>
 
-            <!-- Omnia Cobrança -->
             <div class="col-md-6">
                 <div class="card card-modulo card-cobranca shadow-sm h-100 p-3 bg-white rounded-3">
                     <div class="card-body d-flex flex-column justify-content-between">
@@ -75,8 +73,7 @@
 
         <h5 class="mb-3 text-secondary text-uppercase fs-6 fw-bold">Cadastros Centrais</h5>
         <div class="row g-4 mb-4">
-            <!-- Gestão de Clientes -->
-            <div class="col-md-6">
+            <div class="col-md-4">
                 <div class="card card-modulo card-clientes shadow-sm h-100 p-3 bg-white rounded-3">
                     <div class="card-body d-flex flex-column justify-content-between">
                         <div>
@@ -84,15 +81,47 @@
                                 <div class="bg-primary text-white p-3 rounded-3 me-3"><i class="fa-solid fa-address-book fa-lg"></i></div>
                                 <h5 class="card-title fw-bold mb-0 text-primary">Gestão de Clientes</h5>
                             </div>
-                            <p class="card-text text-muted small">Base centralizada de clientes, dados cadastrais, moradas e informações bancárias/PIX.</p>
+                            <p class="card-text text-muted small">Base centralizada de clientes, moradas e informações bancárias/PIX.</p>
                         </div>
                         <a href="/clientes?origem=dashboard" class="btn btn-primary mt-3 w-100 fw-semibold"><i class="fa-solid fa-arrow-right me-1"></i> Aceder a Clientes</a>
                     </div>
                 </div>
             </div>
 
-            <!-- Administração Central (Apenas Admins) -->
-            <% if (usuario.nivel === 'Administrador') { %>
+            <div class="col-md-4">
+                <div class="card card-modulo card-gerentes shadow-sm h-100 p-3 bg-white rounded-3">
+                    <div class="card-body d-flex flex-column justify-content-between">
+                        <div>
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="bg-purple text-white p-3 rounded-3 me-3" style="background-color: #6f42c1;"><i class="fa-solid fa-user-tie fa-lg"></i></div>
+                                <h5 class="card-title fw-bold mb-0" style="color: #6f42c1;">Gestão de Gerentes</h5>
+                            </div>
+                            <p class="card-text text-muted small">Registo de gerentes com chave resumida, contactos e dados bancários/PIX.</p>
+                        </div>
+                        <a href="/gerentes" class="btn mt-3 w-100 fw-semibold text-white" style="background-color: #6f42c1;"><i class="fa-solid fa-arrow-right me-1"></i> Aceder a Gerentes</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card card-modulo card-vendedores shadow-sm h-100 p-3 bg-white rounded-3">
+                    <div class="card-body d-flex flex-column justify-content-between">
+                        <div>
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="bg-teal text-white p-3 rounded-3 me-3" style="background-color: #20c997;"><i class="fa-solid fa-user-tag fa-lg"></i></div>
+                                <h5 class="card-title fw-bold mb-0" style="color: #20c997;">Gestão de Vendedores</h5>
+                            </div>
+                            <p class="card-text text-muted small">Registo de vendedores vinculados a gerentes, com contactos e dados bancários/PIX.</p>
+                        </div>
+                        <a href="/vendedores" class="btn mt-3 w-100 fw-semibold text-white" style="background-color: #20c997;"><i class="fa-solid fa-arrow-right me-1"></i> Aceder a Vendedores</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <% if (usuario.nivel === 'Administrador') { %>
+            <h5 class="mb-3 text-secondary text-uppercase fs-6 fw-bold">Administração Central</h5>
+            <div class="row g-4">
                 <div class="col-md-6">
                     <div class="card card-modulo card-admin shadow-sm h-100 p-3 bg-white rounded-3">
                         <div class="card-body d-flex flex-column justify-content-between">
@@ -101,14 +130,14 @@
                                     <div class="bg-dark text-white p-3 rounded-3 me-3"><i class="fa-solid fa-users-gear fa-lg"></i></div>
                                     <h5 class="card-title fw-bold mb-0 text-dark">Utilizadores e Acessos</h5>
                                 </div>
-                                <p class="card-text text-muted small">Gestão de contas de operadores, níveis de permissão e segurança do sistema.</p>
+                                <p class="card-text text-muted small">Gestão de contas de operadores e níveis de permissão do sistema.</p>
                             </div>
                             <a href="/usuarios" class="btn btn-dark mt-3 w-100 fw-semibold"><i class="fa-solid fa-arrow-right me-1"></i> Gerir Utilizadores</a>
                         </div>
                     </div>
                 </div>
-            <% } %>
-        </div>
+            </div>
+        <% } %>
     </div>
 </body>
 </html>
