@@ -26,7 +26,7 @@
                 <label class="form-label">Nível de Acesso</label>
                 <select name="nivel" class="form-control" required>
                     <option value="Básico" <%= usuario && usuario.nivel === 'Básico' ? 'selected' : '' %>>Básico</option>
-                    <option value="Moderador" <%= usuario && usuario.nivel === 'Moderador' ? 'selected' : '' %>>Moderador</option>
+                    <option value="Moderado" <%= usuario && usuario.nivel === 'Moderado' ? 'selected' : '' %>>Moderado</option>
                     <option value="Administrador" <%= usuario && usuario.nivel === 'Administrador' ? 'selected' : '' %>>Administrador</option>
                 </select>
             </div>
