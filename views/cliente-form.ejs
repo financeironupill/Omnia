@@ -77,7 +77,7 @@
 
                     <div class="col-md-2">
                         <label class="form-label fw-semibold">UF</label>
-                        <input type="text" name="uf" id="uf" class="form-control" placeholder="EX: SP" value="<%= cliente ? (cliente.uf || '') : '' %>">
+                        <input type="text" name="uf" id="uf" class="form-control" placeholder="EX: SP" maxlength="2" value="<%= cliente ? (cliente.uf || '') : '' %>">
                     </div>
 
                     <div class="col-md-4">
@@ -127,7 +127,6 @@
                         <input type="text" name="chave_pix" class="form-control" placeholder="Insira a chave PIX" value="<%= cliente ? (cliente.chave_pix || '') : '' %>">
                     </div>
 
-                    <!-- BOTÕES DE AÇÃO RESTAURADOS -->
                     <div class="col-12 mt-4">
                         <button type="submit" class="btn btn-primary fw-semibold px-4"><i class="fa-solid fa-check me-1"></i> Gravar Cliente</button>
                         <a href="/clientes" class="btn btn-secondary ms-2">Cancelar</a>
@@ -151,7 +150,7 @@
                     document.getElementById('nome').value = data.razao_social || '';
                     document.getElementById('nome_fantasia').value = data.nome_fantasia || '';
                     document.getElementById('cidade').value = data.municipio || '';
-                    document.getElementById('uf').value = data.uf || '';
+                    document.getElementById('uf').value = (data.uf || '').substring(0, 2);
                     document.getElementById('telefone').value = data.ddd_telefone_1 || data.telefone || '';
                     document.getElementById('email').value = data.email || '';
                 } catch (error) {
