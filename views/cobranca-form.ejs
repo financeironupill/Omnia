@@ -55,7 +55,13 @@
 
                     <div class="col-md-4">
                         <label class="form-label fw-semibold">Banco</label>
-                        <input type="text" name="banco" class="form-control" placeholder="Ex: Itaú, Bradesco" value="<%= conta ? (conta.banco || '') : '' %>">
+                        <select name="banco" class="form-select">
+                            <option value="">Selecione o banco...</option>
+                            <option value="Bradesco" <%= conta && conta.banco === 'Bradesco' ? 'selected' : '' %>>Bradesco</option>
+                            <option value="Caixa Economica" <%= conta && conta.banco === 'Caixa Economica' ? 'selected' : '' %>>Caixa Economica</option>
+                            <option value="Banco do Brasil" <%= conta && conta.banco === 'Banco do Brasil' ? 'selected' : '' %>>Banco do Brasil</option>
+                            <option value="Santander" <%= conta && conta.banco === 'Santander' ? 'selected' : '' %>>Santander</option>
+                        </select>
                     </div>
 
                     <div class="col-md-4">
@@ -74,13 +80,15 @@
                     </div>
 
                     <div class="col-md-4">
-                        <label class="form-label fw-semibold">Tipo de Cobrança</label>
+                        <label class="form-label fw-semibold">Status da Cobrança</label>
                         <select name="tipo_cobranca" class="form-select">
                             <option value="">Selecione...</option>
-                            <option value="Boleto" <%= conta && conta.tipo_cobranca === 'Boleto' ? 'selected' : '' %>>Boleto</option>
-                            <option value="PIX" <%= conta && conta.tipo_cobranca === 'PIX' ? 'selected' : '' %>>PIX</option>
-                            <option value="Transferência" <%= conta && conta.tipo_cobranca === 'Transferência' ? 'selected' : '' %>>Transferência</option>
-                            <option value="Carteira" <%= conta && conta.tipo_cobranca === 'Carteira' ? 'selected' : '' %>>Carteira</option>
+                            <option value="Iniciar" <%= conta && conta.tipo_cobranca === 'Iniciar' ? 'selected' : '' %>>Iniciar</option>
+                            <option value="Em Cobrança" <%= conta && conta.tipo_cobranca === 'Em Cobrança' ? 'selected' : '' %>>Em Cobrança</option>
+                            <option value="Protestar" <%= conta && conta.tipo_cobranca === 'Protestar' ? 'selected' : '' %>>Protestar</option>
+                            <option value="Cartório" <%= conta && conta.tipo_cobranca === 'Cartório' ? 'selected' : '' %>>Cartório</option>
+                            <option value="Custas" <%= conta && conta.tipo_cobranca === 'Custas' ? 'selected' : '' %>>Custas</option>
+                            <option value="Pago" <%= conta && conta.tipo_cobranca === 'Pago' ? 'selected' : '' %>>Pago</option>
                         </select>
                     </div>
 
@@ -90,7 +98,7 @@
                             <option value="Vencido" <%= conta && conta.status_boleto === 'Vencido' ? 'selected' : '' %>>Vencido</option>
                             <option value="Em Aberto" <%= conta && conta.status_boleto === 'Em Aberto' ? 'selected' : '' %>>Em Aberto</option>
                             <option value="Pago" <%= conta && conta.status_boleto === 'Pago' ? 'selected' : '' %>>Pago</option>
-                            <option value="Custas" <%= conta && conta.status_boleto === 'Custas' ? 'selected' : '' %>>Custas</option>
+                            <option value="Pago com Pendência" <%= conta && conta.status_boleto === 'Pago com Pendência' ? 'selected' : '' %>>Pago com Pendência</option>
                         </select>
                     </div>
 
@@ -100,7 +108,7 @@
                     </div>
 
                     <div class="col-md-4">
-                        <label class="form-label fw-semibold">Status da Cobrança</label>
+                        <label class="form-label fw-semibold">Status da Cobrança (Operacional)</label>
                         <select name="status_cobranca" class="form-select">
                             <option value="Iniciar" <%= conta && conta.status_cobranca === 'Iniciar' ? 'selected' : '' %>>Iniciar</option>
                             <option value="Em Andamento" <%= conta && conta.status_cobranca === 'Em Andamento' ? 'selected' : '' %>>Em Andamento</option>
@@ -178,7 +186,6 @@
             document.getElementById('info_vendedor').value = vendedor;
         }
 
-        // Executa ao carregar caso já venha selecionado (modo edição)
         window.onload = function() {
             if(document.getElementById('cliente_id').value) {
                 atualizarGerenteVendedor();
