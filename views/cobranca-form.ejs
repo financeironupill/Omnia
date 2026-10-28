@@ -108,17 +108,6 @@
                     </div>
 
                     <div class="col-md-4">
-                        <label class="form-label fw-semibold">Status da Cobrança (Operacional)</label>
-                        <select name="status_cobranca" class="form-select">
-                            <option value="Iniciar" <%= conta && conta.status_cobranca === 'Iniciar' ? 'selected' : '' %>>Iniciar</option>
-                            <option value="Em Andamento" <%= conta && conta.status_cobranca === 'Em Andamento' ? 'selected' : '' %>>Em Andamento</option>
-                            <option value="Acordo" <%= conta && conta.status_cobranca === 'Acordo' ? 'selected' : '' %>>Acordo</option>
-                            <option value="Cartório" <%= conta && conta.status_cobranca === 'Cartório' ? 'selected' : '' %>>Cartório</option>
-                            <option value="Jurídico" <%= conta && conta.status_cobranca === 'Jurídico' ? 'selected' : '' %>>Jurídico</option>
-                        </select>
-                    </div>
-
-                    <div class="col-md-4">
                         <label class="form-label fw-semibold">Valor Custas (R$)</label>
                         <input type="text" name="valor_custas" class="form-control" placeholder="0,00" value="<%= conta ? (conta.valor_custas || '') : '' %>" oninput="mascaraMoeda(this)">
                     </div>
@@ -127,16 +116,8 @@
                         <label class="form-label fw-semibold">Carteira</label>
                         <select name="carteira" class="form-select">
                             <option value="Simples" <%= conta && conta.carteira === 'Simples' ? 'selected' : '' %>>Simples</option>
-                            <option value="Caucionada" <%= conta && conta.carteira === 'Caucionada' ? 'selected' : '' %>>Caucionada</option>
-                            <option value="Descontada" <%= conta && conta.carteira === 'Descontada' ? 'selected' : '' %>>Descontada</option>
-                        </select>
-                    </div>
-
-                    <div class="col-md-4">
-                        <label class="form-label fw-semibold">Tipo de Cadastro</label>
-                        <select name="cadastro_tipo" class="form-select">
-                            <option value="Normal" <%= conta && conta.cadastro_tipo === 'Normal' ? 'selected' : '' %>>Normal</option>
-                            <option value="Especial" <%= conta && conta.cadastro_tipo === 'Especial' ? 'selected' : '' %>>Especial</option>
+                            <option value="Descontado" <%= conta && conta.carteira === 'Descontado' ? 'selected' : '' %>>Descontado</option>
+                            <option value="Descontado e Devolvido" <%= conta && conta.carteira === 'Descontado e Devolvido' ? 'selected' : '' %>>Descontado e Devolvido</option>
                         </select>
                     </div>
 
@@ -146,6 +127,21 @@
                             <option value="Não Estornada" <%= conta && conta.comissao === 'Não Estornada' ? 'selected' : '' %>>Não Estornada</option>
                             <option value="Estornada" <%= conta && conta.comissao === 'Estornada' ? 'selected' : '' %>>Estornada</option>
                         </select>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Débito da Comissão</label>
+                        <input type="date" name="data_estorno" class="form-control" value="<%= conta && conta.data_estorno ? new Date(conta.data_estorno).toISOString().split('T')[0] : '' %>">
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Valor do Débito em Comissão (R$)</label>
+                        <input type="text" name="valor_debito_comissao" class="form-control" placeholder="0,00" value="<%= conta ? (conta.valor_debito_comissao || '') : '' %>" oninput="mascaraMoeda(this)">
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Data da Reposição da Comissão</label>
+                        <input type="date" name="data_reposicao" class="form-control" value="<%= conta && conta.data_reposicao ? new Date(conta.data_reposicao).toISOString().split('T')[0] : '' %>">
                     </div>
 
                     <div class="col-md-4">
