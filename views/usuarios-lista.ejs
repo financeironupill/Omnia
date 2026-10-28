@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>Utilizadores - Omnia</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+<body class="bg-light">
+    <div class="container mt-4">
+        <h2>Gestão de Utilizadores</h2>
+        <a href="/dashboard" class="btn btn-secondary mb-3">Voltar ao Dashboard</a>
+        <a href="/usuarios/novo" class="btn btn-primary mb-3">Novo Utilizador</a>
+        <% if (locals.sucesso && sucesso) { %> <div class="alert alert-success"><%= sucesso %></div> <% } %>
+        <% if (locals.erro && erro) { %> <div class="alert alert-danger"><%= erro %></div> <% } %>
+        <table class="table table-striped bg-white shadow-sm">
+            <thead>
+                <tr>
+                    <th>Nome</th>
+                    <th>Utilizador</th>
+                    <th>Nível</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% usuarios.forEach(u => { %>
+                    <tr>
+                        <td><%= u.nome %></td>
+                        <td><%= u.usuario %></td>
+                        <td><%= u.nivel %></td>
+                        <td>
+                            <a href="/usuarios/editar/<%= u.id %>" class="btn btn-sm btn-warning">Editar</a>
+                            <form action="/usuarios/excluir/<%= u.id %>" method="POST" style="display:inline;">
+                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Tem certeza?')">Excluir</button>
+                            </form>
+                        </td>
+                    </tr>
+                <% }) %>
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
