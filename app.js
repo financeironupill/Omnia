@@ -447,6 +447,36 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
     }
 });
 
+app.get('/cobranca/nova', verificarAutenticacao, async (req, res) => {
+    try {
+        const clientes = await pool.query('SELECT id, nome FROM clientes ORDER BY nome ASC');
+        res.render('cobranca-form', { conta: null, clientes: clientes.rows, erro: null, sucesso: null });
+    } catch (err) {
+        res.redirect('/cobranca?erro=Erro ao carregar formulário.');
+    }
+});
+
+app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
+    const { cliente_id, numero_documento, banco, valor_original, data_emissao, data_vencimento, tipo_cobranca, observacoes } = req.body;
+    try {
+        const sql = 'INSERT INTO contas_receber (cliente_id, numero_documento, banco, valor_original, valor_recebido, data_emissao, data_vencimento, status, tipo_cobranca, observacoes, criado_em, atualizado_em) VALUES ($1, $2, $3, $4, 0.00, $5, $6, \'Em Aberto\', $7, $8, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)';
+        await pool.query(sql, [
+            parseInt(cliente_id, 10),
+            numero_documento ? numero_documento.trim().toUpperCase() : '',
+            formatarCapitalizacao(banco),
+            parseFloat(valor_original) || 0,
+            data_emissao,
+            data_vencimento,
+            tipo_cobranca,
+            formatarCapitalizacao(observacoes)
+        ]);
+        res.redirect('/cobranca?sucesso=Cobrança cadastrada com sucesso!');
+    } catch (err) {
+        console.error(err);
+        res.redirect('/cobranca?erro=Erro ao cadastrar cobrança.');
+    }
+});
+
 app.get('/logout', (req, res) => {
     req.session.destroy();
     res.redirect('/login');
