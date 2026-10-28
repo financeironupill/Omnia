@@ -1,187 +1,184 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Omnia - <%= cliente ? 'Editar Cliente' : 'Cadastrar Novo Cliente' %></title>
-    <style>
-        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; }
-        .container { max-width: 900px; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin: 0 auto; }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
-        h2 { color: #333; margin: 0; }
-        
-        .form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 15px; }
-        .form-group { display: flex; flex-direction: column; }
-        .form-group.span-2 { grid-column: span 2; }
-        .form-group.full { grid-column: span 3; }
-        
-        label { font-size: 13px; font-weight: bold; color: #555; margin-bottom: 5px; }
-        input[type="text"], input[type="email"], select { padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; }
-        input.uppercase { text-transform: uppercase; }
-        input.titlecase { text-transform: capitalize; }
-        
-        .cnpj-group { display: flex; gap: 8px; }
-        .cnpj-group input { flex: 1; }
-        .btn-buscar { background-color: #17a2b8; color: white; border: none; padding: 0 15px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 13px; }
-        .btn-buscar:hover { background-color: #138496; }
-
-        .section-divider { grid-column: span 3; border-bottom: 1px dashed #ccc; margin: 10px 0; padding-bottom: 5px; font-weight: bold; color: #007bff; font-size: 14px; }
-
-        .btn-save { background-color: #28a745; color: white; border: none; padding: 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 15px; }
-        .btn-save:hover { background-color: #218838; }
-        .btn-cancel { background: #6c757d; color: white; padding: 12px; border-radius: 4px; text-decoration: none; font-weight: bold; font-size: 15px; text-align: center; display: inline-block; }
-        .btn-cancel:hover { background-color: #5a6268; }
-
-        .back-link { color: #007bff; text-decoration: none; font-weight: bold; }
-        .back-link:hover { text-decoration: underline; }
-    </style>
+    <title><%= cliente ? 'Editar Cliente' : 'Novo Cliente' %> - Omnia</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>body { background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }</style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h2><%= cliente ? 'Editar Cliente: ' + cliente.nome : 'Cadastrar Novo Cliente' %></h2>
-            <a href="/clientes" class="back-link">← Voltar à Lista</a>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-4 shadow-sm mb-4">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold" href="/dashboard"><i class="fa-solid fa-cube me-2"></i>OMNIA <small class="text-muted fs-6">Enterprise</small></a>
+            <a href="/clientes" class="btn btn-outline-light btn-sm"><i class="fa-solid fa-arrow-left me-1"></i> Voltar aos Clientes</a>
         </div>
+    </nav>
 
-        <form action="<%= cliente ? '/clientes/editar/' + cliente.id : '/clientes/novo' %>" method="POST">
-            <div class="form-grid">
-                <div class="form-group">
-                    <label for="tipo_pessoa">Tipo de Pessoa:</label>
-                    <select id="tipo_pessoa" name="tipo_pessoa" required onchange="alternarTipoPessoa()">
-                        <option value="PJ" <%= cliente && cliente.tipo_pessoa === 'PJ' ? 'selected' : '' %>>Pessoa Jurídica (CNPJ)</option>
-                        <option value="PF" <%= cliente && cliente.tipo_pessoa === 'PF' ? 'selected' : '' %>>Pessoa Física (CPF)</option>
-                    </select>
-                </div>
+    <div class="container-fluid px-4" style="max-width: 1000px;">
+        <div class="card shadow-sm border-0 rounded-3 p-4 bg-white">
+            <h3 class="fw-bold text-primary mb-1"><i class="fa-solid fa-address-book me-2"></i><%= cliente ? 'Editar Cliente' : 'Cadastrar Novo Cliente' %></h3>
+            <p class="text-muted small mb-3">Preencha os dados cadastrais, morada, dados bancários e vinculação de gerência/venda.</p>
+            <hr class="text-muted mb-4">
 
-                <div class="form-group span-2">
-                    <label for="cnpj_cpf">CPF / CNPJ:</label>
-                    <div class="cnpj-group">
-                        <input type="text" id="cnpj_cpf" name="cnpj_cpf" value="<%= cliente ? cliente.cnpj_cpf : '' %>" placeholder="Apenas números" required>
-                        <button type="button" id="btn-buscar-cnpj" class="btn-buscar" onclick="consultarCNPJ()">Buscar CNPJ</button>
+            <form action="<%= cliente ? '/clientes/editar/' + cliente.id : '/clientes/novo' %>" method="POST" id="clienteForm">
+                <div class="row g-3">
+                    <!-- SEÇÃO DE VINCULAÇÃO (Gerente e Vendedor) -->
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Gerente</label>
+                        <select name="gerente_id" id="gerenteSelect" class="form-select">
+                            <option value="">Selecione o gerente...</option>
+                            <% gerentes.forEach(g => { %>
+                                <option value="<%= g.id %>" <%= (cliente && cliente.gerente_id === g.id) ? 'selected' : '' %>><%= g.nome_resumido %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Vendedor</label>
+                        <select name="vendedor_id" id="vendedorSelect" class="form-select">
+                            <option value="">Selecione o vendedor...</option>
+                            <% vendedores.forEach(v => { %>
+                                <option value="<%= v.id %>" data-gerente="<%= v.gerente_id %>" <%= (cliente && cliente.vendedor_id === v.id) ? 'selected' : '' %>><%= v.nome_resumido %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+
+                    <hr class="my-3">
+
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">Tipo de Pessoa <span class="text-danger">*</span></label>
+                        <select name="tipo_pessoa" class="form-select" required>
+                            <option value="PJ" <%= (cliente && cliente.tipo_pessoa === 'PJ') ? 'selected' : '' %>>PJ (CNPJ)</option>
+                            <option value="PF" <%= (cliente && cliente.tipo_pessoa === 'PF') ? 'selected' : '' %>>PF (CPF)</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">CPF / CNPJ <span class="text-danger">*</span></label>
+                        <input type="text" name="cnpj_cpf" class="form-control" placeholder="Apenas números" value="<%= cliente ? cliente.cnpj_cpf : '' %>" required>
+                    </div>
+
+                    <div class="col-md-5">
+                        <label class="form-label fw-semibold">Razão Social / Nome <span class="text-danger">*</span></label>
+                        <input type="text" name="nome" class="form-control" placeholder="Nome principal" value="<%= cliente ? cliente.nome : '' %>" required>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Nome Fantasia</label>
+                        <input type="text" name="nome_fantasia" class="form-control" placeholder="Nome fantasia (se houver)" value="<%= cliente ? cliente.nome_fantasia : '' %>">
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">Cidade</label>
+                        <input type="text" name="cidade" class="form-control" placeholder="Cidade" value="<%= cliente ? cliente.cidade : '' %>">
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">UF</label>
+                        <input type="text" name="uf" class="form-control" placeholder="Ex: SP" maxlength="2" value="<%= cliente ? cliente.uf : '' %>" style="text-transform: uppercase;">
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Contato</label>
+                        <input type="text" name="contato" class="form-control" placeholder="Nome do contacto" value="<%= cliente ? cliente.contato : '' %>">
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Telefone</label>
+                        <input type="text" name="telefone" class="form-control" placeholder="(00) 00000-0000" value="<%= cliente ? cliente.telefone : '' %>">
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">E-mail</label>
+                        <input type="email" name="email" class="form-control" placeholder="email@empresa.com" value="<%= cliente ? cliente.email : '' %>">
+                    </div>
+
+                    <hr class="my-3">
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Banco</label>
+                        <input type="text" name="banco" class="form-control" placeholder="Nome do banco" value="<%= cliente ? cliente.banco : '' %>">
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Agência</label>
+                        <input type="text" name="agencia" class="form-control" placeholder="Agência" value="<%= cliente ? cliente.agencia : '' %>">
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Conta</label>
+                        <input type="text" name="conta" class="form-control" placeholder="Conta" value="<%= cliente ? cliente.conta : '' %>">
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Tipo Chave PIX</label>
+                        <select name="tipo_chave_pix" class="form-select">
+                            <option value="">Selecione...</option>
+                            <option value="CPF" <%= (cliente && cliente.tipo_chave_pix === 'CPF') ? 'selected' : '' %>>CPF</option>
+                            <option value="CNPJ" <%= (cliente && cliente.tipo_chave_pix === 'CNPJ') ? 'selected' : '' %>>CNPJ</option>
+                            <option value="E-mail" <%= (cliente && cliente.tipo_chave_pix === 'E-mail') ? 'selected' : '' %>>E-mail</option>
+                            <option value="Telefone" <%= (cliente && cliente.tipo_chave_pix === 'Telefone') ? 'selected' : '' %>>Telefone</option>
+                            <option value="Aleatória" <%= (cliente && cliente.tipo_chave_pix === 'Aleatória') ? 'selected' : '' %>>Aleatória</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-8">
+                        <label class="form-label fw-semibold">Chave PIX</label>
+                        <input type="text" name="chave_pix" class="form-control" placeholder="Insira a chave PIX" value="<%= cliente ? cliente.chave_pix : '' %>">
+                    </div>
+
+                    <div class="col-12 mt-4">
+                        <button type="submit" class="btn btn-primary fw-semibold px-4"><i class="fa-solid fa-check me-1"></i> Gravar Cliente</button>
+                        <a href="/clientes" class="btn btn-secondary ms-2">Cancelar</a>
                     </div>
                 </div>
-
-                <div class="form-group span-2">
-                    <label for="nome">Razão Social / Nome Completo:</label>
-                    <input type="text" id="nome" name="nome" class="titlecase" value="<%= cliente ? cliente.nome : '' %>" placeholder="Razão Social Ou Nome Completo" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="nome_fantasia">Nome Fantasia:</label>
-                    <input type="text" id="nome_fantasia" name="nome_fantasia" class="titlecase" value="<%= cliente ? cliente.nome_fantasia : '' %>" placeholder="Opcional Para PJ">
-                </div>
-
-                <div class="form-group">
-                    <label for="contato">Pessoa de Contato:</label>
-                    <input type="text" id="contato" name="contato" class="titlecase" value="<%= cliente ? cliente.contato : '' %>" placeholder="Ex: João Silva">
-                </div>
-
-                <div class="form-group">
-                    <label for="email">E-mail:</label>
-                    <input type="email" id="email" name="email" value="<%= cliente ? cliente.email : '' %>" placeholder="cliente@empresa.com">
-                </div>
-
-                <div class="form-group">
-                    <label for="telefone">Telefone:</label>
-                    <input type="text" id="telefone" name="telefone" value="<%= cliente ? cliente.telefone : '' %>" placeholder="(00) 00000-0000">
-                </div>
-
-                <div class="form-group span-2">
-                    <label for="cidade">Cidade:</label>
-                    <input type="text" id="cidade" name="cidade" class="titlecase" value="<%= cliente ? cliente.cidade : '' %>" placeholder="Cidade">
-                </div>
-
-                <div class="form-group">
-                    <label for="uf">UF:</label>
-                    <input type="text" id="uf" name="uf" class="uppercase" value="<%= cliente ? cliente.uf : '' %>" placeholder="UF" maxlength="2" oninput="this.value = this.value.toUpperCase()">
-                </div>
-
-                <div class="section-divider">Dados Bancários & PIX</div>
-
-                <div class="form-group">
-                    <label for="banco">Banco:</label>
-                    <input type="text" id="banco" name="banco" class="titlecase" value="<%= cliente ? cliente.banco : '' %>" placeholder="Ex: Banco Do Brasil">
-                </div>
-
-                <div class="form-group">
-                    <label for="agencia">Agência:</label>
-                    <input type="text" id="agencia" name="agencia" value="<%= cliente ? cliente.agencia : '' %>" placeholder="Ex: 1234-5">
-                </div>
-
-                <div class="form-group">
-                    <label for="conta">Conta Corrente:</label>
-                    <input type="text" id="conta" name="conta" value="<%= cliente ? cliente.conta : '' %>" placeholder="Ex: 12345-6">
-                </div>
-
-                <div class="form-group">
-                    <label for="tipo_chave_pix">Tipo de Chave PIX:</label>
-                    <select id="tipo_chave_pix" name="tipo_chave_pix">
-                        <option value="">Selecione...</option>
-                        <option value="CNPJ" <%= cliente && cliente.tipo_chave_pix === 'CNPJ' ? 'selected' : '' %>>CNPJ</option>
-                        <option value="CPF" <%= cliente && cliente.tipo_chave_pix === 'CPF' ? 'selected' : '' %>>CPF</option>
-                        <option value="E-mail" <%= cliente && cliente.tipo_chave_pix === 'E-mail' ? 'selected' : '' %>>E-mail</option>
-                        <option value="Telefone" <%= cliente && cliente.tipo_chave_pix === 'Telefone' ? 'selected' : '' %>>Telefone</option>
-                        <option value="Chave Aleatória" <%= cliente && cliente.tipo_chave_pix === 'Chave Aleatória' ? 'selected' : '' %>>Chave Aleatória</option>
-                    </select>
-                </div>
-
-                <div class="form-group span-2">
-                    <label for="chave_pix">Chave PIX:</label>
-                    <input type="text" id="chave_pix" name="chave_pix" value="<%= cliente ? cliente.chave_pix : '' %>" placeholder="Chave para pagamento">
-                </div>
-
-                <div class="form-group full" style="display: flex; gap: 10px; margin-top: 15px;">
-                    <button type="submit" class="btn-save" style="flex: 1;"><%= cliente ? 'Salvar Alterações' : 'Cadastrar Cliente' %></button>
-                    <a href="/clientes" class="btn-cancel" style="flex: 1;">Cancelar</a>
-                </div>
-            </div>
-        </form>
+            </form>
+        </div>
     </div>
 
+    <!-- SCRIPT DE LÓGICA DE VINCULAÇÃO (Gerente <-> Vendedor) -->
     <script>
-        function alternarTipoPessoa() {
-            const tipo = document.getElementById('tipo_pessoa').value;
-            const btnBuscar = document.getElementById('btn-buscar-cnpj');
-            if (tipo === 'PF') {
-                btnBuscar.style.display = 'none';
-            } else {
-                btnBuscar.style.display = 'block';
+        const gerenteSelect = document.getElementById('gerenteSelect');
+        const vendedorSelect = document.getElementById('vendedorSelect');
+        
+        // Guardar todas as opções originais de vendedores
+        const todasOpcoesVendedores = Array.from(vendedorSelect.options);
+
+        function atualizarFiltros(origem) {
+            const gerenteId = gerenteSelect.value;
+            const vendedorId = vendedorSelect.value;
+
+            if (origem === 'vendedor' && vendedorId) {
+                // Se o utilizador escolheu o vendedor primeiro, preenche o gerente automaticamente e bloqueia
+                const vendedorOption = vendedorSelect.options[vendedorSelect.selectedIndex];
+                const gerenteVinculado = vendedorOption.getAttribute('data-gerente');
+                if (gerenteVinculado) {
+                    gerenteSelect.value = gerenteVinculado;
+                    gerenteSelect.setAttribute('disabled', 'true'); // Bloqueia para não poder alterar
+                }
+            } else if (origem === 'gerente') {
+                // Se o utilizador escolheu o gerente primeiro, desbloqueia o gerente e filtra os vendedores
+                gerenteSelect.removeAttribute('disabled');
+                
+                vendedorSelect.innerHTML = '<option value="">Selecione o vendedor...</option>';
+                todasOpcoesVendedores.forEach(opt => {
+                    if (!opt.value) return;
+                    const gVinculado = opt.getAttribute('data-gerente');
+                    if (!gerenteId || gVinculado === gerenteId) {
+                        vendedorSelect.appendChild(opt.cloneNode(true));
+                    }
+                });
             }
         }
 
-        async function consultarCNPJ() {
-            const inputCnpj = document.getElementById('cnpj_cpf');
-            const cnpjLimpo = inputCnpj.value.replace(/\D/g, '');
+        gerenteSelect.addEventListener('change', () => atualizarFiltros('gerente'));
+        vendedorSelect.addEventListener('change', () => atualizarFiltros('vendedor'));
 
-            if (cnpjLimpo.length !== 14) {
-                alert('Por favor, digite um CNPJ válido com 14 dígitos.');
-                return;
-            }
-
-            try {
-                const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpjLimpo}`);
-                if (!response.ok) {
-                    throw new Error('CNPJ não encontrado.');
-                }
-                const data = await response.json();
-
-                document.getElementById('nome').value = data.razao_social || '';
-                document.getElementById('nome_fantasia').value = data.nome_fantasia || '';
-                document.getElementById('email').value = data.email || '';
-                document.getElementById('telefone').value = data.ddd_telefone_1 || '';
-                document.getElementById('cidade').value = data.municipio || '';
-                document.getElementById('uf').value = data.uf || '';
-
-                if (data.cnpj) {
-                    inputCnpj.value = data.cnpj;
-                }
-            } catch (error) {
-                alert('Não foi possível buscar os dados do CNPJ. Verifique o número ou preencha manualmente.');
-            }
-        }
-
-        // Executar ao carregar a página para ajustar a visibilidade do botão
-        window.onload = alternarTipoPessoa;
+        // Garantir que o campo disabled vai no submit para o backend receber o ID do gerente
+        document.getElementById('clienteForm').addEventListener('submit', () => {
+            gerenteSelect.removeAttribute('disabled');
+        });
     </script>
 </body>
 </html>

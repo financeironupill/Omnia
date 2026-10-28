@@ -11,7 +11,6 @@
     </style>
 </head>
 <body>
-    <!-- Barra Superior de Navegação Desktop -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-4 shadow-sm mb-4">
         <div class="container-fluid">
             <a class="navbar-brand fw-bold" href="/dashboard"><i class="fa-solid fa-cube me-2"></i>OMNIA <small class="text-muted fs-6">Enterprise</small></a>
@@ -21,7 +20,6 @@
         </div>
     </nav>
 
-    <!-- Conteúdo em Largura Total -->
     <div class="container-fluid px-4">
         <div class="card shadow-sm border-0 rounded-3 p-4 bg-white">
             <div class="d-flex justify-content-between align-items-center mb-3">
@@ -37,7 +35,6 @@
             <% if (locals.sucesso && sucesso) { %> <div class="alert alert-success py-2"><%= sucesso %></div> <% } %>
             <% if (locals.erro && erro) { %> <div class="alert alert-danger py-2"><%= erro %></div> <% } %>
 
-            <!-- Barra de Pesquisa -->
             <form method="GET" action="/clientes" class="row g-2 mb-4">
                 <input type="hidden" name="origem" value="<%= origemAtual %>">
                 <div class="col-md-10">
@@ -51,7 +48,6 @@
                 </div>
             </form>
 
-            <!-- Tabela Estilizada para Desktop -->
             <div class="table-responsive">
                 <table class="table table-hover table-striped align-middle bg-white mb-0 border">
                     <thead class="table-dark">
@@ -60,8 +56,8 @@
                             <th class="py-3">Tipo</th>
                             <th class="py-3">CPF / CNPJ</th>
                             <th class="py-3">Nome / Fantasia</th>
-                            <th class="py-3">Cidade / UF</th>
-                            <th class="py-3">PIX</th>
+                            <th class="py-3">Gerente / Vendedor</th>
+                            <th class="py-3">Cidade/UF</th>
                             <th class="py-3 text-end">Ações</th>
                         </tr>
                     </thead>
@@ -78,8 +74,11 @@
                                         <div class="fw-bold text-dark"><%= c.nome %></div>
                                         <% if (c.nome_fantasia) { %><small class="text-muted"><%= c.nome_fantasia %></small><% } %>
                                     </td>
+                                    <td>
+                                        <div><span class="badge" style="background-color: #6f42c1;">G: <%= c.gerente_nome || '--' %></span></div>
+                                        <div class="mt-1"><span class="badge" style="background-color: #20c997;">V: <%= c.vendedor_nome || '--' %></span></div>
+                                    </td>
                                     <td><%= c.cidade %> / <%= c.uf %></td>
-                                    <td><%= c.chave_pix || '--' %></td>
                                     <td class="text-end">
                                         <a href="/clientes/editar/<%= c.id %>" class="btn btn-sm btn-outline-warning text-dark px-2 me-1" title="Editar"><i class="fa-solid fa-pen"></i> Editar</a>
                                         <form action="/clientes/excluir/<%= c.id %>" method="POST" style="display:inline;">

@@ -183,19 +183,19 @@ app.post('/transportadoras/excluir/:id', verificarAutenticacao, async (req, res)
     }
 });
 
-// CLIENTES
+// CLIENTES (Atualizado com Gerente e Vendedor)
 app.get('/clientes', verificarAutenticacao, async (req, res) => {
     try {
         const { busca, ordenar, ordem, origem } = req.query;
         let col = ordenar === 'cnpj_cpf' ? 'cnpj_cpf' : (ordenar === 'nome' ? 'nome' : 'id');
         let dir = ordem === 'ASC' ? 'ASC' : 'DESC';
-        let query = 'SELECT * FROM clientes';
+        let query = 'SELECT c.*, g.nome_resumido AS gerente_nome, v.nome_resumido AS vendedor_nome FROM clientes c LEFT JOIN gerentes g ON c.gerente_id = g.id LEFT JOIN vendedores v ON c.vendedor_id = v.id';
         let params = [];
         if (busca && busca.trim() !== '') {
-            query += ' WHERE nome ILIKE $1 OR nome_fantasia ILIKE $1 OR cnpj_cpf ILIKE $1';
+            query += ' WHERE c.nome ILIKE $1 OR c.nome_fantasia ILIKE $1 OR c.cnpj_cpf ILIKE $1';
             params.push('%' + busca.trim() + '%');
         }
-        query += ' ORDER BY ' + col + ' ' + dir;
+        query += ' ORDER BY c.' + col + ' ' + dir;
         const result = await pool.query(query, params);
         res.render('clientes-lista', { 
             clientes: result.rows, 
@@ -207,21 +207,46 @@ app.get('/clientes', verificarAutenticacao, async (req, res) => {
             sucesso: null 
         });
     } catch (err) {
+        console.error(err);
         res.status(500).send('Erro interno');
     }
 });
 
-app.get('/clientes/novo', verificarAutenticacao, (req, res) => {
-    res.render('cliente-form', { cliente: null });
+app.get('/clientes/novo', verificarAutenticacao, async (req, res) => {
+    try {
+        const gerentes = await pool.query('SELECT id, nome_resumido FROM gerentes WHERE ativo = 1 ORDER BY nome_resumido ASC');
+        const vendedores = await pool.query('SELECT v.id, v.nome_resumido, v.gerente_id FROM vendedores v WHERE v.ativo = 1 ORDER BY v.nome_resumido ASC');
+        res.render('cliente-form', { cliente: null, gerentes: gerentes.rows, vendedores: vendedores.rows });
+    } catch (err) {
+        res.redirect('/clientes?erro=Erro ao carregar formulário.');
+    }
 });
 
 app.post('/clientes/novo', verificarAutenticacao, async (req, res) => {
-    const { tipo_pessoa, cnpj_cpf, nome, nome_fantasia, contato, email, telefone, cidade, uf, banco, agencia, conta, tipo_chave_pix, chave_pix } = req.body;
+    const { tipo_pessoa, cnpj_cpf, nome, nome_fantasia, contato, email, telefone, cidade, uf, banco, agencia, conta, tipo_chave_pix, chave_pix, gerente_id, vendedor_id } = req.body;
     try {
-        const sql = 'INSERT INTO clientes (tipo_pessoa, cnpj_cpf, nome, nome_fantasia, contato, email, telefone, cidade, uf, banco, agencia, conta, tipo_chave_pix, chave_pix, ativo) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 1)';
-        await pool.query(sql, [tipo_pessoa, cnpj_cpf ? cnpj_cpf.replace(/\D/g, '') : '', formatarCapitalizacao(nome), formatarCapitalizacao(nome_fantasia), formatarCapitalizacao(contato), email ? email.trim().toLowerCase() : '', telefone, formatarCapitalizacao(cidade), uf ? uf.trim().toUpperCase() : '', formatarCapitalizacao(banco), agencia, conta, tipo_chave_pix, chave_pix]);
+        const sql = 'INSERT INTO clientes (tipo_pessoa, cnpj_cpf, nome, nome_fantasia, contato, email, telefone, cidade, uf, banco, agencia, conta, tipo_chave_pix, chave_pix, gerente_id, vendedor_id, ativo) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 1)';
+        await pool.query(sql, [
+            tipo_pessoa, 
+            cnpj_cpf ? cnpj_cpf.replace(/\D/g, '') : '', 
+            formatarCapitalizacao(nome), 
+            formatarCapitalizacao(nome_fantasia), 
+            formatarCapitalizacao(contato), 
+            email ? email.trim().toLowerCase() : '', 
+            telefone, 
+            formatarCapitalizacao(cidade), 
+            uf ? uf.trim().toUpperCase() : '', 
+            formatarCapitalizacao(banco), 
+            agencia, 
+            conta, 
+            tipo_chave_pix, 
+            chave_pix,
+            gerente_id ? parseInt(gerente_id, 10) : null,
+            vendedor_id ? parseInt(vendedor_id, 10) : null
+        ]);
         res.redirect('/clientes?sucesso=Cadastrado com sucesso!');
     } catch (err) {
+        console.error(err);
         res.redirect('/clientes?erro=Erro ao cadastrar.');
     }
 });
@@ -230,19 +255,40 @@ app.get('/clientes/editar/:id', verificarAutenticacao, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM clientes WHERE id = $1', [req.params.id]);
         if (result.rows.length === 0) return res.redirect('/clientes?erro=Não encontrado.');
-        res.render('cliente-form', { cliente: result.rows[0] });
+        const gerentes = await pool.query('SELECT id, nome_resumido FROM gerentes WHERE ativo = 1 ORDER BY nome_resumido ASC');
+        const vendedores = await pool.query('SELECT v.id, v.nome_resumido, v.gerente_id FROM vendedores v WHERE v.ativo = 1 ORDER BY v.nome_resumido ASC');
+        res.render('cliente-form', { cliente: result.rows[0], gerentes: gerentes.rows, vendedores: vendedores.rows });
     } catch (err) {
         res.redirect('/clientes?erro=Erro ao carregar.');
     }
 });
 
 app.post('/clientes/editar/:id', verificarAutenticacao, async (req, res) => {
-    const { tipo_pessoa, cnpj_cpf, nome, nome_fantasia, contato, email, telefone, cidade, uf, banco, agencia, conta, tipo_chave_pix, chave_pix } = req.body;
+    const { tipo_pessoa, cnpj_cpf, nome, nome_fantasia, contato, email, telefone, cidade, uf, banco, agencia, conta, tipo_chave_pix, chave_pix, gerente_id, vendedor_id } = req.body;
     try {
-        const sql = 'UPDATE clientes SET tipo_pessoa = $1, cnpj_cpf = $2, nome = $3, nome_fantasia = $4, contato = $5, email = $6, telefone = $7, cidade = $8, uf = $9, banco = $10, agencia = $11, conta = $12, tipo_chave_pix = $13, chave_pix = $14 WHERE id = $15';
-        await pool.query(sql, [tipo_pessoa, cnpj_cpf ? cnpj_cpf.replace(/\D/g, '') : '', formatarCapitalizacao(nome), formatarCapitalizacao(nome_fantasia), formatarCapitalizacao(contato), email ? email.trim().toLowerCase() : '', telefone, formatarCapitalizacao(cidade), uf ? uf.trim().toUpperCase() : '', formatarCapitalizacao(banco), agencia, conta, tipo_chave_pix, chave_pix, req.params.id]);
+        const sql = 'UPDATE clientes SET tipo_pessoa = $1, cnpj_cpf = $2, nome = $3, nome_fantasia = $4, contato = $5, email = $6, telefone = $7, cidade = $8, uf = $9, banco = $10, agencia = $11, conta = $12, tipo_chave_pix = $13, chave_pix = $14, gerente_id = $15, vendedor_id = $16 WHERE id = $17';
+        await pool.query(sql, [
+            tipo_pessoa, 
+            cnpj_cpf ? cnpj_cpf.replace(/\D/g, '') : '', 
+            formatarCapitalizacao(nome), 
+            formatarCapitalizacao(nome_fantasia), 
+            formatarCapitalizacao(contato), 
+            email ? email.trim().toLowerCase() : '', 
+            telefone, 
+            formatarCapitalizacao(cidade), 
+            uf ? uf.trim().toUpperCase() : '', 
+            formatarCapitalizacao(banco), 
+            agencia, 
+            conta, 
+            tipo_chave_pix, 
+            chave_pix,
+            gerente_id ? parseInt(gerente_id, 10) : null,
+            vendedor_id ? parseInt(vendedor_id, 10) : null,
+            req.params.id
+        ]);
         res.redirect('/clientes?sucesso=Atualizado com sucesso!');
     } catch (err) {
+        console.error(err);
         res.redirect('/clientes?erro=Erro ao atualizar.');
     }
 });
@@ -296,7 +342,7 @@ app.post('/gerentes/novo', verificarAutenticacao, async (req, res) => {
         ]);
         res.redirect('/gerentes?sucesso=Gerente cadastrado com sucesso!');
     } catch (err) {
-        res.redirect('/gerentes?erro=Erro ao cadastrar (Nome Resumido duplicado?).');
+        res.redirect('/gerentes?erro=Erro ao cadastrar.');
     }
 });
 
@@ -611,7 +657,6 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
 
         const result = await pool.query(queryText, queryParams);
         
-        // Cálculo automático de dias vencidos para exibição
         const hoje = new Date();
         result.rows.forEach(c => {
             let dataFim = hoje;
@@ -658,10 +703,9 @@ app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
     } = req.body;
 
     try {
-        // Cálculo dos dias vencidos conforme a regra de negócio solicitada
         let diasVencidos = 0;
         const dataVenc = new Date(data_vencimento);
-        let dataFim = new Date(); // dia atual
+        let dataFim = new Date();
 
         if ((status_boleto === 'Custas' || status_boleto === 'Pago') && data_pagamento) {
             dataFim = new Date(data_pagamento);
