@@ -302,19 +302,30 @@ app.post('/clientes/excluir/:id', verificarAutenticacao, async (req, res) => {
     }
 });
 
-// GERENTES (Com ordenação A-Z / Z-A)
+// GERENTES (Com filtro de status e ordenação)
 app.get('/gerentes', verificarAutenticacao, async (req, res) => {
     try {
-        const { busca, ordenar, ordem } = req.query;
+        const { busca, ordenar, ordem, status } = req.query;
         let col = ordenar === 'nome_completo' ? 'nome_completo' : 'nome_resumido';
         let dir = ordem === 'DESC' ? 'DESC' : 'ASC';
+        let statusFiltro = status !== undefined ? status : '1';
 
-        let query = 'SELECT * FROM gerentes';
+        let query = 'SELECT * FROM gerentes WHERE 1=1';
         let params = [];
+        let idx = 1;
+
         if (busca && busca.trim() !== '') {
-            query += ' WHERE nome_resumido ILIKE $1 OR nome_completo ILIKE $1';
+            query += ' AND (nome_resumido ILIKE $' + idx + ' OR nome_completo ILIKE $' + idx + ')';
             params.push('%' + busca.trim() + '%');
+            idx++;
         }
+
+        if (statusFiltro !== '') {
+            query += ' AND ativo = $' + idx;
+            params.push(parseInt(statusFiltro, 10));
+            idx++;
+        }
+
         query += ' ORDER BY ' + col + ' ' + dir;
 
         const result = await pool.query(query, params);
@@ -323,10 +334,12 @@ app.get('/gerentes', verificarAutenticacao, async (req, res) => {
             buscaAtual: busca || '', 
             ordenarAtual: col, 
             ordemAtual: dir, 
+            statusAtual: statusFiltro,
             erro: null, 
             sucesso: null 
         });
     } catch (err) {
+        console.error(err);
         res.status(500).send('Erro interno');
     }
 });
@@ -423,19 +436,30 @@ app.post('/gerentes/excluir/:id', verificarAutenticacao, async (req, res) => {
     }
 });
 
-// VENDEDORES (Com ordenação A-Z / Z-A)
+// VENDEDORES (Com filtro de status e ordenação)
 app.get('/vendedores', verificarAutenticacao, async (req, res) => {
     try {
-        const { busca, ordenar, ordem } = req.query;
+        const { busca, ordenar, ordem, status } = req.query;
         let col = ordenar === 'nome_completo' ? 'v.nome_completo' : (ordenar === 'gerente' ? 'g.nome_resumido' : 'v.nome_resumido');
         let dir = ordem === 'DESC' ? 'DESC' : 'ASC';
+        let statusFiltro = status !== undefined ? status : '1';
 
         let query = 'SELECT v.*, g.nome_resumido AS gerente_nome FROM vendedores v LEFT JOIN gerentes g ON v.gerente_id = g.id WHERE 1=1';
         let params = [];
+        let idx = 1;
+
         if (busca && busca.trim() !== '') {
-            query += ' AND (v.nome_resumido ILIKE $1 OR v.nome_completo ILIKE $1 OR g.nome_resumido ILIKE $1)';
+            query += ' AND (v.nome_resumido ILIKE $' + idx + ' OR v.nome_completo ILIKE $' + idx + ' OR g.nome_resumido ILIKE $' + idx + ')';
             params.push('%' + busca.trim() + '%');
+            idx++;
         }
+
+        if (statusFiltro !== '') {
+            query += ' AND v.ativo = $' + idx;
+            params.push(parseInt(statusFiltro, 10));
+            idx++;
+        }
+
         query += ' ORDER BY ' + col + ' ' + dir;
 
         const result = await pool.query(query, params);
@@ -444,10 +468,12 @@ app.get('/vendedores', verificarAutenticacao, async (req, res) => {
             buscaAtual: busca || '', 
             ordenarAtual: ordenar || 'nome_resumido', 
             ordemAtual: dir, 
+            statusAtual: statusFiltro,
             erro: null, 
             sucesso: null 
         });
     } catch (err) {
+        console.error(err);
         res.status(500).send('Erro interno');
     }
 });

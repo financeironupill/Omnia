@@ -38,14 +38,21 @@
             <form method="GET" action="/gerentes" class="row g-2 mb-4">
                 <input type="hidden" name="ordenar" value="<%= ordenarAtual %>">
                 <input type="hidden" name="ordem" value="<%= ordemAtual %>">
-                <div class="col-md-10">
+                <div class="col-md-7">
                     <div class="input-group">
                         <span class="input-group-text bg-light"><i class="fa-solid fa-search text-muted"></i></span>
                         <input type="text" name="busca" class="form-control" placeholder="Pesquisar por Nome Resumido ou Nome Completo..." value="<%= buscaAtual %>">
                     </div>
                 </div>
+                <div class="col-md-3">
+                    <select name="status" class="form-select">
+                        <option value="1" <%= statusAtual === '1' ? 'selected' : '' %>>Ativos (Padrão)</option>
+                        <option value="0" <%= statusAtual === '0' ? 'selected' : '' %>>Inativos</option>
+                        <option value="" <%= statusAtual === '' ? 'selected' : '' %>>Todos (Ativos e Inativos)</option>
+                    </select>
+                </div>
                 <div class="col-md-2">
-                    <button type="submit" class="btn w-100 fw-semibold text-white" style="background-color: #6f42c1;">Pesquisar</button>
+                    <button type="submit" class="btn w-100 fw-semibold text-white" style="background-color: #6f42c1;">Filtrar</button>
                 </div>
             </form>
 
@@ -55,10 +62,8 @@
                         <tr>
                             <th class="py-3" style="width: 80px;">ID</th>
                             <th class="py-3">
-                                <% 
-                                    let novaOrdemResumido = (ordenarAtual === 'nome_resumido' && ordemAtual === 'ASC') ? 'DESC' : 'ASC';
-                                %>
-                                <a href="/gerentes?busca=<%= buscaAtual %>&ordenar=nome_resumido&ordem=<%= novaOrdemResumido %>" class="sort-link">
+                                <% let novaOrdemResumido = (ordenarAtual === 'nome_resumido' && ordemAtual === 'ASC') ? 'DESC' : 'ASC'; %>
+                                <a href="/gerentes?busca=<%= buscaAtual %>&status=<%= statusAtual %>&ordenar=nome_resumido&ordem=<%= novaOrdemResumido %>" class="sort-link">
                                     <span>Nome Resumido (Chave)</span>
                                     <span>
                                         <% if (ordenarAtual === 'nome_resumido') { %>
@@ -70,10 +75,8 @@
                                 </a>
                             </th>
                             <th class="py-3">
-                                <% 
-                                    let novaOrdemCompleto = (ordenarAtual === 'nome_completo' && ordemAtual === 'ASC') ? 'DESC' : 'ASC';
-                                %>
-                                <a href="/gerentes?busca=<%= buscaAtual %>&ordenar=nome_completo&ordem=<%= novaOrdemCompleto %>" class="sort-link">
+                                <% let novaOrdemCompleto = (ordenarAtual === 'nome_completo' && ordemAtual === 'ASC') ? 'DESC' : 'ASC'; %>
+                                <a href="/gerentes?busca=<%= buscaAtual %>&status=<%= statusAtual %>&ordenar=nome_completo&ordem=<%= novaOrdemCompleto %>" class="sort-link">
                                     <span>Nome Completo</span>
                                     <span>
                                         <% if (ordenarAtual === 'nome_completo') { %>
