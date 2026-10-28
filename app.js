@@ -338,7 +338,7 @@ app.get('/gerentes', verificarAutenticacao, async (req, res) => {
         let idx = 1;
 
         if (busca && busca.trim() !== '') {
-            query += ' AND (nome_resumido ILIKE $' + idx + ' OR nome_completo ILIKE$' + idx + ')';
+            query += ' AND (nome_resumido ILIKE $' + idx + ' OR nome_completo ILIKE $' + idx + ')';
             params.push('%' + busca.trim() + '%');
             idx++;
         }
@@ -471,7 +471,7 @@ app.get('/vendedores', verificarAutenticacao, async (req, res) => {
         let idx = 1;
 
         if (busca && busca.trim() !== '') {
-            query += ' AND (v.nome_resumido ILIKE $' + idx + ' OR v.nome_completo ILIKE $' + idx + ' OR g.nome_resumido ILIKE$' + idx + ')';
+            query += ' AND (v.nome_resumido ILIKE $' + idx + ' OR v.nome_completo ILIKE $' + idx + ' OR g.nome_resumido ILIKE $' + idx + ')';
             params.push('%' + busca.trim() + '%');
             idx++;
         }
@@ -512,4 +512,399 @@ app.get('/vendedores/novo', verificarAutenticacao, async (req, res) => {
 app.post('/vendedores/novo', verificarAutenticacao, async (req, res) => {
     const { gerente_id, nome_resumido, nome_completo, telefone, email, banco, agencia, conta, tipo_chave_pix, chave_pix, ativo } = req.body;
     try {
-        const sql = 'INSERT INTO vendedores (gerente_id, nome_resumido, nome_completo, telefone, email, banco, agencia, conta, tipo_chave_pix, chave_pix, ativo) VALUES ($1, $2, $3, $4, $5, $6, $7, $
+        const sql = 'INSERT INTO vendedores (gerente_id, nome_resumido, nome_completo, telefone, email, banco, agencia, conta, tipo_chave_pix, chave_pix, ativo) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)';
+        await pool.query(sql, [
+            gerente_id ? parseInt(gerente_id, 10) : null,
+            nome_resumido ? nome_resumido.trim().toUpperCase() : '',
+            formatarCapitalizacao(nome_completo),
+            telefone,
+            email ? email.trim().toLowerCase() : '',
+            formatarCapitalizacao(banco),
+            agencia,
+            conta,
+            tipo_chave_pix,
+            chave_pix,
+            ativo ? parseInt(ativo, 10) : 1
+        ]);
+        res.redirect('/vendedores?sucesso=Vendedor cadastrado com sucesso!');
+    } catch (err) {
+        res.redirect('/vendedores?erro=Erro ao cadastrar.');
+    }
+});
+
+app.get('/vendedores/editar/:id', verificarAutenticacao, async (req, res) => {
+    try {
+        const vendedorRes = await pool.query('SELECT * FROM vendedores WHERE id = $1', [req.params.id]);
+        if (vendedorRes.rows.length === 0) return res.redirect('/vendedores?erro=Não encontrado.');
+        const gerentes = await pool.query('SELECT id, nome_resumido, nome_completo FROM gerentes ORDER BY nome_resumido ASC');
+        res.render('vendedor-form', { vendedor: vendedorRes.rows[0], gerentes: gerentes.rows, erro: null });
+    } catch (err) {
+        res.redirect('/vendedores?erro=Erro ao carregar.');
+    }
+});
+
+app.post('/vendedores/editar/:id', verificarAutenticacao, async (req, res) => {
+    const { gerente_id, nome_resumido, nome_completo, telefone, email, banco, agencia, conta, tipo_chave_pix, chave_pix, ativo } = req.body;
+    try {
+        const sql = 'UPDATE vendedores SET gerente_id = $1, nome_resumido = $2, nome_completo = $3, telefone = $4, email = $5, banco = $6, agencia = $7, conta = $8, tipo_chave_pix = $9, chave_pix = $10, ativo = $11 WHERE id = $12';
+        await pool.query(sql, [
+            gerente_id ? parseInt(gerente_id, 10) : null,
+            nome_resumido ? nome_resumido.trim().toUpperCase() : '',
+            formatarCapitalizacao(nome_completo),
+            telefone,
+            email ? email.trim().toLowerCase() : '',
+            formatarCapitalizacao(banco),
+            agencia,
+            conta,
+            tipo_chave_pix,
+            chave_pix,
+            ativo ? parseInt(ativo, 10) : 1,
+            req.params.id
+        ]);
+        res.redirect('/vendedores?sucesso=Vendedor atualizado com sucesso!');
+    } catch (err) {
+        res.redirect('/vendedores?erro=Erro ao atualizar.');
+    }
+});
+
+app.post('/vendedores/excluir/:id', verificarAutenticacao, async (req, res) => {
+    try {
+        await pool.query('DELETE FROM vendedores WHERE id = $1', [req.params.id]);
+        res.redirect('/vendedores?sucesso=Vendedor excluído!');
+    } catch (err) {
+        res.redirect('/vendedores?erro=Erro ao excluir.');
+    }
+});
+
+// OCORRÊNCIAS
+app.get('/ocorrencias', verificarAutenticacao, async (req, res) => {
+    try {
+        const { busca, tipo_id, cliente_nome_busca, transportadora_nome_busca, status, ordenar, ordem } = req.query;
+        let queryText = 'SELECT o.*, t.descricao AS tipo_descricao, tr.nome AS transportadora_nome, u.nome AS usuario_nome FROM ocorrencias o LEFT JOIN tipos_ocorrencia t ON o.tipo_ocorrencia_id = t.id LEFT JOIN transportadoras tr ON o.transportadora_id = tr.id LEFT JOIN usuarios u ON o.usuario_id = u.id WHERE 1=1';
+        let queryParams = [];
+        let idx = 1;
+
+        if (busca && busca.trim() !== '') {
+            queryText += ' AND (o.numero ILIKE $' + idx + ' OR o.nf_origem ILIKE $' + idx + ' OR o.nfd ILIKE $' + idx + ' OR o.cliente_nome ILIKE $' + idx + ' OR tr.nome ILIKE $' + idx + ')';
+            queryParams.push('%' + busca.trim() + '%');
+            idx++;
+        }
+        if (tipo_id) { 
+            queryText += ' AND o.tipo_ocorrencia_id = $' + idx; 
+            queryParams.push(parseInt(tipo_id, 10)); 
+            idx++; 
+        }
+
+        let clienteIdFiltro = '';
+        if (cliente_nome_busca && cliente_nome_busca.trim() !== '') {
+            const cliRes = await pool.query('SELECT id FROM clientes WHERE UPPER(TRIM(nome)) = UPPER(TRIM($1))', [cliente_nome_busca]);
+            if (cliRes.rows.length > 0) {
+                clienteIdFiltro = cliRes.rows[0].id;
+                queryText += ' AND o.cliente_id = $' + idx;
+                queryParams.push(clienteIdFiltro);
+                idx++;
+            } else {
+                queryText += ' AND 1 = 0'; 
+            }
+        }
+
+        let transportadoraIdFiltro = '';
+        if (transportadora_nome_busca && transportadora_nome_busca.trim() !== '') {
+            const transpRes = await pool.query('SELECT id FROM transportadoras WHERE UPPER(TRIM(nome)) = UPPER(TRIM($1))', [transportadora_nome_busca]);
+            if (transpRes.rows.length > 0) {
+                transportadoraIdFiltro = transpRes.rows[0].id;
+                queryText += ' AND o.transportadora_id = $' + idx;
+                queryParams.push(transportadoraIdFiltro);
+                idx++;
+            } else {
+                queryText += ' AND 1 = 0'; 
+            }
+        }
+
+        let statusFiltro = status !== undefined ? status : 'Em Aberto';
+        if (statusFiltro && statusFiltro !== '') {
+            queryText += ' AND o.status = $' + idx; 
+            queryParams.push(statusFiltro); 
+            idx++; 
+        }
+
+        let col = 'o.id';
+        if (ordenar === 'tipo') col = 't.descricao';
+        if (ordenar === 'cliente') col = 'o.cliente_nome';
+        if (ordenar === 'nf') col = 'o.nf_origem';
+        if (ordenar === 'status') col = 'o.status';
+
+        let dir = ordem === 'ASC' ? 'ASC' : 'DESC';
+        queryText += ' ORDER BY ' + col + ' ' + dir;
+
+        const result = await pool.query(queryText, queryParams);
+        const tipos = await pool.query('SELECT id, descricao FROM tipos_ocorrencia ORDER BY descricao ASC');
+        const clientes = await pool.query('SELECT id, nome FROM clientes ORDER BY nome ASC');
+        const transportadoras = await pool.query('SELECT id, nome FROM transportadoras ORDER BY nome ASC');
+
+        res.render('ocorrencias-lista', { 
+            ocorrencias: result.rows, tipos: tipos.rows, clientes: clientes.rows, transportadoras: transportadoras.rows,
+            buscaAtual: busca || '', tipoAtual: tipo_id || '', clienteAtual: clienteIdFiltro, 
+            transportadoraAtual: transportadoraIdFiltro, statusAtual: statusFiltro, 
+            ordenarAtual: ordenar || 'id', ordemAtual: dir, erro: null, sucesso: null 
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Erro interno');
+    }
+});
+
+app.get('/ocorrencias/nova', verificarAutenticacao, async (req, res) => {
+    try {
+        const tipos = await pool.query('SELECT id, descricao FROM tipos_ocorrencia ORDER BY descricao ASC');
+        const clientes = await pool.query('SELECT id, nome FROM clientes ORDER BY nome ASC');
+        const transportadoras = await pool.query('SELECT id, nome FROM transportadoras ORDER BY nome ASC');
+        res.render('ocorrencia-form', { ocorrencia: null, tipos: tipos.rows, clientes: clientes.rows, transportadoras: transportadoras.rows, numeroSugerido: gerarNumeroOcorrencia() });
+    } catch (err) {
+        res.redirect('/ocorrencias?erro=Erro ao carregar.');
+    }
+});
+
+app.post('/ocorrencias/novo', verificarAutenticacao, async (req, res) => {
+    const { tipo_ocorrencia_id, cliente_id, transportadora_id, nf_origem, valor_nf_origem, vencimento_atual, nfd, tipo_financeiro, valor_financeiro, descricao_problema } = req.body;
+    try {
+        const cli = await pool.query('SELECT nome FROM clientes WHERE id = $1', [cliente_id]);
+        const cliNome = cli.rows.length > 0 ? cli.rows[0].nome : '';
+        const sql = 'INSERT INTO ocorrencias (numero, tipo_ocorrencia_id, cliente_id, transportadora_id, usuario_id, cliente_nome, nf_origem, valor_nf_origem, vencimento_atual, nfd, tipo_financeiro, valor_financeiro, descricao_problema, status, criado_em, atualizado_em) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, \'Em Aberto\', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)';
+        await pool.query(sql, [gerarNumeroOcorrencia(), parseInt(tipo_ocorrencia_id, 10), parseInt(cliente_id, 10), transportadora_id ? parseInt(transportadora_id, 10) : null, req.session.usuario.id, cliNome, nf_origem ? nf_origem.trim().toUpperCase() : '', valor_nf_origem ? parseFloat(valor_nf_origem) : null, vencimento_atual || null, nfd ? nfd.trim().toUpperCase() : '', tipo_financeiro || null, valor_financeiro ? parseFloat(valor_financeiro) : null, formatarCapitalizacao(descricao_problema)]);
+        res.redirect('/ocorrencias?sucesso=Ocorrência registrada!');
+    } catch (err) {
+        console.error(err);
+        res.redirect('/ocorrencias?erro=Erro ao registrar.');
+    }
+});
+
+app.get('/ocorrencias/detalhes/:id', verificarAutenticacao, async (req, res) => {
+    try {
+        const sql = 'SELECT o.*, t.descricao AS tipo_descricao, tr.nome AS transportadora_nome, c.nome AS cliente_nome_real, u.nome AS usuario_nome FROM ocorrencias o LEFT JOIN tipos_ocorrencia t ON o.tipo_ocorrencia_id = t.id LEFT JOIN transportadoras tr ON o.transportadora_id = tr.id LEFT JOIN clientes c ON o.cliente_id = c.id LEFT JOIN usuarios u ON o.usuario_id = u.id WHERE o.id = $1';
+        const result = await pool.query(sql, [req.params.id]);
+        if (result.rows.length === 0) return res.redirect('/ocorrencias?erro=Não encontrada.');
+        res.render('ocorrencia-detalhes', { ocorrencia: result.rows[0], erro: null, sucesso: null });
+    } catch (err) {
+        res.redirect('/ocorrencias?erro=Erro.');
+    }
+});
+
+app.get('/ocorrencias/editar/:id', verificarAutenticacao, async (req, res) => {
+    try {
+        const edit = await pool.query('SELECT * FROM ocorrencias WHERE id = $1', [req.params.id]);
+        if (edit.rows.length === 0) return res.redirect('/ocorrencias?erro=Não encontrada.');
+        const tipos = await pool.query('SELECT id, descricao FROM tipos_ocorrencia ORDER BY descricao ASC');
+        const clientes = await pool.query('SELECT id, nome FROM clientes ORDER BY nome ASC');
+        const transportadoras = await pool.query('SELECT id, nome FROM transportadoras ORDER BY nome ASC');
+        res.render('ocorrencia-form', { ocorrencia: edit.rows[0], tipos: tipos.rows, clientes: clientes.rows, transportadoras: transportadoras.rows, numeroSugerido: edit.rows[0].numero });
+    } catch (err) {
+        res.redirect('/ocorrencias?erro=Erro.');
+    }
+});
+
+app.post('/ocorrencias/editar/:id', verificarAutenticacao, async (req, res) => {
+    const { tipo_ocorrencia_id, cliente_id, transportadora_id, nf_origem, valor_nf_origem, vencimento_atual, nfd, tipo_financeiro, valor_financeiro, status, descricao_problema, solucao_aplicada } = req.body;
+    try {
+        const cli = await pool.query('SELECT nome FROM clientes WHERE id = $1', [cliente_id]);
+        const cliNome = cli.rows.length > 0 ? cli.rows[0].nome : '';
+        const sql = 'UPDATE ocorrencias SET tipo_ocorrencia_id = $1, cliente_id = $2, transportadora_id = $3, cliente_nome = $4, nf_origem = $5, valor_nf_origem = $6, vencimento_atual = $7, nfd = $8, tipo_financeiro = $9, valor_financeiro = $10, status = $11, descricao_problema = $12, solucao_aplicada = $13, atualizado_em = CURRENT_TIMESTAMP WHERE id = $14';
+        await pool.query(sql, [parseInt(tipo_ocorrencia_id, 10), parseInt(cliente_id, 10), transportadora_id ? parseInt(transportadora_id, 10) : null, cliNome, nf_origem ? nf_origem.trim().toUpperCase() : '', valor_nf_origem ? parseFloat(valor_nf_origem) : null, vencimento_atual || null, nfd ? nfd.trim().toUpperCase() : '', tipo_financeiro || null, valor_financeiro ? parseFloat(valor_financeiro) : null, status, formatarCapitalizacao(descricao_problema), formatarCapitalizacao(solucao_aplicada), req.params.id]);
+        res.redirect('/ocorrencias?sucesso=Atualizada com sucesso!');
+    } catch (err) {
+        console.error(err);
+        res.redirect('/ocorrencias?erro=Erro ao atualizar.');
+    }
+});
+
+app.post('/ocorrencias/excluir/:id', verificarAutenticacao, async (req, res) => {
+    try {
+        await pool.query('DELETE FROM ocorrencias WHERE id = $1', [req.params.id]);
+        res.redirect('/ocorrencias?sucesso=Excluída!');
+    } catch (err) {
+        res.redirect('/ocorrencias?erro=Erro ao excluir.');
+    }
+});
+
+// OMNIA COBRANÇA
+app.get('/cobranca', verificarAutenticacao, async (req, res) => {
+    try {
+        const { busca, status, gerente_id, vendedor_id } = req.query;
+        let queryText = `
+            SELECT c.*, cl.nome AS cliente_nome, cl.cnpj_cpf AS cliente_cnpj, 
+                   g.nome_resumido AS gerente_nome, v.nome_resumido AS vendedor_nome 
+            FROM contas_receber c 
+            LEFT JOIN clientes cl ON c.cliente_id = cl.id 
+            LEFT JOIN gerentes g ON c.gerente_id = g.id 
+            LEFT JOIN vendedores v ON c.vendedor_id = v.id 
+            WHERE 1=1
+        `;
+        let queryParams = [];
+        let idx = 1;
+
+        if (busca && busca.trim() !== '') {
+            queryText += ' AND (c.numero_documento ILIKE $' + idx + ' OR cl.nome ILIKE $' + idx + ' OR c.banco ILIKE $' + idx + ')';
+            queryParams.push('%' + busca.trim() + '%');
+            idx++;
+        }
+
+        let statusFiltro = status !== undefined ? status : 'Em Aberto';
+        if (statusFiltro && statusFiltro !== '') {
+            queryText += ' AND c.status = $' + idx;
+            queryParams.push(statusFiltro);
+            idx++;
+        }
+
+        if (gerente_id && gerente_id !== '') {
+            queryText += ' AND c.gerente_id = $' + idx;
+            queryParams.push(parseInt(gerente_id, 10));
+            idx++;
+        }
+
+        if (vendedor_id && vendedor_id !== '') {
+            queryText += ' AND c.vendedor_id = $' + idx;
+            queryParams.push(parseInt(vendedor_id, 10));
+            idx++;
+        }
+
+        queryText += ' ORDER BY c.data_vencimento ASC';
+
+        const result = await pool.query(queryText, queryParams);
+        const gerentes = await pool.query('SELECT id, nome_resumido FROM gerentes WHERE ativo = 1 ORDER BY nome_resumido ASC');
+        const vendedores = await pool.query('SELECT id, nome_resumido FROM vendedores WHERE ativo = 1 ORDER BY nome_resumido ASC');
+        
+        const hoje = new Date();
+        result.rows.forEach(c => {
+            let dataFim = hoje;
+            if ((c.status_boleto === 'Custas' || c.status_boleto === 'Pago') && c.data_pagamento) {
+                dataFim = new Date(c.data_pagamento);
+            }
+            if (c.data_vencimento) {
+                const diffTime = dataFim - new Date(c.data_vencimento);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                c.dias_vencidos_calc = diffDays > 0 ? diffDays : 0;
+            } else {
+                c.dias_vencidos_calc = 0;
+            }
+        });
+
+        res.render('cobranca-lista', { 
+            contas: result.rows, 
+            gerentes: gerentes.rows,
+            vendedores: vendedores.rows,
+            buscaAtual: busca || '', 
+            statusAtual: statusFiltro, 
+            gerenteAtual: gerente_id || '',
+            vendedorAtual: vendedor_id || '',
+            erro: null, 
+            sucesso: null 
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Erro interno');
+    }
+});
+
+app.get('/cobranca/nova', verificarAutenticacao, async (req, res) => {
+    try {
+        const clientes = await pool.query(`
+            SELECT c.id, c.nome, c.gerente_id, c.vendedor_id, 
+                   g.nome_resumido AS gerente_nome, v.nome_resumido AS vendedor_nome 
+            FROM clientes c 
+            LEFT JOIN gerentes g ON c.gerente_id = g.id 
+            LEFT JOIN vendedores v ON c.vendedor_id = v.id 
+            WHERE c.ativo = 1 
+            ORDER BY c.nome ASC
+        `);
+        res.render('cobranca-form', { conta: null, clientes: clientes.rows, erro: null, sucesso: null });
+    } catch (err) {
+        console.error(err);
+        res.redirect('/cobranca?erro=Erro ao carregar formulário.');
+    }
+});
+
+app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
+    const { 
+        cliente_id, numero_documento, banco, valor_original, data_emissao, data_vencimento, 
+        tipo_cobranca, observacoes, status_boleto, data_pagamento, status_cobranca, 
+        valor_custas, carteira, debito_conta_corrente, cadastro_tipo, data_cartorio, 
+        comissao, data_estorno, data_reposicao 
+    } = req.body;
+
+    try {
+        const cliRes = await pool.query('SELECT gerente_id, vendedor_id FROM clientes WHERE id = $1', [cliente_id]);
+        let gerenteId = null;
+        let vendedorId = null;
+        if (cliRes.rows.length > 0) {
+            gerenteId = cliRes.rows[0].gerente_id;
+            vendedorId = cliRes.rows[0].vendedor_id;
+        }
+
+        let diasVencidos = 0;
+        const dataVenc = new Date(data_vencimento);
+        let dataFim = new Date();
+
+        if ((status_boleto === 'Custas' || status_boleto === 'Pago') && data_pagamento) {
+            dataFim = new Date(data_pagamento);
+        }
+
+        if (dataVenc && dataFim) {
+            const diffTime = dataFim - dataVenc;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            diasVencidos = diffDays > 0 ? diffDays : 0;
+        }
+
+        const sql = `INSERT INTO contas_receber (
+            cliente_id, gerente_id, vendedor_id, numero_documento, banco, valor_original, valor_recebido, data_emissao, 
+            data_vencimento, status, tipo_cobranca, observacoes, status_boleto, data_pagamento, 
+            dias_vencidos, status_cobranca, valor_custas, carteira, debito_conta_corrente, 
+            cadastro_tipo, data_cartorio, comissao, data_estorno, data_reposicao, criado_em, atualizado_em
+        ) VALUES ($1, $2, $3, $4, $5, $6, 0.00, $7, $8, 'Em Aberto', $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`;
+
+        await pool.query(sql, [
+            parseInt(cliente_id, 10),
+            gerenteId,
+            vendedorId,
+            numero_documento ? numero_documento.trim().toUpperCase() : '',
+            banco,
+            parseFloat(valor_original) || 0,
+            data_emissao,
+            data_vencimento,
+            tipo_cobranca,
+            formatarCapitalizacao(observacoes),
+            status_boleto || 'Vencido',
+            data_pagamento || null,
+            diasVencidos,
+            status_cobranca || 'Iniciar',
+            parseFloat(valor_custas) || 0.00,
+            carteira || 'Simples',
+            debito_conta_corrente || null,
+            cadastro_tipo || 'Normal',
+            data_cartorio || null,
+            comissao || 'Não Estornada',
+            data_estorno || null,
+            data_reposicao || null
+        ]);
+
+        res.redirect('/cobranca?sucesso=Cobrança cadastrada com sucesso!');
+    } catch (err) {
+        console.error(err);
+        res.redirect('/cobranca?erro=Erro ao cadastrar cobrança.');
+    }
+});
+
+app.get('/logout', (req, res) => {
+    req.session.destroy();
+    res.redirect('/login');
+});
+
+app.get('/', (req, res) => {
+    if (req.session.usuario) {
+        return res.redirect('/dashboard');
+    }
+    res.redirect('/login');
+});
+
+app.listen(PORT, () => {
+    console.log(`Servidor Omnia a correr na porta ${PORT}`);
+});
