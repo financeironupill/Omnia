@@ -15,7 +15,7 @@
         </div>
     </nav>
 
-    <div class="container-fluid px-4" style="max-width: 1100px;">
+    <div class="container-fluid px-4" style="max-width: 1100px; margin-bottom: 50px;">
         <div class="card shadow-sm border-0 rounded-3 p-4 bg-white">
             <h3 class="fw-bold text-dark mb-1"><i class="fa-solid fa-users text-primary me-2"></i><%= cliente ? 'Editar Cliente' : 'Cadastrar Novo Cliente' %></h3>
             <p class="text-muted small mb-3">Preencha os dados cadastrais, morada, dados bancários e vinculação de gerência/venda.</p>
@@ -111,4 +111,54 @@
                     </div>
 
                     <div class="col-md-4">
-                        <label class="
+                        <label class="form-label fw-semibold">Tipo Chave PIX</label>
+                        <select name="tipo_chave_pix" class="form-select">
+                            <option value="">Selecione...</option>
+                            <option value="CNPJ" <%= cliente && cliente.tipo_chave_pix === 'CNPJ' ? 'selected' : '' %>>CNPJ</option>
+                            <option value="CPF" <%= cliente && cliente.tipo_chave_pix === 'CPF' ? 'selected' : '' %>>CPF</option>
+                            <option value="E-mail" <%= cliente && cliente.tipo_chave_pix === 'E-mail' ? 'selected' : '' %>>E-mail</option>
+                            <option value="Telefone" <%= cliente && cliente.tipo_chave_pix === 'Telefone' ? 'selected' : '' %>>Telefone</option>
+                            <option value="Aleatória" <%= cliente && cliente.tipo_chave_pix === 'Aleatória' ? 'selected' : '' %>>Aleatória</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-8">
+                        <label class="form-label fw-semibold">Chave PIX</label>
+                        <input type="text" name="chave_pix" class="form-control" placeholder="Insira a chave PIX" value="<%= cliente ? (cliente.chave_pix || '') : '' %>">
+                    </div>
+
+                    <!-- BOTÕES DE AÇÃO RESTAURADOS -->
+                    <div class="col-12 mt-4">
+                        <button type="submit" class="btn btn-primary fw-semibold px-4"><i class="fa-solid fa-check me-1"></i> Gravar Cliente</button>
+                        <a href="/clientes" class="btn btn-secondary ms-2">Cancelar</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        async function consultarCnpj() {
+            const inputCnpj = document.getElementById('cnpj_cpf');
+            let cnpj = inputCnpj.value.replace(/\D/g, '');
+
+            if (cnpj.length === 14) {
+                try {
+                    const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
+                    if (!response.ok) throw new Error('CNPJ não encontrado');
+                    const data = await response.json();
+
+                    document.getElementById('nome').value = data.razao_social || '';
+                    document.getElementById('nome_fantasia').value = data.nome_fantasia || '';
+                    document.getElementById('cidade').value = data.municipio || '';
+                    document.getElementById('uf').value = data.uf || '';
+                    document.getElementById('telefone').value = data.ddd_telefone_1 || data.telefone || '';
+                    document.getElementById('email').value = data.email || '';
+                } catch (error) {
+                    console.error('Erro ao consultar CNPJ:', error);
+                }
+            }
+        }
+    </script>
+</body>
+</html>
