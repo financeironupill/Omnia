@@ -8,6 +8,8 @@
     <style>
         body { background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         .table-hover tbody tr:hover { background-color: #f1f3f5; }
+        .sort-link { color: #fff; text-decoration: none; display: flex; align-items: center; justify-content: space-between; }
+        .sort-link:hover { color: #d1c4e9; }
     </style>
 </head>
 <body>
@@ -34,6 +36,8 @@
             <% if (locals.erro && erro) { %> <div class="alert alert-danger py-2"><%= erro %></div> <% } %>
 
             <form method="GET" action="/vendedores" class="row g-2 mb-4">
+                <input type="hidden" name="ordenar" value="<%= ordenarAtual %>">
+                <input type="hidden" name="ordem" value="<%= ordemAtual %>">
                 <div class="col-md-10">
                     <div class="input-group">
                         <span class="input-group-text bg-light"><i class="fa-solid fa-search text-muted"></i></span>
@@ -49,10 +53,52 @@
                 <table class="table table-hover table-striped align-middle bg-white mb-0 border">
                     <thead class="table-dark">
                         <tr>
-                            <th class="py-3">ID</th>
-                            <th class="py-3">Nome Resumido (Chave)</th>
-                            <th class="py-3">Nome Completo</th>
-                            <th class="py-3">Gerente Vinculado</th>
+                            <th class="py-3" style="width: 80px;">ID</th>
+                            <th class="py-3">
+                                <% 
+                                    let novaOrdemRes = (ordenarAtual === 'nome_resumido' && ordemAtual === 'ASC') ? 'DESC' : 'ASC';
+                                %>
+                                <a href="/vendedores?busca=<%= buscaAtual %>&ordenar=nome_resumido&ordem=<%= novaOrdemRes %>" class="sort-link">
+                                    <span>Nome Resumido (Chave)</span>
+                                    <span>
+                                        <% if (ordenarAtual === 'nome_resumido') { %>
+                                            <i class="fa-solid fa-sort-<%= ordemAtual === 'ASC' ? 'up' : 'down' %> text-warning"></i>
+                                        <% } else { %>
+                                            <i class="fa-solid fa-sort text-muted opacity-50"></i>
+                                        <% } %>
+                                    </span>
+                                </a>
+                            </th>
+                            <th class="py-3">
+                                <% 
+                                    let novaOrdemComp = (ordenarAtual === 'nome_completo' && ordemAtual === 'ASC') ? 'DESC' : 'ASC';
+                                %>
+                                <a href="/vendedores?busca=<%= buscaAtual %>&ordenar=nome_completo&ordem=<%= novaOrdemComp %>" class="sort-link">
+                                    <span>Nome Completo</span>
+                                    <span>
+                                        <% if (ordenarAtual === 'nome_completo') { %>
+                                            <i class="fa-solid fa-sort-<%= ordemAtual === 'ASC' ? 'up' : 'down' %> text-warning"></i>
+                                        <% } else { %>
+                                            <i class="fa-solid fa-sort text-muted opacity-50"></i>
+                                        <% } %>
+                                    </span>
+                                </a>
+                            </th>
+                            <th class="py-3">
+                                <% 
+                                    let novaOrdemGer = (ordenarAtual === 'gerente' && ordemAtual === 'ASC') ? 'DESC' : 'ASC';
+                                %>
+                                <a href="/vendedores?busca=<%= buscaAtual %>&ordenar=gerente&ordem=<%= novaOrdemGer %>" class="sort-link">
+                                    <span>Gerente Vinculado</span>
+                                    <span>
+                                        <% if (ordenarAtual === 'gerente') { %>
+                                            <i class="fa-solid fa-sort-<%= ordemAtual === 'ASC' ? 'up' : 'down' %> text-warning"></i>
+                                        <% } else { %>
+                                            <i class="fa-solid fa-sort text-muted opacity-50"></i>
+                                        <% } %>
+                                    </span>
+                                </a>
+                            </th>
                             <th class="py-3">Contacto</th>
                             <th class="py-3">PIX / Banco</th>
                             <th class="py-3">Status</th>
@@ -68,7 +114,7 @@
                                     <td class="fw-bold text-secondary">#<%= v.id %></td>
                                     <td><span class="badge text-white px-2 py-1" style="background-color: #20c997; font-size: 0.9rem;"><%= v.nome_resumido %></span></td>
                                     <td class="fw-bold text-dark"><%= v.nome_completo %></td>
-                                    <td><span class="badge bg-light text-dark border"><%= v.gerente_nome || 'Sem Gerente' %></span></td>
+                                    <td><span class="badge bg-secondary"><%= v.gerente_nome || '--' %></span></td>
                                     <td>
                                         <div><i class="fa-solid fa-phone text-muted me-1 small"></i> <%= v.telefone || '--' %></div>
                                         <div><i class="fa-solid fa-envelope text-muted me-1 small"></i> <%= v.email || '--' %></div>

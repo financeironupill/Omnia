@@ -302,19 +302,30 @@ app.post('/clientes/excluir/:id', verificarAutenticacao, async (req, res) => {
     }
 });
 
-// GERENTES
+// GERENTES (Com ordenação A-Z / Z-A)
 app.get('/gerentes', verificarAutenticacao, async (req, res) => {
     try {
-        const { busca } = req.query;
+        const { busca, ordenar, ordem } = req.query;
+        let col = ordenar === 'nome_completo' ? 'nome_completo' : 'nome_resumido';
+        let dir = ordem === 'DESC' ? 'DESC' : 'ASC';
+
         let query = 'SELECT * FROM gerentes';
         let params = [];
         if (busca && busca.trim() !== '') {
             query += ' WHERE nome_resumido ILIKE $1 OR nome_completo ILIKE $1';
             params.push('%' + busca.trim() + '%');
         }
-        query += ' ORDER BY nome_resumido ASC';
+        query += ' ORDER BY ' + col + ' ' + dir;
+
         const result = await pool.query(query, params);
-        res.render('gerentes-lista', { gerentes: result.rows, buscaAtual: busca || '', erro: null, sucesso: null });
+        res.render('gerentes-lista', { 
+            gerentes: result.rows, 
+            buscaAtual: busca || '', 
+            ordenarAtual: col, 
+            ordemAtual: dir, 
+            erro: null, 
+            sucesso: null 
+        });
     } catch (err) {
         res.status(500).send('Erro interno');
     }
@@ -412,19 +423,30 @@ app.post('/gerentes/excluir/:id', verificarAutenticacao, async (req, res) => {
     }
 });
 
-// VENDEDORES
+// VENDEDORES (Com ordenação A-Z / Z-A)
 app.get('/vendedores', verificarAutenticacao, async (req, res) => {
     try {
-        const { busca } = req.query;
+        const { busca, ordenar, ordem } = req.query;
+        let col = ordenar === 'nome_completo' ? 'v.nome_completo' : (ordenar === 'gerente' ? 'g.nome_resumido' : 'v.nome_resumido');
+        let dir = ordem === 'DESC' ? 'DESC' : 'ASC';
+
         let query = 'SELECT v.*, g.nome_resumido AS gerente_nome FROM vendedores v LEFT JOIN gerentes g ON v.gerente_id = g.id WHERE 1=1';
         let params = [];
         if (busca && busca.trim() !== '') {
             query += ' AND (v.nome_resumido ILIKE $1 OR v.nome_completo ILIKE $1 OR g.nome_resumido ILIKE $1)';
             params.push('%' + busca.trim() + '%');
         }
-        query += ' ORDER BY v.nome_resumido ASC';
+        query += ' ORDER BY ' + col + ' ' + dir;
+
         const result = await pool.query(query, params);
-        res.render('vendedores-lista', { vendedores: result.rows, buscaAtual: busca || '', erro: null, sucesso: null });
+        res.render('vendedores-lista', { 
+            vendedores: result.rows, 
+            buscaAtual: busca || '', 
+            ordenarAtual: ordenar || 'nome_resumido', 
+            ordemAtual: dir, 
+            erro: null, 
+            sucesso: null 
+        });
     } catch (err) {
         res.status(500).send('Erro interno');
     }

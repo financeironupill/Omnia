@@ -8,6 +8,8 @@
     <style>
         body { background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         .table-hover tbody tr:hover { background-color: #f1f3f5; }
+        .sort-link { color: #fff; text-decoration: none; display: flex; align-items: center; justify-content: space-between; }
+        .sort-link:hover { color: #d1c4e9; }
     </style>
 </head>
 <body>
@@ -34,6 +36,8 @@
             <% if (locals.erro && erro) { %> <div class="alert alert-danger py-2"><%= erro %></div> <% } %>
 
             <form method="GET" action="/gerentes" class="row g-2 mb-4">
+                <input type="hidden" name="ordenar" value="<%= ordenarAtual %>">
+                <input type="hidden" name="ordem" value="<%= ordemAtual %>">
                 <div class="col-md-10">
                     <div class="input-group">
                         <span class="input-group-text bg-light"><i class="fa-solid fa-search text-muted"></i></span>
@@ -49,9 +53,37 @@
                 <table class="table table-hover table-striped align-middle bg-white mb-0 border">
                     <thead class="table-dark">
                         <tr>
-                            <th class="py-3">ID</th>
-                            <th class="py-3">Nome Resumido (Chave)</th>
-                            <th class="py-3">Nome Completo</th>
+                            <th class="py-3" style="width: 80px;">ID</th>
+                            <th class="py-3">
+                                <% 
+                                    let novaOrdemResumido = (ordenarAtual === 'nome_resumido' && ordemAtual === 'ASC') ? 'DESC' : 'ASC';
+                                %>
+                                <a href="/gerentes?busca=<%= buscaAtual %>&ordenar=nome_resumido&ordem=<%= novaOrdemResumido %>" class="sort-link">
+                                    <span>Nome Resumido (Chave)</span>
+                                    <span>
+                                        <% if (ordenarAtual === 'nome_resumido') { %>
+                                            <i class="fa-solid fa-sort-<%= ordemAtual === 'ASC' ? 'up' : 'down' %> text-warning"></i>
+                                        <% } else { %>
+                                            <i class="fa-solid fa-sort text-muted opacity-50"></i>
+                                        <% } %>
+                                    </span>
+                                </a>
+                            </th>
+                            <th class="py-3">
+                                <% 
+                                    let novaOrdemCompleto = (ordenarAtual === 'nome_completo' && ordemAtual === 'ASC') ? 'DESC' : 'ASC';
+                                %>
+                                <a href="/gerentes?busca=<%= buscaAtual %>&ordenar=nome_completo&ordem=<%= novaOrdemCompleto %>" class="sort-link">
+                                    <span>Nome Completo</span>
+                                    <span>
+                                        <% if (ordenarAtual === 'nome_completo') { %>
+                                            <i class="fa-solid fa-sort-<%= ordemAtual === 'ASC' ? 'up' : 'down' %> text-warning"></i>
+                                        <% } else { %>
+                                            <i class="fa-solid fa-sort text-muted opacity-50"></i>
+                                        <% } %>
+                                    </span>
+                                </a>
+                            </th>
                             <th class="py-3">Contacto</th>
                             <th class="py-3">PIX / Banco</th>
                             <th class="py-3">Status</th>
