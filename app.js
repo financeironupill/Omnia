@@ -28,6 +28,12 @@ function gerarNumeroOcorrencia() {
     return `${a.getFullYear()}${String(a.getMonth() + 1).padStart(2, '0')}${Math.floor(1000 + Math.random() * 9000)}`;
 }
 
+function limparValorMonetario(valor) {
+    if (!valor) return 0;
+    let limpo = String(valor).replace(/\./g, '').replace(',', '.');
+    return parseFloat(limpo) || 0;
+}
+
 function verificarAutenticacao(req, res, next) {
     if (req.session.usuario) return next();
     res.redirect('/login');
@@ -671,7 +677,7 @@ app.post('/ocorrencias/novo', verificarAutenticacao, async (req, res) => {
         const cli = await pool.query('SELECT nome FROM clientes WHERE id = $1', [cliente_id]);
         const cliNome = cli.rows.length > 0 ? cli.rows[0].nome : '';
         const sql = 'INSERT INTO ocorrencias (numero, tipo_ocorrencia_id, cliente_id, transportadora_id, usuario_id, cliente_nome, nf_origem, valor_nf_origem, vencimento_atual, nfd, tipo_financeiro, valor_financeiro, descricao_problema, status, criado_em, atualizado_em) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, \'Em Aberto\', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)';
-        await pool.query(sql, [gerarNumeroOcorrencia(), parseInt(tipo_ocorrencia_id, 10), parseInt(cliente_id, 10), transportadora_id ? parseInt(transportadora_id, 10) : null, req.session.usuario.id, cliNome, nf_origem ? nf_origem.trim().toUpperCase() : '', valor_nf_origem ? parseFloat(valor_nf_origem) : null, vencimento_atual || null, nfd ? nfd.trim().toUpperCase() : '', tipo_financeiro || null, valor_financeiro ? parseFloat(valor_financeiro) : null, formatarCapitalizacao(descricao_problema)]);
+        await pool.query(sql, [gerarNumeroOcorrencia(), parseInt(tipo_ocorrencia_id, 10), parseInt(cliente_id, 10), transportadora_id ? parseInt(transportadora_id, 10) : null, req.session.usuario.id, cliNome, nf_origem ? nf_origem.trim().toUpperCase() : '', limparValorMonetario(valor_nf_origem), vencimento_atual || null, nfd ? nfd.trim().toUpperCase() : '', tipo_financeiro || null, limparValorMonetario(valor_financeiro), formatarCapitalizacao(descricao_problema)]);
         res.redirect('/ocorrencias?sucesso=Ocorrência registrada!');
     } catch (err) {
         console.error(err);
@@ -709,7 +715,7 @@ app.post('/ocorrencias/editar/:id', verificarAutenticacao, async (req, res) => {
         const cli = await pool.query('SELECT nome FROM clientes WHERE id = $1', [cliente_id]);
         const cliNome = cli.rows.length > 0 ? cli.rows[0].nome : '';
         const sql = 'UPDATE ocorrencias SET tipo_ocorrencia_id = $1, cliente_id = $2, transportadora_id = $3, cliente_nome = $4, nf_origem = $5, valor_nf_origem = $6, vencimento_atual = $7, nfd = $8, tipo_financeiro = $9, valor_financeiro = $10, status = $11, descricao_problema = $12, solucao_aplicada = $13, atualizado_em = CURRENT_TIMESTAMP WHERE id = $14';
-        await pool.query(sql, [parseInt(tipo_ocorrencia_id, 10), parseInt(cliente_id, 10), transportadora_id ? parseInt(transportadora_id, 10) : null, cliNome, nf_origem ? nf_origem.trim().toUpperCase() : '', valor_nf_origem ? parseFloat(valor_nf_origem) : null, vencimento_atual || null, nfd ? nfd.trim().toUpperCase() : '', tipo_financeiro || null, valor_financeiro ? parseFloat(valor_financeiro) : null, status, formatarCapitalizacao(descricao_problema), formatarCapitalizacao(solucao_aplicada), req.params.id]);
+        await pool.query(sql, [parseInt(tipo_ocorrencia_id, 10), parseInt(cliente_id, 10), transportadora_id ? parseInt(transportadora_id, 10) : null, cliNome, nf_origem ? nf_origem.trim().toUpperCase() : '', limparValorMonetario(valor_nf_origem), vencimento_atual || null, nfd ? nfd.trim().toUpperCase() : '', tipo_financeiro || null, limparValorMonetario(valor_financeiro), status, formatarCapitalizacao(descricao_problema), formatarCapitalizacao(solucao_aplicada), req.params.id]);
         res.redirect('/ocorrencias?sucesso=Atualizada com sucesso!');
     } catch (err) {
         console.error(err);
@@ -867,7 +873,7 @@ app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
             vendedorId,
             numero_documento ? numero_documento.trim().toUpperCase() : '',
             banco,
-            parseFloat(valor_original) || 0,
+            limparValorMonetario(valor_original),
             data_emissao,
             data_vencimento,
             tipo_cobranca,
@@ -876,7 +882,7 @@ app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
             data_pagamento || null,
             diasVencidos,
             status_cobranca || 'Iniciar',
-            parseFloat(valor_custas) || 0.00,
+            limparValorMonetario(valor_custas),
             carteira || 'Simples',
             debito_conta_corrente || null,
             cadastro_tipo || 'Normal',
