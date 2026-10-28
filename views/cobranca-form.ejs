@@ -18,7 +18,7 @@
     <div class="container-fluid px-4" style="max-width: 1100px; margin-bottom: 50px;">
         <div class="card shadow-sm border-0 rounded-3 p-4 bg-white">
             <h3 class="fw-bold text-dark mb-1"><i class="fa-solid fa-file-invoice-dollar text-primary me-2"></i><%= conta ? 'Editar Cobrança' : 'Cadastrar Nova Cobrança' %></h3>
-            <p class="text-muted small mb-3">Preencha os dados do título, valores e condições de cobrança.</p>
+            <p class="text-muted small mb-3">Preencha os dados completos do título, valores, carteira e condições de cobrança.</p>
             <hr class="text-muted mb-4">
 
             <% if (locals.erro && erro) { %>
@@ -63,8 +63,75 @@
                     </div>
 
                     <div class="col-md-4">
+                        <label class="form-label fw-semibold">Tipo de Cobrança</label>
+                        <select name="tipo_cobranca" class="form-select">
+                            <option value="">Selecione...</option>
+                            <option value="Boleto" <%= conta && conta.tipo_cobranca === 'Boleto' ? 'selected' : '' %>>Boleto</option>
+                            <option value="PIX" <%= conta && conta.tipo_cobranca === 'PIX' ? 'selected' : '' %>>PIX</option>
+                            <option value="Transferência" <%= conta && conta.tipo_cobranca === 'Transferência' ? 'selected' : '' %>>Transferência</option>
+                            <option value="Carteira" <%= conta && conta.tipo_cobranca === 'Carteira' ? 'selected' : '' %>>Carteira</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Status do Boleto</label>
+                        <select name="status_boleto" class="form-select">
+                            <option value="Vencido" <%= conta && conta.status_boleto === 'Vencido' ? 'selected' : '' %>>Vencido</option>
+                            <option value="Em Aberto" <%= conta && conta.status_boleto === 'Em Aberto' ? 'selected' : '' %>>Em Aberto</option>
+                            <option value="Pago" <%= conta && conta.status_boleto === 'Pago' ? 'selected' : '' %>>Pago</option>
+                            <option value="Custas" <%= conta && conta.status_boleto === 'Custas' ? 'selected' : '' %>>Custas</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Data de Pagamento</label>
+                        <input type="date" name="data_pagamento" class="form-control" value="<%= conta && conta.data_pagamento ? new Date(conta.data_pagamento).toISOString().split('T')[0] : '' %>">
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Status da Cobrança</label>
+                        <select name="status_cobranca" class="form-select">
+                            <option value="Iniciar" <%= conta && conta.status_cobranca === 'Iniciar' ? 'selected' : '' %>>Iniciar</option>
+                            <option value="Em Andamento" <%= conta && conta.status_cobranca === 'Em Andamento' ? 'selected' : '' %>>Em Andamento</option>
+                            <option value="Acordo" <%= conta && conta.status_cobranca === 'Acordo' ? 'selected' : '' %>>Acordo</option>
+                            <option value="Cartório" <%= conta && conta.status_cobranca === 'Cartório' ? 'selected' : '' %>>Cartório</option>
+                            <option value="Jurídico" <%= conta && conta.status_cobranca === 'Jurídico' ? 'selected' : '' %>>Jurídico</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-4">
                         <label class="form-label fw-semibold">Valor Custas (R$)</label>
                         <input type="text" name="valor_custas" class="form-control" placeholder="0,00" value="<%= conta ? (conta.valor_custas || '') : '' %>" oninput="mascaraMoeda(this)">
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Carteira</label>
+                        <select name="carteira" class="form-select">
+                            <option value="Simples" <%= conta && conta.carteira === 'Simples' ? 'selected' : '' %>>Simples</option>
+                            <option value="Caucionada" <%= conta && conta.carteira === 'Caucionada' ? 'selected' : '' %>>Caucionada</option>
+                            <option value="Descontada" <%= conta && conta.carteira === 'Descontada' ? 'selected' : '' %>>Descontada</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Tipo de Cadastro</label>
+                        <select name="cadastro_tipo" class="form-select">
+                            <option value="Normal" <%= conta && conta.cadastro_tipo === 'Normal' ? 'selected' : '' %>>Normal</option>
+                            <option value="Especial" <%= conta && conta.cadastro_tipo === 'Especial' ? 'selected' : '' %>>Especial</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Comissão</label>
+                        <select name="comissao" class="form-select">
+                            <option value="Não Estornada" <%= conta && conta.comissao === 'Não Estornada' ? 'selected' : '' %>>Não Estornada</option>
+                            <option value="Estornada" <%= conta && conta.comissao === 'Estornada' ? 'selected' : '' %>>Estornada</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Data em Cartório</label>
+                        <input type="date" name="data_cartorio" class="form-control" value="<%= conta && conta.data_cartorio ? new Date(conta.data_cartorio).toISOString().split('T')[0] : '' %>">
                     </div>
 
                     <div class="col-md-12">
