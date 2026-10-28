@@ -5,6 +5,9 @@
     <title><%= conta ? 'Editar Cobrança' : 'Cadastrar Nova Cobrança' %> - Omnia</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Select2 CSS para pesquisa de clientes -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
     <style>body { background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }</style>
 </head>
 <body>
@@ -33,7 +36,7 @@
                     <div class="card-body row g-3">
                         <div class="col-md-12">
                             <label class="form-label fw-semibold">Cliente <span class="text-danger">*</span></label>
-                            <select name="cliente_id" id="cliente_id" class="form-select" required onchange="atualizarGerenteVendedor()">
+                            <select name="cliente_id" id="cliente_id" class="form-select select2" required onchange="atualizarGerenteVendedor()">
                                 <option value="">Selecione o cliente...</option>
                                 <% clientes.forEach(c => { %>
                                     <option value="<%= c.id %>" data-gerente="<%= c.gerente_nome || 'Não atribuído' %>" data-vendedor="<%= c.vendedor_nome || 'Não atribuído' %>" <%= conta && conta.cliente_id == c.id ? 'selected' : '' %>><%= c.nome %></option>
@@ -56,7 +59,7 @@
                     <div class="card-header bg-secondary text-white fw-bold"><i class="fa-solid fa-file-lines me-2"></i>Dados do documento</div>
                     <div class="card-body row g-3">
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">Número do Documento / Título <span class="text-danger">*</span></label>
+                            <label class="form-label fw-semibold">Número do Documento <span class="text-danger">*</span></label>
                             <input type="text" name="numero_documento" class="form-control" placeholder="Ex: 123456" value="<%= conta ? (conta.numero_documento || '') : '' %>" required>
                         </div>
                         <div class="col-md-4">
@@ -78,16 +81,16 @@
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">Valor Original (R$) <span class="text-danger">*</span></label>
-                            <input type="text" name="valor_original" class="form-control" placeholder="0,00" value="<%= conta ? (conta.valor_original || '') : '' %>" oninput="mascaraMoeda(this)" required>
-                        </div>
-                        <div class="col-md-4">
                             <label class="form-label fw-semibold">Carteira</label>
                             <select name="carteira" class="form-select">
                                 <option value="Simples" <%= conta && conta.carteira === 'Simples' ? 'selected' : '' %>>Simples</option>
                                 <option value="Descontado" <%= conta && conta.carteira === 'Descontado' ? 'selected' : '' %>>Descontado</option>
                                 <option value="Descontado e Devolvido" <%= conta && conta.carteira === 'Descontado e Devolvido' ? 'selected' : '' %>>Descontado e Devolvido</option>
                             </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Valor Original (R$) <span class="text-danger">*</span></label>
+                            <input type="text" name="valor_original" class="form-control" placeholder="0,00" value="<%= conta ? (conta.valor_original || '') : '' %>" oninput="mascaraMoeda(this)" required>
                         </div>
                     </div>
                 </div>
@@ -106,111 +109,3 @@
                             </select>
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label fw-semibold">Status da Cobrança</label>
-                            <select name="tipo_cobranca" class="form-select">
-                                <option value="">Selecione...</option>
-                                <option value="Iniciar" <%= conta && conta.tipo_cobranca === 'Iniciar' ? 'selected' : '' %>>Iniciar</option>
-                                <option value="Em Cobrança" <%= conta && conta.tipo_cobranca === 'Em Cobrança' ? 'selected' : '' %>>Em Cobrança</option>
-                                <option value="Protestar" <%= conta && conta.tipo_cobranca === 'Protestar' ? 'selected' : '' %>>Protestar</option>
-                                <option value="Cartório" <%= conta && conta.tipo_cobranca === 'Cartório' ? 'selected' : '' %>>Cartório</option>
-                                <option value="Custas" <%= conta && conta.tipo_cobranca === 'Custas' ? 'selected' : '' %>>Custas</option>
-                                <option value="Pago" <%= conta && conta.tipo_cobranca === 'Pago' ? 'selected' : '' %>>Pago</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-semibold">Data em Cartório</label>
-                            <input type="date" name="data_cartorio" class="form-control" value="<%= conta && conta.data_cartorio ? new Date(conta.data_cartorio).toISOString().split('T')[0] : '' %>">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-semibold">Valor Custas (R$)</label>
-                            <input type="text" name="valor_custas" class="form-control" placeholder="0,00" value="<%= conta ? (conta.valor_custas || '') : '' %>" oninput="mascaraMoeda(this)">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- GRUPO: DADOS DOS PAGAMENTOS -->
-                <div class="card mb-4 border-0 shadow-sm bg-light">
-                    <div class="card-header bg-secondary text-white fw-bold"><i class="fa-solid fa-money-bill-transfer me-2"></i>Dados dos Pagamentos</div>
-                    <div class="card-body row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Data de Pagamento (Boleto)</label>
-                            <input type="date" name="data_pagamento" class="form-control" value="<%= conta && conta.data_pagamento ? new Date(conta.data_pagamento).toISOString().split('T')[0] : '' %>">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Data de Pagamento das Custas</label>
-                            <input type="date" name="data_pagamento_custas" class="form-control" value="<%= conta && conta.data_pagamento_custas ? new Date(conta.data_pagamento_custas).toISOString().split('T')[0] : '' %>">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- GRUPO: COMISSÃO -->
-                <div class="card mb-4 border-0 shadow-sm bg-light">
-                    <div class="card-header bg-secondary text-white fw-bold"><i class="fa-solid fa-percent me-2"></i>Comissão</div>
-                    <div class="card-body row g-3">
-                        <div class="col-md-3">
-                            <label class="form-label fw-semibold">Comissão</label>
-                            <select name="comissao" class="form-select">
-                                <option value="Não Estornada" <%= conta && conta.comissao === 'Não Estornada' ? 'selected' : '' %>>Não Estornada</option>
-                                <option value="Estornada" <%= conta && conta.comissao === 'Estornada' ? 'selected' : '' %>>Estornada</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-semibold">Débito da Comissão</label>
-                            <input type="date" name="data_estorno" class="form-control" value="<%= conta && conta.data_estorno ? new Date(conta.data_estorno).toISOString().split('T')[0] : '' %>">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-semibold">Valor do Débito em Comissão (R$)</label>
-                            <input type="text" name="valor_debito_comissao" class="form-control" placeholder="0,00" value="<%= conta ? (conta.valor_debito_comissao || '') : '' %>" oninput="mascaraMoeda(this)">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-semibold">Data da Reposição da Comissão</label>
-                            <input type="date" name="data_reposicao" class="form-control" value="<%= conta && conta.data_reposicao ? new Date(conta.data_reposicao).toISOString().split('T')[0] : '' %>">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- GRUPO: OBSERVAÇÕES -->
-                <div class="card mb-4 border-0 shadow-sm bg-light">
-                    <div class="card-header bg-secondary text-white fw-bold"><i class="fa-solid fa-comment-dots me-2"></i>Observações</div>
-                    <div class="card-body row g-3">
-                        <div class="col-md-12">
-                            <textarea name="observacoes" class="form-control" rows="3" placeholder="Observações adicionais..."><%= conta ? (conta.observacoes || '') : '' %></textarea>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-12 mt-4">
-                    <button type="submit" class="btn btn-primary fw-semibold px-4"><i class="fa-solid fa-check me-1"></i> Gravar Cobrança</button>
-                    <a href="/cobranca" class="btn btn-secondary ms-2">Cancelar</a>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <script>
-        function mascaraMoeda(i) {
-            let v = i.value.replace(/\D/g, '');
-            v = (v / 100).toFixed(2) + '';
-            v = v.replace(".", ",");
-            v = v.replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1.');
-            i.value = v === 'NaN' ? '' : v;
-        }
-
-        function atualizarGerenteVendedor() {
-            const select = document.getElementById('cliente_id');
-            const option = select.options[select.selectedIndex];
-            const gerente = option.getAttribute('data-gerente') || 'Não atribuído';
-            const vendedor = option.getAttribute('data-vendedor') || 'Não atribuído';
-
-            document.getElementById('info_gerente').value = gerente;
-            document.getElementById('info_vendedor').value = vendedor;
-        }
-
-        window.onload = function() {
-            if(document.getElementById('cliente_id').value) {
-                atualizarGerenteVendedor();
-            }
-        };
-    </script>
-</body>
-</html>
