@@ -65,7 +65,7 @@
                             <% gerentes.forEach(g => { %>
                                 <tr>
                                     <td class="fw-bold text-secondary">#<%= g.id %></td>
-                                    <td><span class="badge bg-purple text-white px-2 py-1" style="background-color: #6f42c1; font-size: 0.9rem;"><%= g.nome_resumido %></span></td>
+                                    <td><span class="badge text-white px-2 py-1" style="background-color: #6f42c1; font-size: 0.9rem;"><%= g.nome_resumido %></span></td>
                                     <td class="fw-bold text-dark"><%= g.nome_completo %></td>
                                     <td>
                                         <div><i class="fa-solid fa-phone text-muted me-1 small"></i> <%= g.telefone || '--' %></div>
@@ -83,6 +83,7 @@
                                         <% } %>
                                     </td>
                                     <td class="text-end">
+                                        <a href="/gerentes/relatorio-vendedores/<%= g.id %>" class="btn btn-sm btn-outline-info text-dark px-2 me-1" title="Ver Vendedores"><i class="fa-solid fa-users"></i> Vendedores</a>
                                         <a href="/gerentes/editar/<%= g.id %>" class="btn btn-sm btn-outline-warning text-dark px-2 me-1" title="Editar"><i class="fa-solid fa-pen"></i> Editar</a>
                                         <form action="/gerentes/excluir/<%= g.id %>" method="POST" style="display:inline;">
                                             <button type="submit" class="btn btn-sm btn-outline-danger px-2" title="Excluir" onclick="return confirm('Tem certeza que deseja excluir este gerente?')"><i class="fa-solid fa-trash"></i> Excluir</button>
