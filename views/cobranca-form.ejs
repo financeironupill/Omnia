@@ -29,12 +29,23 @@
                 <div class="row g-3">
                     <div class="col-md-12">
                         <label class="form-label fw-semibold">Cliente <span class="text-danger">*</span></label>
-                        <select name="cliente_id" class="form-select" required>
+                        <select name="cliente_id" id="cliente_id" class="form-select" required onchange="atualizarGerenteVendedor()">
                             <option value="">Selecione o cliente...</option>
                             <% clientes.forEach(c => { %>
-                                <option value="<%= c.id %>" <%= conta && conta.cliente_id == c.id ? 'selected' : '' %>><%= c.nome %></option>
+                                <option value="<%= c.id %>" data-gerente="<%= c.gerente_nome || 'Não atribuído' %>" data-vendedor="<%= c.vendedor_nome || 'Não atribuído' %>" <%= conta && conta.cliente_id == c.id ? 'selected' : '' %>><%= c.nome %></option>
                             <% }) %>
                         </select>
+                    </div>
+
+                    <!-- Campos informativos de Gerente e Vendedor vinculados ao cliente -->
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold text-muted">Gerente Vinculado</label>
+                        <input type="text" id="info_gerente" class="form-control bg-light" readonly value="Selecione um cliente...">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold text-muted">Vendedor Vinculado</label>
+                        <input type="text" id="info_vendedor" class="form-control bg-light" readonly value="Selecione um cliente...">
                     </div>
 
                     <div class="col-md-4">
@@ -156,6 +167,23 @@
             v = v.replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1.');
             i.value = v === 'NaN' ? '' : v;
         }
+
+        function atualizarGerenteVendedor() {
+            const select = document.getElementById('cliente_id');
+            const option = select.options[select.selectedIndex];
+            const gerente = option.getAttribute('data-gerente') || 'Não atribuído';
+            const vendedor = option.getAttribute('data-vendedor') || 'Não atribuído';
+
+            document.getElementById('info_gerente').value = gerente;
+            document.getElementById('info_vendedor').value = vendedor;
+        }
+
+        // Executa ao carregar caso já venha selecionado (modo edição)
+        window.onload = function() {
+            if(document.getElementById('cliente_id').value) {
+                atualizarGerenteVendedor();
+            }
+        };
     </script>
 </body>
 </html>
