@@ -34,18 +34,34 @@
             <% if (locals.erro && erro) { %> <div class="alert alert-danger py-2"><%= erro %></div> <% } %>
 
             <form method="GET" action="/cobranca" class="row g-2 mb-4">
-                <div class="col-md-7">
+                <div class="col-md-4">
                     <div class="input-group">
                         <span class="input-group-text bg-light"><i class="fa-solid fa-search text-muted"></i></span>
-                        <input type="text" name="busca" class="form-control" placeholder="Pesquisar por Nº Documento, Cliente ou Banco..." value="<%= buscaAtual %>">
+                        <input type="text" name="busca" class="form-control" placeholder="Pesquisar Documento, Cliente..." value="<%= buscaAtual %>">
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <select name="status" class="form-select">
                         <option value="">Todos os Status</option>
                         <option value="Em Aberto" <%= statusAtual === 'Em Aberto' ? 'selected' : '' %>>Em Aberto</option>
                         <option value="Recebido" <%= statusAtual === 'Recebido' ? 'selected' : '' %>>Recebido</option>
                         <option value="Vencido" <%= statusAtual === 'Vencido' ? 'selected' : '' %>>Vencido</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select name="gerente_id" class="form-select">
+                        <option value="">Todos Gerentes</option>
+                        <% gerentes.forEach(g => { %>
+                            <option value="<%= g.id %>" <%= gerenteAtual == g.id ? 'selected' : '' %>><%= g.nome_resumido %></option>
+                        <% }) %>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select name="vendedor_id" class="form-select">
+                        <option value="">Todos Vendedores</option>
+                        <% vendedores.forEach(v => { %>
+                            <option value="<%= v.id %>" <%= vendedorAtual == v.id ? 'selected' : '' %>><%= v.nome_resumido %></option>
+                        <% }) %>
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -60,6 +76,7 @@
                             <th class="py-3">ID</th>
                             <th class="py-3">Documento</th>
                             <th class="py-3">Cliente</th>
+                            <th class="py-3">Gerente / Vendedor</th>
                             <th class="py-3">Banco / Cart.</th>
                             <th class="py-3">Vencimento</th>
                             <th class="py-3">Dias Venc.</th>
@@ -70,7 +87,7 @@
                     </thead>
                     <tbody>
                         <% if (contas.length === 0) { %>
-                            <tr><td colspan="9" class="text-center text-muted py-4">Nenhum registo de cobrança encontrado.</td></tr>
+                            <tr><td colspan="10" class="text-center text-muted py-4">Nenhum registo de cobrança encontrado.</td></tr>
                         <% } else { %>
                             <% contas.forEach(c => { %>
                                 <tr>
@@ -79,6 +96,10 @@
                                     <td>
                                         <div class="fw-bold text-dark"><%= c.cliente_nome || 'Cliente não associado' %></div>
                                         <% if (c.cliente_cnpj) { %><small class="text-muted"><%= c.cliente_cnpj %></small><% } %>
+                                    </td>
+                                    <td>
+                                        <div><span class="badge" style="background-color: #6f42c1;"><%= c.gerente_nome || '--' %></span></div>
+                                        <small class="text-muted"><%= c.vendedor_nome || '--' %></small>
                                     </td>
                                     <td>
                                         <div><strong><%= c.banco %></strong></div>
