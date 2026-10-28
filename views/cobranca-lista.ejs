@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>Omnia Cobrança - Contas a Receber</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .table-hover tbody tr:hover { background-color: #f1f3f5; }
+    </style>
+</head>
+<body>
+    <!-- Barra Superior de Navegação Desktop -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-4 shadow-sm mb-4">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold" href="/dashboard"><i class="fa-solid fa-cube me-2"></i>OMNIA <small class="text-muted fs-6">Enterprise</small></a>
+            <a href="/dashboard" class="btn btn-outline-light btn-sm">
+                <i class="fa-solid fa-arrow-left me-1"></i> Voltar ao Dashboard
+            </a>
+        </div>
+    </nav>
+
+    <!-- Conteúdo em Largura Total -->
+    <div class="container-fluid px-4">
+        <div class="card shadow-sm border-0 rounded-3 p-4 bg-white">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h3 class="fw-bold text-dark mb-0"><i class="fa-solid fa-file-invoice-dollar text-warning me-2"></i>Omnia Cobrança</h3>
+                    <p class="text-muted small mb-0">Controlo de contas a receber, vencidas, múltiplos bancos e boletos antecipados.</p>
+                </div>
+                <a href="#" class="btn btn-warning fw-semibold shadow-sm text-dark"><i class="fa-solid fa-plus me-1"></i> Nova Cobrança</a>
+            </div>
+
+            <hr class="text-muted">
+
+            <% if (locals.sucesso && sucesso) { %> <div class="alert alert-success py-2"><%= sucesso %></div> <% } %>
+            <% if (locals.erro && erro) { %> <div class="alert alert-danger py-2"><%= erro %></div> <% } %>
+
+            <!-- Barra de Filtros e Pesquisa -->
+            <form method="GET" action="/cobranca" class="row g-2 mb-4">
+                <div class="col-md-7">
+                    <div class="input-group">
+                        <span class="input-group-text bg-light"><i class="fa-solid fa-search text-muted"></i></span>
+                        <input type="text" name="busca" class="form-control" placeholder="Pesquisar por Nº Documento, Cliente ou Banco..." value="<%= buscaAtual %>">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <select name="status" class="form-select">
+                        <option value="">Todos os Status</option>
+                        <option value="Em Aberto" <%= statusAtual === 'Em Aberto' ? 'selected' : '' %>>Em Aberto</option>
+                        <option value="Recebido" <%= statusAtual === 'Recebido' ? 'selected' : '' %>>Recebido</option>
+                        <option value="Vencido" <%= statusAtual === 'Vencido' ? 'selected' : '' %>>Vencido</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100 fw-semibold">Filtrar</button>
+                </div>
+            </form>
+
+            <!-- Tabela de Contas a Receber -->
+            <div class="table-responsive">
+                <table class="table table-hover table-striped align-middle bg-white mb-0 border">
+                    <thead class="table-dark">
+                        <tr>
+                            <th class="py-3">ID</th>
+                            <th class="py-3">Documento</th>
+                            <th class="py-3">Cliente</th>
+                            <th class="py-3">Banco</th>
+                            <th class="py-3">Vencimento</th>
+                            <th class="py-3">Valor Original</th>
+                            <th class="py-3">Status</th>
+                            <th class="py-3 text-end">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (contas.length === 0) { %>
+                            <tr><td colspan="8" class="text-center text-muted py-4">Nenhum registo de cobrança encontrado.</td></tr>
+                        <% } else { %>
+                            <% contas.forEach(c => { %>
+                                <tr>
+                                    <td class="fw-bold text-secondary">#<%= c.id %></td>
+                                    <td><%= c.numero_documento %></td>
+                                    <td>
+                                        <div class="fw-bold text-dark"><%= c.cliente_nome || 'Cliente não associado' %></div>
+                                        <% if (c.cliente_cnpj) { %><small class="text-muted"><%= c.cliente_cnpj %></small><% } %>
+                                    </td>
+                                    <td><span class="badge bg-secondary"><%= c.banco %></span></td>
+                                    <td><%= c.data_vencimento ? new Date(c.data_vencimento).toLocaleDateString('pt-BR') : '--' %></td>
+                                    <td class="fw-bold text-success">R$ <%= Number(c.valor_original).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) %></td>
+                                    <td>
+                                        <% if (c.status === 'Recebido') { %>
+                                            <span class="badge bg-success">Recebido</span>
+                                        <% } else if (c.status === 'Vencido') { %>
+                                            <span class="badge bg-danger">Vencido</span>
+                                        <% } else { %>
+                                            <span class="badge bg-warning text-dark">Em Aberto</span>
+                                        <% } %>
+                                    </td>
+                                    <td class="text-end">
+                                        <a href="#" class="btn btn-sm btn-outline-warning text-dark px-2 me-1" title="Editar"><i class="fa-solid fa-pen"></i> Editar</a>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
