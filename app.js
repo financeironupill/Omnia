@@ -754,9 +754,16 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
             idx++;
         }
 
-        let statusFiltro = status !== undefined ? status : 'Em Aberto';
-        if (statusFiltro && statusFiltro !== '') {
-            queryText += ' AND c.status = $' + idx;
+        // Por defeito, se nenhum status for passado, filtra os que NÃO estão pagos
+        let statusFiltro = status !== undefined ? status : 'TODOS_MENOS_PAGO';
+        
+        if (statusFiltro === 'TODOS_MENOS_PAGO') {
+            queryText += ' AND (c.status_boleto != $ ' + idx + ' OR c.status_boleto IS NULL)';
+            // Ajuste simples para query parameter do operador not equals
+            // Ou mais limpo:
+            queryText = queryText.replace(`AND (c.status_boleto != $ ${idx} OR c.status_boleto IS NULL)`, ` AND (c.status_boleto <> 'Pago')`);
+        } else if (statusFiltro && statusFiltro !== '') {
+            queryText += ' AND c.status_boleto = $' + idx;
             queryParams.push(statusFiltro);
             idx++;
         }

@@ -42,10 +42,11 @@
                 </div>
                 <div class="col-md-2">
                     <select name="status" class="form-select">
+                        <option value="TODOS_MENOS_PAGO" <%= statusAtual === 'TODOS_MENOS_PAGO' ? 'selected' : '' %>>Em Aberto (Exceto Pagos)</option>
                         <option value="">Todos os Status</option>
-                        <option value="Em Aberto" <%= statusAtual === 'Em Aberto' ? 'selected' : '' %>>Em Aberto</option>
-                        <option value="Recebido" <%= statusAtual === 'Recebido' ? 'selected' : '' %>>Recebido</option>
                         <option value="Vencido" <%= statusAtual === 'Vencido' ? 'selected' : '' %>>Vencido</option>
+                        <option value="Pago" <%= statusAtual === 'Pago' ? 'selected' : '' %>>Pago</option>
+                        <option value="Pago com Pendência" <%= statusAtual === 'Pago com Pendência' ? 'selected' : '' %>>Pago com Pendência</option>
                     </select>
                 </div>
                 <div class="col-md-2">
