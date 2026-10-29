@@ -113,7 +113,8 @@
                                         <small class="text-muted"><%= c.status_cobranca %></small>
                                     </td>
                                     <td class="text-end">
-                                        <a href="#" class="btn btn-sm btn-outline-warning text-dark px-2 me-1" title="Editar"><i class="fa-solid fa-pen"></i> Editar</a>
+                                        <a href="/cobranca/detalhes/<%= c.id %>" class="btn btn-sm btn-outline-primary px-2 me-1" title="Ver Detalhes e Histórico"><i class="fa-solid fa-eye"></i> Detalhes</a>
+                                        <a href="/cobranca/editar/<%= c.id %>" class="btn btn-sm btn-outline-warning text-dark px-2" title="Editar"><i class="fa-solid fa-pen"></i></a>
                                     </td>
                                 </tr>
                             <% }) %>

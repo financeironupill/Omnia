@@ -811,6 +811,71 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
     }
 });
 
+// DETALHES DA COBRANÇA E HISTÓRICO
+app.get('/cobranca/detalhes/:id', verificarAutenticacao, async (req, res) => {
+    try {
+        const contaId = req.params.id;
+        
+        const contaRes = await pool.query(`
+            SELECT c.*, cl.nome AS cliente_nome, cl.cnpj_cpf AS cliente_cnpj, 
+                   g.nome_resumido AS gerente_nome, v.nome_resumido AS vendedor_nome 
+            FROM contas_receber c 
+            LEFT JOIN clientes cl ON c.cliente_id = cl.id 
+            LEFT JOIN gerentes g ON c.gerente_id = g.id 
+            LEFT JOIN vendedores v ON c.vendedor_id = v.id 
+            WHERE c.id = $1
+        `, [contaId]);
+
+        if (contaRes.rows.length === 0) {
+            return res.redirect('/cobranca?erro=Cobrança não encontrada.');
+        }
+
+        const historicoRes = await pool.query(`
+            SELECT h.*, u.nome AS usuario_nome 
+            FROM cobranca_historico h 
+            LEFT JOIN usuarios u ON h.usuario_id = u.id 
+            WHERE h.conta_id = $1 
+            ORDER BY h.criado_em DESC
+        `, [contaId]);
+
+        res.render('cobranca-detalhes', {
+            conta: contaRes.rows[0],
+            historico: historicoRes.rows,
+            erro: null,
+            sucesso: req.query.sucesso || null
+        });
+    } catch (err) {
+        console.error(err);
+        res.redirect('/cobranca?erro=Erro ao carregar detalhes da cobrança.');
+    }
+});
+
+// REGISTAR AÇÃO NO HISTÓRICO
+app.post('/cobranca/historico/novo/:id', verificarAutenticacao, async (req, res) => {
+    const contaId = req.params.id;
+    const { tipo_acao, canal, descricao } = req.body;
+    const usuarioId = req.session.usuario.id;
+
+    try {
+        const sql = `
+            INSERT INTO cobranca_historico (conta_id, usuario_id, tipo_acao, canal, descricao, criado_em) 
+            VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+        `;
+        await pool.query(sql, [
+            parseInt(contaId, 10),
+            usuarioId,
+            tipo_acao,
+            canal,
+            formatarCapitalizacao(descricao)
+        ]);
+
+        res.redirect(`/cobranca/detalhes/${contaId}?sucesso=Ação registada com sucesso!`);
+    } catch (err) {
+        console.error(err);
+        res.redirect(`/cobranca/detalhes/${contaId}?erro=Erro ao registar a ação no histórico.`);
+    }
+});
+
 app.get('/cobranca/nova', verificarAutenticacao, async (req, res) => {
     try {
         const clientes = await pool.query(`
