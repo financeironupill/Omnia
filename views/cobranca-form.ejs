@@ -25,7 +25,7 @@
             <hr class="text-muted mb-4">
 
             <% if (locals.erro && erro) { %>
-                <div class="alert alert-danger py-2"><%= erro %></div>
+                <div class="alert alert-danger py-2"><i class="fa-solid fa-triangle-exclamation me-2"></i><%= erro %></div>
             <% } %>
 
             <form action="<%= conta && conta.id ? '/cobranca/editar/' + conta.id : '/cobranca/novo' %>" method="POST">
@@ -103,22 +103,23 @@
                         <div class="col-md-3">
                             <label class="form-label fw-semibold">Status do Boleto</label>
                             <select name="status_boleto" class="form-select">
-                                <% const st = conta && conta.status_boleto ? conta.status_boleto.trim() : 'Vencido'; %>
-                                <option value="Vencido" <%= st === 'Vencido' ? 'selected' : '' %>>Vencido</option>
-                                <option value="Pago" <%= st === 'Pago' ? 'selected' : '' %>>Pago</option>
-                                <option value="Pago com Pendência" <%= st === 'Pago com Pendência' ? 'selected' : '' %>>Pago com Pendência</option>
+                                <% const stBoleto = conta && conta.status_boleto ? conta.status_boleto.trim() : 'Vencido'; %>
+                                <option value="Vencido" <%= stBoleto === 'Vencido' ? 'selected' : '' %>>Vencido</option>
+                                <option value="Pago" <%= stBoleto === 'Pago' ? 'selected' : '' %>>Pago</option>
+                                <option value="Pago com Pendência" <%= stBoleto === 'Pago com Pendência' ? 'selected' : '' %>>Pago com Pendência</option>
                             </select>
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-semibold">Status da Cobrança</label>
-                            <select name="tipo_cobranca" class="form-select">
+                            <select name="status_cobranca" class="form-select">
+                                <% const stCob = conta && (conta.status_cobranca || conta.tipo_cobranca) ? (conta.status_cobranca || conta.tipo_cobranca).trim() : ''; %>
                                 <option value="">Selecione...</option>
-                                <option value="Iniciar" <%= conta && conta.tipo_cobranca === 'Iniciar' ? 'selected' : '' %>>Iniciar</option>
-                                <option value="Em Cobrança" <%= conta && conta.tipo_cobranca === 'Em Cobrança' ? 'selected' : '' %>>Em Cobrança</option>
-                                <option value="Protestar" <%= conta && conta.tipo_cobranca === 'Protestar' ? 'selected' : '' %>>Protestar</option>
-                                <option value="Cartório" <%= conta && conta.tipo_cobranca === 'Cartório' ? 'selected' : '' %>>Cartório</option>
-                                <option value="Custas" <%= conta && conta.tipo_cobranca === 'Custas' ? 'selected' : '' %>>Custas</option>
-                                <option value="Pago" <%= conta && conta.tipo_cobranca === 'Pago' ? 'selected' : '' %>>Pago</option>
+                                <option value="Iniciar" <%= stCob === 'Iniciar' ? 'selected' : '' %>>Iniciar</option>
+                                <option value="Em Cobrança" <%= stCob === 'Em Cobrança' ? 'selected' : '' %>>Em Cobrança</option>
+                                <option value="Protestar" <%= stCob === 'Protestar' ? 'selected' : '' %>>Protestar</option>
+                                <option value="Cartório" <%= stCob === 'Cartório' ? 'selected' : '' %>>Cartório</option>
+                                <option value="Custas" <%= stCob === 'Custas' ? 'selected' : '' %>>Custas</option>
+                                <option value="Pago" <%= stCob === 'Pago' ? 'selected' : '' %>>Pago</option>
                             </select>
                         </div>
                         <div class="col-md-3">
@@ -141,12 +142,12 @@
                             <input type="date" name="data_pagamento" class="form-control" value="<%= conta && conta.data_pagamento ? new Date(conta.data_pagamento).toISOString().split('T')[0] : '' %>">
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">Data de Pagamento das Custas</label>
-                            <input type="date" name="data_pagamento_custas" class="form-control" value="<%= conta && conta.data_pagamento_custas ? new Date(conta.data_pagamento_custas).toISOString().split('T')[0] : '' %>">
+                            <label class="form-label fw-semibold">Débito em Conta Corrente (Custas)</label>
+                            <input type="date" name="debito_conta_corrente" class="form-control" value="<%= conta && conta.debito_conta_corrente ? new Date(conta.debito_conta_corrente).toISOString().split('T')[0] : '' %>">
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">Valor Pago (R$)</label>
-                            <input type="text" name="valor_pago" class="form-control" placeholder="0,00" value="<%= conta ? (conta.valor_pago || '') : '' %>" oninput="mascaraMoeda(this)">
+                            <label class="form-label fw-semibold">Valor Recebido (R$)</label>
+                            <input type="text" name="valor_recebido" class="form-control" placeholder="0,00" value="<%= conta ? (conta.valor_recebido || '') : '' %>" oninput="mascaraMoeda(this)">
                         </div>
                     </div>
                 </div>
@@ -155,22 +156,19 @@
                 <div class="card mb-4 border-0 shadow-sm bg-light">
                     <div class="card-header bg-secondary text-white fw-bold"><i class="fa-solid fa-percent me-2"></i>Comissão</div>
                     <div class="card-body row g-3">
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <label class="form-label fw-semibold">Comissão</label>
                             <select name="comissao" class="form-select">
-                                <option value="Não Estornada" <%= conta && conta.comissao === 'Não Estornada' ? 'selected' : '' %>>Não Estornada</option>
-                                <option value="Estornada" <%= conta && conta.comissao === 'Estornada' ? 'selected' : '' %>>Estornada</option>
+                                <% const stCom = conta && conta.comissao ? conta.comissao.trim() : 'Não Estornada'; %>
+                                <option value="Não Estornada" <%= stCom === 'Não Estornada' ? 'selected' : '' %>>Não Estornada</option>
+                                <option value="Estornada" <%= stCom === 'Estornada' ? 'selected' : '' %>>Estornada</option>
                             </select>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <label class="form-label fw-semibold">Débito da Comissão</label>
                             <input type="date" name="data_estorno" class="form-control" value="<%= conta && conta.data_estorno ? new Date(conta.data_estorno).toISOString().split('T')[0] : '' %>">
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-semibold">R$ Debitado na Comissão</label>
-                            <input type="text" name="valor_debito_comissao" class="form-control" placeholder="0,00" value="<%= conta ? (conta.valor_debito_comissao || '') : '' %>" oninput="mascaraMoeda(this)">
-                        </div>
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <label class="form-label fw-semibold">Data da Reposição da Comissão</label>
                             <input type="date" name="data_reposicao" class="form-control" value="<%= conta && conta.data_reposicao ? new Date(conta.data_reposicao).toISOString().split('T')[0] : '' %>">
                         </div>
@@ -195,7 +193,7 @@
         </div>
     </div>
 
-    <!-- jQuery e Select2 JS para o autocomplete/filtro do cliente -->
+    <!-- jQuery e Select2 JS -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 

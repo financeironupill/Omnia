@@ -935,9 +935,9 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
     const contaId = req.params.id;
     const { 
         cliente_id, numero_documento, banco, valor_original, data_emissao, data_vencimento, 
-        tipo_cobranca, observacoes, status_boleto, data_pagamento, 
-        valor_custas, carteira, data_cartorio, 
-        comissao, data_estorno, data_reposicao, data_pagamento_custas, valor_pago, valor_debito_comissao
+        status_cobranca, observacoes, status_boleto, data_pagamento, 
+        valor_custas, carteira, debito_conta_corrente, data_cartorio, 
+        comissao, data_estorno, data_reposicao, valor_recebido
     } = req.body;
 
     try {
@@ -950,7 +950,7 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
         }
 
         const stBoleto = status_boleto ? status_boleto.trim() : 'Vencido';
-        const stCob = tipo_cobranca ? tipo_cobranca.trim() : null;
+        const stCob = status_cobranca ? status_cobranca.trim() : null;
 
         let diasVencidos = 0;
         const dtVencStr = tratarData(data_vencimento);
@@ -969,12 +969,11 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
 
         const sql = `UPDATE contas_receber SET 
             cliente_id = $1, gerente_id = $2, vendedor_id = $3, numero_documento = $4, banco = $5, 
-            valor_original = $6, data_emissao = $7, data_vencimento = $8, tipo_cobranca = $9, 
+            valor_original = $6, data_emissao = $7, data_vencimento = $8, status_cobranca = $9, tipo_cobranca = $9, 
             observacoes = $10, status_boleto = $11, data_pagamento = $12, dias_vencidos = $13, 
-            valor_custas = $14, carteira = $15, data_cartorio = $16, comissao = $17, 
-            data_estorno = $18, data_reposicao = $19, data_pagamento_custas = $20, valor_pago = $21, 
-            valor_debito_comissao = $22, atualizado_em = CURRENT_TIMESTAMP 
-            WHERE id = $23`;
+            valor_custas = $14, carteira = $15, debito_conta_corrente = $16, data_cartorio = $17, comissao = $18, 
+            data_estorno = $19, data_reposicao = $20, valor_recebido = $21, atualizado_em = CURRENT_TIMESTAMP 
+            WHERE id = $22`;
 
         await pool.query(sql, [
             parseInt(cliente_id, 10),
@@ -992,13 +991,12 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
             diasVencidos,
             limparValorMonetario(valor_custas),
             carteira || 'Simples',
+            tratarData(debito_conta_corrente),
             tratarData(data_cartorio),
             comissao || 'Não Estornada',
             tratarData(data_estorno),
             tratarData(data_reposicao),
-            tratarData(data_pagamento_custas),
-            limparValorMonetario(valor_pago),
-            limparValorMonetario(valor_debito_comissao),
+            limparValorMonetario(valor_recebido),
             parseInt(contaId, 10)
         ]);
 
@@ -1019,9 +1017,9 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
 app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
     const { 
         cliente_id, numero_documento, banco, valor_original, data_emissao, data_vencimento, 
-        tipo_cobranca, observacoes, status_boleto, data_pagamento, 
-        valor_custas, carteira, data_cartorio, 
-        comissao, data_estorno, data_reposicao, data_pagamento_custas, valor_pago, valor_debito_comissao 
+        status_cobranca, observacoes, status_boleto, data_pagamento, 
+        valor_custas, carteira, debito_conta_corrente, data_cartorio, 
+        comissao, data_estorno, data_reposicao, valor_recebido 
     } = req.body;
 
     try {
@@ -1034,7 +1032,7 @@ app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
         }
 
         const stBoleto = status_boleto ? status_boleto.trim() : 'Vencido';
-        const stCob = tipo_cobranca ? tipo_cobranca.trim() : null;
+        const stCob = status_cobranca ? status_cobranca.trim() : null;
 
         let diasVencidos = 0;
         const dtVencStr = tratarData(data_vencimento);
@@ -1053,16 +1051,14 @@ app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
 
         const sql = `INSERT INTO contas_receber (
             cliente_id, gerente_id, vendedor_id, numero_documento, banco, valor_original, valor_recebido, 
-            data_emissao, data_vencimento, status, tipo_cobranca, observacoes, status_boleto, 
-            data_pagamento, dias_vencidos, valor_custas, carteira, data_cartorio, comissao, 
-            data_estorno, data_reposicao, data_pagamento_custas, valor_pago, valor_debito_comissao, 
-            criado_em, atualizado_em
+            data_emissao, data_vencimento, status, status_cobranca, tipo_cobranca, observacoes, status_boleto, 
+            data_pagamento, dias_vencidos, valor_custas, carteira, debito_conta_corrente, data_cartorio, comissao, 
+            data_estorno, data_reposicao, criado_em, atualizado_em
         ) VALUES (
-            $1, $2, $3, $4, $5, $6, 0.00, 
-            $7, $8, 'Em Aberto', $9, $10, $11, 
-            $12, $13, $14, $15, $16, $17, 
-            $18, $19, $20, $21, $22, 
-            CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+            $1, $2, $3, $4, $5, $6, $7, 
+            $8, $9, 'Em Aberto', $10, $10, $11, $12, 
+            $13, $14, $15, $16, $17, $18, $19, 
+            $20, $21, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
         )`;
 
         await pool.query(sql, [
@@ -1072,6 +1068,7 @@ app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
             numero_documento ? numero_documento.trim().toUpperCase() : '',
             banco || null,
             limparValorMonetario(valor_original),
+            limparValorMonetario(valor_recebido),
             tratarData(data_emissao),
             tratarData(data_vencimento),
             stCob,
@@ -1081,13 +1078,11 @@ app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
             diasVencidos,
             limparValorMonetario(valor_custas),
             carteira || 'Simples',
+            tratarData(debito_conta_corrente),
             tratarData(data_cartorio),
             comissao || 'Não Estornada',
             tratarData(data_estorno),
-            tratarData(data_reposicao),
-            tratarData(data_pagamento_custas),
-            limparValorMonetario(valor_pago),
-            limparValorMonetario(valor_debito_comissao)
+            tratarData(data_reposicao)
         ]);
 
         res.redirect('/cobranca?sucesso=Cobrança cadastrada com sucesso!');
