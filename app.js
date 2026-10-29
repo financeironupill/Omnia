@@ -894,12 +894,123 @@ app.get('/cobranca/nova', verificarAutenticacao, async (req, res) => {
     }
 });
 
+// CARREGAR FORMULÁRIO DE EDIÇÃO DE COBRANÇA
+app.get('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
+    try {
+        const contaId = req.params.id;
+        const contaRes = await pool.query('SELECT * FROM contas_receber WHERE id = $1', [contaId]);
+        
+        if (contaRes.rows.length === 0) {
+            return res.redirect('/cobranca?erro=Cobrança não encontrada.');
+        }
+
+        const clientes = await pool.query(`
+            SELECT c.id, c.nome, c.gerente_id, c.vendedor_id, 
+                   g.nome_resumido AS gerente_nome, v.nome_resumido AS vendedor_nome 
+            FROM clientes c 
+            LEFT JOIN gerentes g ON c.gerente_id = g.id 
+            LEFT JOIN vendedores v ON c.vendedor_id = v.id 
+            WHERE c.ativo = 1 
+            ORDER BY c.nome ASC
+        `);
+
+        res.render('cobranca-form', { 
+            conta: contaRes.rows[0], 
+            clientes: clientes.rows, 
+            erro: null, 
+            sucesso: null 
+        });
+    } catch (err) {
+        console.error(err);
+        res.redirect('/cobranca?erro=Erro ao carregar edição da cobrança.');
+    }
+});
+
+// SALVAR EDIÇÃO DE COBRANÇA
+app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
+    const contaId = req.params.id;
+    const { 
+        cliente_id, numero_documento, banco, valor_original, data_emissao, data_vencimento, 
+        tipo_cobranca, observacoes, status_boleto, data_pagamento, status_cobranca, 
+        valor_custas, carteira, debito_conta_corrente, cadastro_tipo, data_cartorio, 
+        comissao, data_estorno, data_reposicao, data_pagamento_custas, valor_pago, valor_debito_comissao
+    } = req.body;
+
+    try {
+        const cliRes = await pool.query('SELECT gerente_id, vendedor_id FROM clientes WHERE id = $1', [cliente_id]);
+        let gerenteId = null;
+        let vendedorId = null;
+        if (cliRes.rows.length > 0) {
+            gerenteId = cliRes.rows[0].gerente_id;
+            vendedorId = cliRes.rows[0].vendedor_id;
+        }
+
+        let diasVencidos = 0;
+        const dataVenc = new Date(data_vencimento);
+        let dataFim = new Date();
+
+        if ((status_boleto === 'Custas' || status_boleto === 'Pago') && data_pagamento) {
+            dataFim = new Date(data_pagamento);
+        }
+
+        if (dataVenc && dataFim) {
+            const diffTime = dataFim - dataVenc;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            diasVencidos = diffDays > 0 ? diffDays : 0;
+        }
+
+        const sql = `UPDATE contas_receber SET 
+            cliente_id = $1, gerente_id = $2, vendedor_id = $3, numero_documento = $4, banco = $5, 
+            valor_original = $6, data_emissao = $7, data_vencimento = $8, tipo_cobranca = $9, 
+            observacoes = $10, status_boleto = $11, data_pagamento = $12, dias_vencidos = $13, 
+            status_cobranca = $14, valor_custas = $15, carteira = $16, debito_conta_corrente = $17, 
+            cadastro_tipo = $18, data_cartorio = $19, comissao = $20, data_estorno = $21, 
+            data_reposicao = $22, data_pagamento_custas = $23, valor_pago = $24, valor_debito_comissao = $25, 
+            atualizado_em = CURRENT_TIMESTAMP 
+            WHERE id = $26`;
+
+        await pool.query(sql, [
+            parseInt(cliente_id, 10),
+            gerenteId,
+            vendedorId,
+            numero_documento ? numero_documento.trim().toUpperCase() : '',
+            banco,
+            limparValorMonetario(valor_original),
+            data_emissao || null,
+            data_vencimento || null,
+            tipo_cobranca || null,
+            formatarCapitalizacao(observacoes),
+            status_boleto || 'Vencido',
+            data_pagamento || null,
+            diasVencidos,
+            status_cobranca || 'Iniciar',
+            limparValorMonetario(valor_custas),
+            carteira || 'Simples',
+            debito_conta_corrente || null,
+            cadastro_tipo || 'Normal',
+            data_cartorio || null,
+            comissao || 'Não Estornada',
+            data_estorno || null,
+            data_reposicao || null,
+            data_pagamento_custas || null,
+            limparValorMonetario(valor_pago),
+            limparValorMonetario(valor_debito_comissao),
+            parseInt(contaId, 10)
+        ]);
+
+        res.redirect('/cobranca?sucesso=Cobrança atualizada com sucesso!');
+    } catch (err) {
+        console.error(err);
+        res.redirect('/cobranca?erro=Erro ao atualizar cobrança.');
+    }
+});
+
 app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
     const { 
         cliente_id, numero_documento, banco, valor_original, data_emissao, data_vencimento, 
         tipo_cobranca, observacoes, status_boleto, data_pagamento, status_cobranca, 
         valor_custas, carteira, debito_conta_corrente, cadastro_tipo, data_cartorio, 
-        comissao, data_estorno, data_reposicao 
+        comissao, data_estorno, data_reposicao, data_pagamento_custas, valor_pago, valor_debito_comissao 
     } = req.body;
 
     try {
@@ -929,8 +1040,8 @@ app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
             cliente_id, gerente_id, vendedor_id, numero_documento, banco, valor_original, valor_recebido, data_emissao, 
             data_vencimento, status, tipo_cobranca, observacoes, status_boleto, data_pagamento, 
             dias_vencidos, status_cobranca, valor_custas, carteira, debito_conta_corrente, 
-            cadastro_tipo, data_cartorio, comissao, data_estorno, data_reposicao, criado_em, atualizado_em
-        ) VALUES ($1, $2, $3, $4, $5, $6, 0.00, $7, $8, 'Em Aberto', $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`;
+            cadastro_tipo, data_cartorio, comissao, data_estorno, data_reposicao, data_pagamento_custas, valor_pago, valor_debito_comissao, criado_em, atualizado_em
+        ) VALUES ($1, $2, $3, $4, $5, $6, 0.00, $7, $8, 'Em Aberto', $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`;
 
         await pool.query(sql, [
             parseInt(cliente_id, 10),
@@ -939,8 +1050,8 @@ app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
             numero_documento ? numero_documento.trim().toUpperCase() : '',
             banco,
             limparValorMonetario(valor_original),
-            data_emissao,
-            data_vencimento,
+            data_emissao || null,
+            data_vencimento || null,
             tipo_cobranca,
             formatarCapitalizacao(observacoes),
             status_boleto || 'Vencido',
@@ -954,7 +1065,10 @@ app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
             data_cartorio || null,
             comissao || 'Não Estornada',
             data_estorno || null,
-            data_reposicao || null
+            data_reposicao || null,
+            data_pagamento_custas || null,
+            limparValorMonetario(valor_pago),
+            limparValorMonetario(valor_debito_comissao)
         ]);
 
         res.redirect('/cobranca?sucesso=Cobrança cadastrada com sucesso!');
