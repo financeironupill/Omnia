@@ -811,14 +811,20 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
         const gerentes = await pool.query('SELECT id, nome_resumido FROM gerentes WHERE ativo = 1 ORDER BY nome_resumido ASC');
         const vendedores = await pool.query('SELECT id, nome_resumido FROM vendedores WHERE ativo = 1 ORDER BY nome_resumido ASC');
         
+        const contagemClientesPendentes = {};
         result.rows.forEach(c => {
             c.dias_vencidos_calc = calcularDiasVencidosRegra(c.status_boleto, c.data_vencimento, c.data_pagamento);
+            const stBoleto = c.status_boleto ? String(c.status_boleto).trim() : '';
+            if (c.cliente_id && (stBoleto === 'Vencido' || stBoleto === 'Pago com Pendência')) {
+                contagemClientesPendentes[c.cliente_id] = (contagemClientesPendentes[c.cliente_id] || 0) + 1;
+            }
         });
 
         res.render('cobranca-lista', { 
             contas: result.rows, 
             gerentes: gerentes.rows,
             vendedores: vendedores.rows,
+            contagemClientesPendentes: contagemClientesPendentes,
             buscaAtual: busca || '', 
             statusAtual: statusFiltro, 
             gerenteAtual: gerente_id || '',
@@ -910,6 +916,40 @@ app.get('/cobranca/nova', verificarAutenticacao, async (req, res) => {
     } catch (err) {
         console.error(err);
         res.redirect('/cobranca?erro=Erro ao carregar formulário.');
+    }
+});
+
+// DUPLICAR COBRANÇA
+app.get('/cobranca/duplicar/:id', verificarAutenticacao, async (req, res) => {
+    try {
+        const contaId = req.params.id;
+        const contaRes = await pool.query('SELECT * FROM contas_receber WHERE id = $1', [contaId]);
+        
+        if (contaRes.rows.length === 0) {
+            return res.redirect('/cobranca?erro=Cobrança não encontrada para duplicação.');
+        }
+
+        const clientes = await pool.query(`
+            SELECT c.id, c.nome, c.gerente_id, c.vendedor_id, 
+                   g.nome_resumido AS gerente_nome, v.nome_resumido AS vendedor_nome 
+            FROM clientes c 
+            LEFT JOIN gerentes g ON c.gerente_id = g.id 
+            LEFT JOIN vendedores v ON c.vendedor_id = v.id 
+            WHERE c.ativo = 1 
+            ORDER BY c.nome ASC
+        `);
+
+        const contaDuplicada = { ...contaRes.rows[0], id: null };
+
+        res.render('cobranca-form', { 
+            conta: contaDuplicada, 
+            clientes: clientes.rows, 
+            erro: null, 
+            sucesso: 'A carregar dados duplicados. Modifique os campos necessários e grave a nova cobrança.' 
+        });
+    } catch (err) {
+        console.error(err);
+        res.redirect('/cobranca?erro=Erro ao carregar cobrança para duplicação.');
     }
 });
 
