@@ -39,6 +39,26 @@ function tratarData(dataStr) {
     return dataStr.trim();
 }
 
+function calcularDiasVencidosRegra(statusBoleto, dataVencimento, dataPagamento) {
+    const dtVencStr = tratarData(dataVencimento);
+    if (!dtVencStr) return 0;
+
+    const stBoleto = statusBoleto ? statusBoleto.trim() : 'Vencido';
+    const dataVenc = new Date(dtVencStr);
+    let dataFim;
+
+    if (stBoleto === 'Vencido') {
+        dataFim = new Date();
+    } else {
+        const dtPagStr = tratarData(dataPagamento);
+        dataFim = dtPagStr ? new Date(dtPagStr) : new Date();
+    }
+
+    const diffTime = dataFim - dataVenc;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 ? diffDays : 0;
+}
+
 function verificarAutenticacao(req, res, next) {
     if (req.session.usuario) return next();
     res.redirect('/login');
@@ -786,19 +806,8 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
         const gerentes = await pool.query('SELECT id, nome_resumido FROM gerentes WHERE ativo = 1 ORDER BY nome_resumido ASC');
         const vendedores = await pool.query('SELECT id, nome_resumido FROM vendedores WHERE ativo = 1 ORDER BY nome_resumido ASC');
         
-        const hoje = new Date();
         result.rows.forEach(c => {
-            let dataFim = hoje;
-            if ((c.status_boleto === 'Custas' || c.status_boleto === 'Pago') && c.data_pagamento) {
-                dataFim = new Date(c.data_pagamento);
-            }
-            if (c.data_vencimento) {
-                const diffTime = dataFim - new Date(c.data_vencimento);
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                c.dias_vencidos_calc = diffDays > 0 ? diffDays : 0;
-            } else {
-                c.dias_vencidos_calc = 0;
-            }
+            c.dias_vencidos_calc = calcularDiasVencidosRegra(c.status_boleto, c.data_vencimento, c.data_pagamento);
         });
 
         res.render('cobranca-lista', { 
@@ -951,21 +960,7 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
 
         const stBoleto = status_boleto ? status_boleto.trim() : 'Vencido';
         const stCob = status_cobranca ? status_cobranca.trim() : null;
-
-        let diasVencidos = 0;
-        const dtVencStr = tratarData(data_vencimento);
-        const dtPagStr = tratarData(data_pagamento);
-
-        if (dtVencStr) {
-            const dataVenc = new Date(dtVencStr);
-            let dataFim = new Date();
-            if ((stBoleto === 'Pago' || stBoleto === 'Pago com Pendência') && dtPagStr) {
-                dataFim = new Date(dtPagStr);
-            }
-            const diffTime = dataFim - dataVenc;
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            diasVencidos = diffDays > 0 ? diffDays : 0;
-        }
+        const diasVencidos = calcularDiasVencidosRegra(stBoleto, data_vencimento, data_pagamento);
 
         const sql = `UPDATE contas_receber SET 
             cliente_id = $1, gerente_id = $2, vendedor_id = $3, numero_documento = $4, banco = $5, 
@@ -1033,21 +1028,7 @@ app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
 
         const stBoleto = status_boleto ? status_boleto.trim() : 'Vencido';
         const stCob = status_cobranca ? status_cobranca.trim() : null;
-
-        let diasVencidos = 0;
-        const dtVencStr = tratarData(data_vencimento);
-        const dtPagStr = tratarData(data_pagamento);
-
-        if (dtVencStr) {
-            const dataVenc = new Date(dtVencStr);
-            let dataFim = new Date();
-            if ((stBoleto === 'Pago' || stBoleto === 'Pago com Pendência') && dtPagStr) {
-                dataFim = new Date(dtPagStr);
-            }
-            const diffTime = dataFim - dataVenc;
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            diasVencidos = diffDays > 0 ? diffDays : 0;
-        }
+        const diasVencidos = calcularDiasVencidosRegra(stBoleto, data_vencimento, data_pagamento);
 
         const sql = `INSERT INTO contas_receber (
             cliente_id, gerente_id, vendedor_id, numero_documento, banco, valor_original, valor_recebido, 
