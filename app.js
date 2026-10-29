@@ -63,7 +63,6 @@ app.post('/login', async (req, res) => {
 app.get('/dashboard', verificarAutenticacao, (req, res) => res.render('dashboard', { usuario: req.session.usuario, erro: req.query.erro || null }));
 app.get('/solucao', verificarAutenticacao, (req, res) => res.render('dashboard-solucao', { usuario: req.session.usuario }));
 
-// ROTA DE BACKEND PARA CONSULTA DE CNPJ (Contorna o CORS)
 app.get('/api/consultar-cnpj/:cnpj', verificarAutenticacao, async (req, res) => {
     try {
         const cnpjClean = req.params.cnpj.replace(/\D/g, '');
@@ -754,14 +753,10 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
             idx++;
         }
 
-        // Por defeito, se nenhum status for passado, filtra os que NÃO estão pagos
         let statusFiltro = status !== undefined ? status : 'TODOS_MENOS_PAGO';
         
         if (statusFiltro === 'TODOS_MENOS_PAGO') {
-            queryText += ' AND (c.status_boleto != $ ' + idx + ' OR c.status_boleto IS NULL)';
-            // Ajuste simples para query parameter do operador not equals
-            // Ou mais limpo:
-            queryText = queryText.replace(`AND (c.status_boleto != $ ${idx} OR c.status_boleto IS NULL)`, ` AND (c.status_boleto <> 'Pago')`);
+            queryText += ` AND (c.status_boleto <> 'Pago' OR c.status_boleto IS NULL)`;
         } else if (statusFiltro && statusFiltro !== '') {
             queryText += ' AND c.status_boleto = $' + idx;
             queryParams.push(statusFiltro);
@@ -818,7 +813,6 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
     }
 });
 
-// DETALHES DA COBRANÇA E HISTÓRICO
 app.get('/cobranca/detalhes/:id', verificarAutenticacao, async (req, res) => {
     try {
         const contaId = req.params.id;
@@ -857,7 +851,6 @@ app.get('/cobranca/detalhes/:id', verificarAutenticacao, async (req, res) => {
     }
 });
 
-// REGISTAR AÇÃO NO HISTÓRICO
 app.post('/cobranca/historico/novo/:id', verificarAutenticacao, async (req, res) => {
     const contaId = req.params.id;
     const { tipo_acao, canal, descricao } = req.body;
@@ -901,7 +894,6 @@ app.get('/cobranca/nova', verificarAutenticacao, async (req, res) => {
     }
 });
 
-// CARREGAR FORMULÁRIO DE EDIÇÃO DE COBRANÇA
 app.get('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
     try {
         const contaId = req.params.id;
@@ -933,7 +925,7 @@ app.get('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
     }
 });
 
-// SALVAR EDIÇÃO DE COBRANÇA
+// ATUALIZAR COBRANÇA (Com captura correta do status_boleto)
 app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
     const contaId = req.params.id;
     const { 
