@@ -34,16 +34,21 @@ function limparValorMonetario(valor) {
     return parseFloat(limpo) || 0;
 }
 
-function tratarData(dataStr) {
-    if (!dataStr || dataStr.trim() === '') return null;
-    return dataStr.trim();
+function tratarData(dataInput) {
+    if (!dataInput) return null;
+    if (dataInput instanceof Date) {
+        return dataInput.toISOString().split('T')[0];
+    }
+    const str = String(dataInput).trim();
+    if (str === '') return null;
+    return str;
 }
 
 function calcularDiasVencidosRegra(statusBoleto, dataVencimento, dataPagamento) {
     const dtVencStr = tratarData(dataVencimento);
     if (!dtVencStr) return 0;
 
-    const stBoleto = statusBoleto ? statusBoleto.trim() : 'Vencido';
+    const stBoleto = statusBoleto ? String(statusBoleto).trim() : 'Vencido';
     const dataVenc = new Date(dtVencStr);
     let dataFim;
 
@@ -822,7 +827,7 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
             sucesso: req.query.sucesso || null 
         });
     } catch (err) {
-        console.error(err);
+        console.error('ERRO EM GET /cobranca:', err);
         res.status(500).send('Erro interno');
     }
 });
