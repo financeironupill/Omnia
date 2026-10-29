@@ -756,9 +756,9 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
         let statusFiltro = status !== undefined ? status : 'TODOS_MENOS_PAGO';
         
         if (statusFiltro === 'TODOS_MENOS_PAGO') {
-            queryText += ` AND (c.status_boleto <> 'Pago' OR c.status_boleto IS NULL)`;
+            queryText += ` AND (TRIM(c.status_boleto) <> 'Pago' OR c.status_boleto IS NULL)`;
         } else if (statusFiltro && statusFiltro !== '') {
-            queryText += ' AND c.status_boleto = $' + idx;
+            queryText += ' AND TRIM(c.status_boleto) = $' + idx;
             queryParams.push(statusFiltro);
             idx++;
         }
@@ -925,7 +925,7 @@ app.get('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
     }
 });
 
-// ATUALIZAR COBRANÇA (Com captura correta do status_boleto)
+// ATUALIZAR COBRANÇA
 app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
     const contaId = req.params.id;
     const { 
@@ -979,7 +979,7 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
             data_vencimento || null,
             tipo_cobranca || null,
             formatarCapitalizacao(observacoes),
-            status_boleto || 'Vencido',
+            status_boleto ? status_boleto.trim() : 'Vencido',
             data_pagamento || null,
             diasVencidos,
             status_cobranca || 'Iniciar',
@@ -1053,7 +1053,7 @@ app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
             data_vencimento || null,
             tipo_cobranca,
             formatarCapitalizacao(observacoes),
-            status_boleto || 'Vencido',
+            status_boleto ? status_boleto.trim() : 'Vencido',
             data_pagamento || null,
             diasVencidos,
             status_cobranca || 'Iniciar',
