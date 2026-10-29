@@ -34,6 +34,11 @@ function limparValorMonetario(valor) {
     return parseFloat(limpo) || 0;
 }
 
+function tratarData(dataStr) {
+    if (!dataStr || dataStr.trim() === '') return null;
+    return dataStr.trim();
+}
+
 function verificarAutenticacao(req, res, next) {
     if (req.session.usuario) return next();
     res.redirect('/login');
@@ -676,7 +681,7 @@ app.post('/ocorrencias/novo', verificarAutenticacao, async (req, res) => {
         const cli = await pool.query('SELECT nome FROM clientes WHERE id = $1', [cliente_id]);
         const cliNome = cli.rows.length > 0 ? cli.rows[0].nome : '';
         const sql = 'INSERT INTO ocorrencias (numero, tipo_ocorrencia_id, cliente_id, transportadora_id, usuario_id, cliente_nome, nf_origem, valor_nf_origem, vencimento_atual, nfd, tipo_financeiro, valor_financeiro, descricao_problema, status, criado_em, atualizado_em) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, \'Em Aberto\', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)';
-        await pool.query(sql, [gerarNumeroOcorrencia(), parseInt(tipo_ocorrencia_id, 10), parseInt(cliente_id, 10), transportadora_id ? parseInt(transportadora_id, 10) : null, req.session.usuario.id, cliNome, nf_origem ? nf_origem.trim().toUpperCase() : '', limparValorMonetario(valor_nf_origem), vencimento_atual || null, nfd ? nfd.trim().toUpperCase() : '', tipo_financeiro || null, limparValorMonetario(valor_financeiro), formatarCapitalizacao(descricao_problema)]);
+        await pool.query(sql, [gerarNumeroOcorrencia(), parseInt(tipo_ocorrencia_id, 10), parseInt(cliente_id, 10), transportadora_id ? parseInt(transportadora_id, 10) : null, req.session.usuario.id, cliNome, nf_origem ? nf_origem.trim().toUpperCase() : '', limparValorMonetario(valor_nf_origem), tratarData(vencimento_atual), nfd ? nfd.trim().toUpperCase() : '', tipo_financeiro || null, limparValorMonetario(valor_financeiro), formatarCapitalizacao(descricao_problema)]);
         res.redirect('/ocorrencias?sucesso=Ocorrência registrada!');
     } catch (err) {
         console.error(err);
@@ -714,7 +719,7 @@ app.post('/ocorrencias/editar/:id', verificarAutenticacao, async (req, res) => {
         const cli = await pool.query('SELECT nome FROM clientes WHERE id = $1', [cliente_id]);
         const cliNome = cli.rows.length > 0 ? cli.rows[0].nome : '';
         const sql = 'UPDATE ocorrencias SET tipo_ocorrencia_id = $1, cliente_id = $2, transportadora_id = $3, cliente_nome = $4, nf_origem = $5, valor_nf_origem = $6, vencimento_atual = $7, nfd = $8, tipo_financeiro = $9, valor_financeiro = $10, status = $11, descricao_problema = $12, solucao_aplicada = $13, atualizado_em = CURRENT_TIMESTAMP WHERE id = $14';
-        await pool.query(sql, [parseInt(tipo_ocorrencia_id, 10), parseInt(cliente_id, 10), transportadora_id ? parseInt(transportadora_id, 10) : null, cliNome, nf_origem ? nf_origem.trim().toUpperCase() : '', limparValorMonetario(valor_nf_origem), vencimento_atual || null, nfd ? nfd.trim().toUpperCase() : '', tipo_financeiro || null, limparValorMonetario(valor_financeiro), status, formatarCapitalizacao(descricao_problema), formatarCapitalizacao(solucao_aplicada), req.params.id]);
+        await pool.query(sql, [parseInt(tipo_ocorrencia_id, 10), parseInt(cliente_id, 10), transportadora_id ? parseInt(transportadora_id, 10) : null, cliNome, nf_origem ? nf_origem.trim().toUpperCase() : '', limparValorMonetario(valor_nf_origem), tratarData(vencimento_atual), nfd ? nfd.trim().toUpperCase() : '', tipo_financeiro || null, limparValorMonetario(valor_financeiro), status, formatarCapitalizacao(descricao_problema), formatarCapitalizacao(solucao_aplicada), req.params.id]);
         res.redirect('/ocorrencias?sucesso=Atualizada com sucesso!');
     } catch (err) {
         console.error(err);
@@ -804,8 +809,8 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
             statusAtual: statusFiltro, 
             gerenteAtual: gerente_id || '',
             vendedorAtual: vendedor_id || '',
-            erro: null, 
-            sucesso: null 
+            erro: req.query.erro || null, 
+            sucesso: req.query.sucesso || null 
         });
     } catch (err) {
         console.error(err);
@@ -930,8 +935,8 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
     const contaId = req.params.id;
     const { 
         cliente_id, numero_documento, banco, valor_original, data_emissao, data_vencimento, 
-        tipo_cobranca, observacoes, status_boleto, data_pagamento, status_cobranca, 
-        valor_custas, carteira, debito_conta_corrente, cadastro_tipo, data_cartorio, 
+        tipo_cobranca, observacoes, status_boleto, data_pagamento, 
+        valor_custas, carteira, data_cartorio, 
         comissao, data_estorno, data_reposicao, data_pagamento_custas, valor_pago, valor_debito_comissao
     } = req.body;
 
@@ -944,15 +949,19 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
             vendedorId = cliRes.rows[0].vendedor_id;
         }
 
+        const stBoleto = status_boleto ? status_boleto.trim() : 'Vencido';
+        const stCob = tipo_cobranca ? tipo_cobranca.trim() : null;
+
         let diasVencidos = 0;
-        const dataVenc = new Date(data_vencimento);
-        let dataFim = new Date();
+        const dtVencStr = tratarData(data_vencimento);
+        const dtPagStr = tratarData(data_pagamento);
 
-        if ((status_boleto === 'Custas' || status_boleto === 'Pago') && data_pagamento) {
-            dataFim = new Date(data_pagamento);
-        }
-
-        if (dataVenc && dataFim) {
+        if (dtVencStr) {
+            const dataVenc = new Date(dtVencStr);
+            let dataFim = new Date();
+            if ((stBoleto === 'Pago' || stBoleto === 'Pago com Pendência') && dtPagStr) {
+                dataFim = new Date(dtPagStr);
+            }
             const diffTime = dataFim - dataVenc;
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
             diasVencidos = diffDays > 0 ? diffDays : 0;
@@ -962,36 +971,32 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
             cliente_id = $1, gerente_id = $2, vendedor_id = $3, numero_documento = $4, banco = $5, 
             valor_original = $6, data_emissao = $7, data_vencimento = $8, tipo_cobranca = $9, 
             observacoes = $10, status_boleto = $11, data_pagamento = $12, dias_vencidos = $13, 
-            status_cobranca = $14, valor_custas = $15, carteira = $16, debito_conta_corrente = $17, 
-            cadastro_tipo = $18, data_cartorio = $19, comissao = $20, data_estorno = $21, 
-            data_reposicao = $22, data_pagamento_custas = $23, valor_pago = $24, valor_debito_comissao = $25, 
-            atualizado_em = CURRENT_TIMESTAMP 
-            WHERE id = $26`;
+            valor_custas = $14, carteira = $15, data_cartorio = $16, comissao = $17, 
+            data_estorno = $18, data_reposicao = $19, data_pagamento_custas = $20, valor_pago = $21, 
+            valor_debito_comissao = $22, atualizado_em = CURRENT_TIMESTAMP 
+            WHERE id = $23`;
 
         await pool.query(sql, [
             parseInt(cliente_id, 10),
             gerenteId,
             vendedorId,
             numero_documento ? numero_documento.trim().toUpperCase() : '',
-            banco,
+            banco || null,
             limparValorMonetario(valor_original),
-            data_emissao || null,
-            data_vencimento || null,
-            tipo_cobranca || null,
+            tratarData(data_emissao),
+            tratarData(data_vencimento),
+            stCob,
             formatarCapitalizacao(observacoes),
-            status_boleto ? status_boleto.trim() : 'Vencido',
-            data_pagamento || null,
+            stBoleto,
+            tratarData(data_pagamento),
             diasVencidos,
-            status_cobranca || 'Iniciar',
             limparValorMonetario(valor_custas),
             carteira || 'Simples',
-            debito_conta_corrente || null,
-            cadastro_tipo || 'Normal',
-            data_cartorio || null,
+            tratarData(data_cartorio),
             comissao || 'Não Estornada',
-            data_estorno || null,
-            data_reposicao || null,
-            data_pagamento_custas || null,
+            tratarData(data_estorno),
+            tratarData(data_reposicao),
+            tratarData(data_pagamento_custas),
             limparValorMonetario(valor_pago),
             limparValorMonetario(valor_debito_comissao),
             parseInt(contaId, 10)
@@ -999,16 +1004,23 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
 
         res.redirect('/cobranca?sucesso=Cobrança atualizada com sucesso!');
     } catch (err) {
-        console.error(err);
-        res.redirect('/cobranca?erro=Erro ao atualizar cobrança.');
+        console.error('ERRO AO EDITAR COBRANÇA:', err);
+        const clientes = await pool.query('SELECT c.id, c.nome, c.gerente_id, c.vendedor_id, g.nome_resumido AS gerente_nome, v.nome_resumido AS vendedor_nome FROM clientes c LEFT JOIN gerentes g ON c.gerente_id = g.id LEFT JOIN vendedores v ON c.vendedor_id = v.id WHERE c.ativo = 1 ORDER BY c.nome ASC');
+        res.render('cobranca-form', { 
+            conta: { id: contaId, ...req.body }, 
+            clientes: clientes.rows, 
+            erro: 'Erro ao atualizar cobrança: ' + err.message, 
+            sucesso: null 
+        });
     }
 });
 
+// CADASTRAR NOVA COBRANÇA
 app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
     const { 
         cliente_id, numero_documento, banco, valor_original, data_emissao, data_vencimento, 
-        tipo_cobranca, observacoes, status_boleto, data_pagamento, status_cobranca, 
-        valor_custas, carteira, debito_conta_corrente, cadastro_tipo, data_cartorio, 
+        tipo_cobranca, observacoes, status_boleto, data_pagamento, 
+        valor_custas, carteira, data_cartorio, 
         comissao, data_estorno, data_reposicao, data_pagamento_custas, valor_pago, valor_debito_comissao 
     } = req.body;
 
@@ -1021,59 +1033,73 @@ app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
             vendedorId = cliRes.rows[0].vendedor_id;
         }
 
+        const stBoleto = status_boleto ? status_boleto.trim() : 'Vencido';
+        const stCob = tipo_cobranca ? tipo_cobranca.trim() : null;
+
         let diasVencidos = 0;
-        const dataVenc = new Date(data_vencimento);
-        let dataFim = new Date();
+        const dtVencStr = tratarData(data_vencimento);
+        const dtPagStr = tratarData(data_pagamento);
 
-        if ((status_boleto === 'Custas' || status_boleto === 'Pago') && data_pagamento) {
-            dataFim = new Date(data_pagamento);
-        }
-
-        if (dataVenc && dataFim) {
+        if (dtVencStr) {
+            const dataVenc = new Date(dtVencStr);
+            let dataFim = new Date();
+            if ((stBoleto === 'Pago' || stBoleto === 'Pago com Pendência') && dtPagStr) {
+                dataFim = new Date(dtPagStr);
+            }
             const diffTime = dataFim - dataVenc;
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
             diasVencidos = diffDays > 0 ? diffDays : 0;
         }
 
         const sql = `INSERT INTO contas_receber (
-            cliente_id, gerente_id, vendedor_id, numero_documento, banco, valor_original, valor_recebido, data_emissao, 
-            data_vencimento, status, tipo_cobranca, observacoes, status_boleto, data_pagamento, 
-            dias_vencidos, status_cobranca, valor_custas, carteira, debito_conta_corrente, 
-            cadastro_tipo, data_cartorio, comissao, data_estorno, data_reposicao, data_pagamento_custas, valor_pago, valor_debito_comissao, criado_em, atualizado_em
-        ) VALUES ($1, $2, $3, $4, $5, $6, 0.00, $7, $8, 'Em Aberto', $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`;
+            cliente_id, gerente_id, vendedor_id, numero_documento, banco, valor_original, valor_recebido, 
+            data_emissao, data_vencimento, status, tipo_cobranca, observacoes, status_boleto, 
+            data_pagamento, dias_vencidos, valor_custas, carteira, data_cartorio, comissao, 
+            data_estorno, data_reposicao, data_pagamento_custas, valor_pago, valor_debito_comissao, 
+            criado_em, atualizado_em
+        ) VALUES (
+            $1, $2, $3, $4, $5, $6, 0.00, 
+            $7, $8, 'Em Aberto', $9, $10, $11, 
+            $12, $13, $14, $15, $16, $17, 
+            $18, $19, $20, $21, $22, 
+            CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        )`;
 
         await pool.query(sql, [
             parseInt(cliente_id, 10),
             gerenteId,
             vendedorId,
             numero_documento ? numero_documento.trim().toUpperCase() : '',
-            banco,
+            banco || null,
             limparValorMonetario(valor_original),
-            data_emissao || null,
-            data_vencimento || null,
-            tipo_cobranca,
+            tratarData(data_emissao),
+            tratarData(data_vencimento),
+            stCob,
             formatarCapitalizacao(observacoes),
-            status_boleto ? status_boleto.trim() : 'Vencido',
-            data_pagamento || null,
+            stBoleto,
+            tratarData(data_pagamento),
             diasVencidos,
-            status_cobranca || 'Iniciar',
             limparValorMonetario(valor_custas),
             carteira || 'Simples',
-            debito_conta_corrente || null,
-            cadastro_tipo || 'Normal',
-            data_cartorio || null,
+            tratarData(data_cartorio),
             comissao || 'Não Estornada',
-            data_estorno || null,
-            data_reposicao || null,
-            data_pagamento_custas || null,
+            tratarData(data_estorno),
+            tratarData(data_reposicao),
+            tratarData(data_pagamento_custas),
             limparValorMonetario(valor_pago),
             limparValorMonetario(valor_debito_comissao)
         ]);
 
         res.redirect('/cobranca?sucesso=Cobrança cadastrada com sucesso!');
     } catch (err) {
-        console.error(err);
-        res.redirect('/cobranca?erro=Erro ao cadastrar cobrança.');
+        console.error('ERRO AO CADASTRAR COBRANÇA:', err);
+        const clientes = await pool.query('SELECT c.id, c.nome, c.gerente_id, c.vendedor_id, g.nome_resumido AS gerente_nome, v.nome_resumido AS vendedor_nome FROM clientes c LEFT JOIN gerentes g ON c.gerente_id = g.id LEFT JOIN vendedores v ON c.vendedor_id = v.id WHERE c.ativo = 1 ORDER BY c.nome ASC');
+        res.render('cobranca-form', { 
+            conta: req.body, 
+            clientes: clientes.rows, 
+            erro: 'Erro ao cadastrar cobrança: ' + err.message, 
+            sucesso: null 
+        });
     }
 });
 
