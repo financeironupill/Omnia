@@ -1098,6 +1098,18 @@ app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
     }
 });
 
+// EXCLUIR COBRANÇA E HISTÓRICO
+app.post('/cobranca/excluir/:id', verificarAutenticacao, async (req, res) => {
+    try {
+        await pool.query('DELETE FROM cobranca_historico WHERE conta_id = $1', [req.params.id]);
+        await pool.query('DELETE FROM contas_receber WHERE id = $1', [req.params.id]);
+        res.redirect('/cobranca?sucesso=Cobrança e respetivo histórico excluídos com sucesso!');
+    } catch (err) {
+        console.error('ERRO AO EXCLUIR COBRANÇA:', err);
+        res.redirect('/cobranca?erro=Erro ao excluir cobrança.');
+    }
+});
+
 app.get('/logout', (req, res) => {
     req.session.destroy();
     res.redirect('/login');

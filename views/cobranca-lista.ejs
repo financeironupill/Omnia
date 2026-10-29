@@ -111,11 +111,16 @@
                                     <td class="fw-bold text-success">R$ <%= Number(c.valor_original).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) %></td>
                                     <td>
                                         <div><span class="badge bg-secondary"><%= c.status_boleto %></span></div>
-                                        <small class="text-muted"><%= c.status_cobranca %></small>
+                                        <small class="text-muted"><%= c.status_cobranca || c.tipo_cobranca %></small>
                                     </td>
                                     <td class="text-end">
-                                        <a href="/cobranca/detalhes/<%= c.id %>" class="btn btn-sm btn-outline-primary px-2 me-1" title="Ver Detalhes e Histórico"><i class="fa-solid fa-eye"></i> Detalhes</a>
-                                        <a href="/cobranca/editar/<%= c.id %>" class="btn btn-sm btn-outline-warning text-dark px-2" title="Editar"><i class="fa-solid fa-pen"></i></a>
+                                        <div class="d-inline-flex gap-1">
+                                            <a href="/cobranca/detalhes/<%= c.id %>" class="btn btn-sm btn-outline-primary px-2" title="Ver Detalhes e Histórico"><i class="fa-solid fa-eye"></i> Detalhes</a>
+                                            <a href="/cobranca/editar/<%= c.id %>" class="btn btn-sm btn-outline-warning text-dark px-2" title="Editar"><i class="fa-solid fa-pen"></i></a>
+                                            <form action="/cobranca/excluir/<%= c.id %>" method="POST" class="d-inline" onsubmit="return confirm('Tem certeza que deseja excluir a cobrança #<%= c.id %> e todo o seu histórico?');">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger px-2" title="Excluir"><i class="fa-solid fa-trash"></i></button>
+                                            </form>
+                                        </div>
                                     </td>
                                 </tr>
                             <% }) %>
