@@ -23,6 +23,24 @@ function formatarCapitalizacao(texto) {
     return texto.trim().toLowerCase().split(' ').map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
 }
 
+// FORMATADOR DE CNPJ (00.000.000/0000-00) E CPF (000.000.000-00)
+function formatarCnpjCpf(valor) {
+    if (!valor) return '';
+    const limpo = String(valor).replace(/\D/g, '');
+    if (limpo.length === 14) {
+        return limpo.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+    } else if (limpo.length === 11) {
+        return limpo.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
+    }
+    return valor;
+}
+
+// FORMATADOR DE MOEDA BRASILEIRA SEM R$ (Ex: 2.205,60)
+function formatarMoedaSemSimbolo(valor) {
+    const num = parseFloat(valor) || 0;
+    return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 function gerarNumeroOcorrencia() {
     const a = new Date();
     return `${a.getFullYear()}${String(a.getMonth() + 1).padStart(2, '0')}${Math.floor(1000 + Math.random() * 9000)}`;
@@ -180,10 +198,15 @@ app.get('/transportadoras', verificarAutenticacao, async (req, res) => {
         let params = [];
         if (busca && busca.trim() !== '') {
             query += ' WHERE nome ILIKE $1 OR nome_fantasia ILIKE $1 OR cnpj ILIKE $1';
-            params.push('%' + busca.trim() + '%');
+            params.push('%' + busca.trim().replace(/\D/g, '') + '%');
         }
         query += ' ORDER BY ' + col + ' ' + dir;
         const result = await pool.query(query, params);
+
+        result.rows.forEach(tr => {
+            tr.cnpj = formatarCnpjCpf(tr.cnpj);
+        });
+
         res.render('transportadoras-lista', { transportadoras: result.rows, buscaAtual: busca || '', ordenarAtual: col, ordemAtual: dir, erro: null, sucesso: null });
     } catch (err) {
         res.status(500).send('Erro interno');
@@ -208,6 +231,9 @@ app.post('/transportadoras/novo', verificarAutenticacao, async (req, res) => {
 app.get('/transportadoras/editar/:id', verificarAutenticacao, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM transportadoras WHERE id = $1', [req.params.id]);
+        if (result.rows.length > 0) {
+            result.rows[0].cnpj = formatarCnpjCpf(result.rows[0].cnpj);
+        }
         res.render('transportadora-form', { transportadora: result.rows[0] });
     } catch (err) {
         res.redirect('/transportadoras?erro=Erro ao carregar.');
@@ -248,6 +274,11 @@ app.get('/clientes', verificarAutenticacao, async (req, res) => {
         }
         query += ' ORDER BY c.' + col + ' ' + dir;
         const result = await pool.query(query, params);
+
+        result.rows.forEach(cli => {
+            cli.cnpj_cpf = formatarCnpjCpf(cli.cnpj_cpf);
+        });
+
         res.render('clientes-lista', { 
             clientes: result.rows, 
             buscaAtual: busca || '', 
@@ -313,6 +344,11 @@ app.get('/clientes/editar/:id', verificarAutenticacao, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM clientes WHERE id = $1', [req.params.id]);
         if (result.rows.length === 0) return res.redirect('/clientes?erro=Não encontrado.');
+
+        if (result.rows[0].cnpj_cpf) {
+            result.rows[0].cnpj_cpf = formatarCnpjCpf(result.rows[0].cnpj_cpf);
+        }
+
         const gerentes = await pool.query('SELECT id, nome_resumido FROM gerentes WHERE ativo = 1 ORDER BY nome_resumido ASC');
         const vendedores = await pool.query('SELECT v.id, v.nome_resumido, v.gerente_id FROM vendedores v WHERE v.ativo = 1 ORDER BY v.nome_resumido ASC');
         res.render('cliente-form', { cliente: result.rows[0], gerentes: gerentes.rows, vendedores: vendedores.rows, erro: null });
@@ -814,6 +850,9 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
         const contagemClientesPendentes = {};
         result.rows.forEach(c => {
             c.dias_vencidos_calc = calcularDiasVencidosRegra(c.status_boleto, c.data_vencimento, c.data_pagamento);
+            c.cliente_cnpj = formatarCnpjCpf(c.cliente_cnpj);
+            c.valor_original_fmt = formatarMoedaSemSimbolo(c.valor_original);
+
             const stBoleto = c.status_boleto ? String(c.status_boleto).trim() : '';
             if (c.cliente_id && (stBoleto === 'Vencido' || stBoleto === 'Pago com Pendência')) {
                 contagemClientesPendentes[c.cliente_id] = (contagemClientesPendentes[c.cliente_id] || 0) + 1;
@@ -855,6 +894,11 @@ app.get('/cobranca/detalhes/:id', verificarAutenticacao, async (req, res) => {
         if (contaRes.rows.length === 0) {
             return res.redirect('/cobranca?erro=Cobrança não encontrada.');
         }
+
+        if (contaRes.rows[0].cliente_cnpj) {
+            contaRes.rows[0].cliente_cnpj = formatarCnpjCpf(contaRes.rows[0].cliente_cnpj);
+        }
+        contaRes.rows[0].valor_original_fmt = formatarMoedaSemSimbolo(contaRes.rows[0].valor_original);
 
         const historicoRes = await pool.query(`
             SELECT h.*, u.nome AS usuario_nome 
