@@ -115,8 +115,8 @@
                             </div>
 
                             <div class="col-md-4">
-                                <label class="form-label small fw-bold">Data de Emissão</label>
-                                <input type="date" name="data_emissao" class="form-control" value="<%= conta && conta.data_emissao ? new Date(conta.data_emissao).toISOString().split('T')[0] : '' %>">
+                                <label class="form-label small fw-bold">Data de Emissão *</label>
+                                <input type="date" name="data_emissao" class="form-control" value="<%= conta && conta.data_emissao ? new Date(conta.data_emissao).toISOString().split('T')[0] : '' %>" required>
                             </div>
 
                             <div class="col-md-4">
@@ -125,8 +125,8 @@
                             </div>
 
                             <div class="col-md-4">
-                                <label class="form-label small fw-bold">Banco</label>
-                                <select name="banco" class="form-select">
+                                <label class="form-label small fw-bold">Banco *</label>
+                                <select name="banco" class="form-select" required>
                                     <option value="">Selecione um Banco...</option>
                                     <option value="Banco do Brasil" <%= conta && conta.banco === 'Banco do Brasil' ? 'selected' : '' %>>Banco do Brasil</option>
                                     <option value="Bradesco" <%= conta && conta.banco === 'Bradesco' ? 'selected' : '' %>>Bradesco</option>
@@ -160,7 +160,6 @@
                     <div class="card-body">
                         <div class="row g-3">
                             <% if (conta && conta.id) { %>
-                                <!-- MODO EDIÇÃO: EXIBE TODOS OS CAMPOS DA RÉGUA E CARTÓRIO -->
                                 <div class="col-md-4">
                                     <label class="form-label small fw-bold">Situação do Boleto *</label>
                                     <select name="situacao_boleto" id="situacaoBoleto" class="form-select" required>
@@ -194,7 +193,7 @@
                                 </div>
 
                                 <div class="col-md-4">
-                                    <label class="form-label small fw-bold">Valor Custas (Multa + Juros + R$ 35,00)</label>
+                                    <label class="form-label small fw-bold">Valor Custas (Multa + Juros + 35,00)</label>
                                     <div class="input-group">
                                         <input type="text" name="valor_custas" id="valorCustas" class="form-control text-end mascara-moeda" value="<%= conta.valor_custas %>">
                                         <button type="button" class="btn btn-outline-secondary" id="btnCalcularCustas" title="Calcular Custas Padrão"><i class="fa-solid fa-calculator"></i></button>
@@ -216,7 +215,6 @@
                                     <input type="text" name="observacoes" class="form-control" value="<%= conta.observacoes || '' %>" placeholder="Notas sobre o acordo ou cliente...">
                                 </div>
                             <% } else { %>
-                                <!-- MODO INCLUSÃO: ENXUTO APENAS COM SITUAÇÃO E OBSERVAÇÕES -->
                                 <div class="col-md-4">
                                     <label class="form-label small fw-bold">Situação do Boleto *</label>
                                     <input type="text" class="form-control bg-light" value="Vencido" readonly disabled>
@@ -226,7 +224,7 @@
 
                                 <div class="col-md-8">
                                     <label class="form-label small fw-bold">Observações Internas</label>
-                                    <input type="text" name="observacoes" class="form-control" placeholder="Notas iniciais sobre o boleto ou cliente...">
+                                    <input type="text" name="observacoes" class="form-control" value="<%= conta ? conta.observacoes || '' : '' %>" placeholder="Notas iniciais sobre o boleto ou cliente...">
                                 </div>
                             <% } %>
                         </div>
@@ -347,7 +345,7 @@
         </div>
     <% } %>
 
-    <!-- MODAL DE COPIAR TEXTO DO E-MAIL (BACKUP CASO NÃO TENHA CLIENTE NATIVO) -->
+    <!-- MODAL DE COPIAR TEXTO DO E-MAIL -->
     <div class="modal fade" id="modalCopiarEmail" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
@@ -503,13 +501,13 @@
 
             if (etapa === 1) {
                 assunto = `Aviso de Cobrança - Boleto Nº ${dadosBoleto.numero_documento}`;
-                corpo = `Prezados,\n\nIdentificamos o boleto de número ${dadosBoleto.numero_documento} no valor de R$ ${dadosBoleto.valor_original}, vencido em ${dadosBoleto.data_vencimento}, pendente de pagamento.\n\nSolicitamos a gentileza de nos informar a previsão de pagamento ou nos enviar o comprovante de quitação.\n\nAtenciosamente,\nSetor de Cobrança - Omnia`;
+                corpo = `Prezados,\n\nIdentificamos o boleto de número ${dadosBoleto.numero_documento} no valor de ${dadosBoleto.valor_original}, vencido em ${dadosBoleto.data_vencimento}, pendente de pagamento.\n\nSolicitamos a gentileza de nos informar a previsão de pagamento ou nos enviar o comprovante de quitação.\n\nAtenciosamente,\nSetor de Cobrança - Omnia`;
             } else if (etapa === 2) {
                 assunto = `RE: Lembrete de Cobrança - Boleto Nº ${dadosBoleto.numero_documento}`;
-                corpo = `Prezados,\n\nReforçamos o contato anterior referente ao boleto Nº ${dadosBoleto.numero_documento} (Valor: R$ ${dadosBoleto.valor_original}, Vencimento: ${dadosBoleto.data_vencimento}).\n\nRessaltamos que os títulos não quitados sujeitam-se ao envio para cartório/negativação após 3 dias úteis do vencimento. Caso o pagamento já tenha sido efetuado, por favor nos envie o comprovante.\n\nAtenciosamente,\nSetor de Cobrança - Omnia`;
+                corpo = `Prezados,\n\nReforçamos o contato anterior referente ao boleto Nº ${dadosBoleto.numero_documento} (Valor: ${dadosBoleto.valor_original}, Vencimento: ${dadosBoleto.data_vencimento}).\n\nRessaltamos que os títulos não quitados sujeitam-se ao envio para cartório/negativação após 3 dias úteis do vencimento. Caso o pagamento já tenha sido efetuado, por favor nos envie o comprovante.\n\nAtenciosamente,\nSetor de Cobrança - Omnia`;
             } else if (etapa === 3) {
                 assunto = `URGENTE: Notificação Final de Envio a Cartório - Boleto Nº ${dadosBoleto.numero_documento}`;
-                corpo = `Prezados,\n\nInformamos que o boleto Nº ${dadosBoleto.numero_documento} no valor de R$ ${dadosBoleto.valor_original} será encaminhado para Cartório no próximo dia útil.\n\nSolicitamos o envio imediato do comprovante de pagamento caso já tenha sido liquidado.\n\nAtenciosamente,\nSetor de Cobrança - Omnia`;
+                corpo = `Prezados,\n\nInformamos que o boleto Nº ${dadosBoleto.numero_documento} no valor de ${dadosBoleto.valor_original} será encaminhado para Cartório no próximo dia útil.\n\nSolicitamos o envio imediato do comprovante de pagamento caso já tenha sido liquidado.\n\nAtenciosamente,\nSetor de Cobrança - Omnia`;
             }
 
             dispararEmail(dadosBoleto.cliente_email, cc, assunto, corpo);
@@ -525,7 +523,7 @@
                 corpo = `Prezados Gerente e Vendedor,\n\nO boleto Nº ${dadosBoleto.numero_documento} referente ao cliente ${dadosBoleto.cliente_nome} foi totalmente liquidado sem pendências.\n\nO cadastro do cliente está liberado para novos pedidos no sistema.\n\nAtenciosamente,\nSetor Financeiro - Omnia`;
             } else {
                 assunto = `PENDÊNCIA DE CUSTAS: Cliente ${dadosBoleto.cliente_nome} - Boleto Nº ${dadosBoleto.numero_documento}`;
-                corpo = `Prezados Gerente e Vendedor,\n\nO boleto Nº ${dadosBoleto.numero_documento} referente ao cliente ${dadosBoleto.cliente_nome} foi pago, porém possui pendência de custas bancárias/cartório no valor de R$ ${dadosBoleto.valor_custas}.\n\nInformamos que novos pedidos permanecerão bloqueados até a quitação integral destas custas.\n\nAtenciosamente,\nSetor Financeiro - Omnia`;
+                corpo = `Prezados Gerente e Vendedor,\n\nO boleto Nº ${dadosBoleto.numero_documento} referente ao cliente ${dadosBoleto.cliente_nome} foi pago, porém possui pendência de custas bancárias/cartório no valor de ${dadosBoleto.valor_custas}.\n\nInformamos que novos pedidos permanecerão bloqueados até a quitação integral destas custas.\n\nAtenciosamente,\nSetor Financeiro - Omnia`;
             }
 
             dispararEmail(destinatarios, '', assunto, corpo);

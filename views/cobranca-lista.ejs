@@ -80,6 +80,7 @@
                     <label class="form-label small fw-bold">Fase da Régua</label>
                     <select name="status_cobranca" class="form-select form-select-sm">
                         <option value="">Todas as Fases</option>
+                        <option value="Aguardando Régua" <%= statusCobrancaAtual === 'Aguardando Régua' ? 'selected' : '' %>>Aguardando Régua</option>
                         <option value="Aviso 1 (Notificação)" <%= statusCobrancaAtual === 'Aviso 1 (Notificação)' ? 'selected' : '' %>>Aviso 1 (Notificação)</option>
                         <option value="Aviso 2 (Alerta Cartório)" <%= statusCobrancaAtual === 'Aviso 2 (Alerta Cartório)' ? 'selected' : '' %>>Aviso 2 (Alerta Cartório)</option>
                         <option value="Aviso 3 (Aviso Final)" <%= statusCobrancaAtual === 'Aviso 3 (Aviso Final)' ? 'selected' : '' %>>Aviso 3 (Aviso Final)</option>
@@ -134,15 +135,17 @@
                                 <tr>
                                     <td class="fw-bold"><%= b.numero_documento %></td>
                                     <td>
-                                        <div class="fw-semibold"><%= b.cliente_nome || 'N/A' %></div>
+                                        <div class="<%= b.reincidente_vencido ? 'text-danger fw-normal' : 'fw-semibold' %>">
+                                            <%= b.cliente_nome || 'N/A' %>
+                                        </div>
                                         <small class="text-muted"><%= b.cliente_cnpj || '' %></small>
                                     </td>
                                     <td><%= b.data_vencimento ? new Date(b.data_vencimento).toLocaleDateString('pt-BR') : '-' %></td>
                                     <td class="fw-semibold text-primary">
                                         <%= b.data_previsao_pagamento ? new Date(b.data_previsao_pagamento).toLocaleDateString('pt-BR') : '-' %>
                                     </td>
-                                    <td class="text-end fw-bold">R$ <%= b.valor_original_fmt %></td>
-                                    <td class="text-end text-danger fw-semibold">R$ <%= b.valor_custas_fmt %></td>
+                                    <td class="text-end fw-bold"><%= b.valor_original_fmt %></td>
+                                    <td class="text-end text-danger fw-semibold"><%= b.valor_custas_fmt %></td>
                                     <td class="text-center">
                                         <% if (b.situacao_boleto === 'Pago') { %>
                                             <span class="badge bg-success">Pago</span>
@@ -156,13 +159,16 @@
                                         <% if (b.status_cobranca === 'Custas Pendentes (Cartório)') { %>
                                             <span class="badge bg-warning text-dark"><i class="fa-solid fa-triangle-exclamation me-1"></i>Custas Pendentes</span>
                                         <% } else { %>
-                                            <span class="badge bg-info text-dark"><%= b.status_cobranca || 'Aviso 1' %></span>
+                                            <span class="badge bg-info text-dark"><%= b.status_cobranca || 'Aguardando Régua' %></span>
                                         <% } %>
                                     </td>
                                     <td class="text-center">
                                         <div class="d-inline-flex gap-1">
                                             <a href="/cobranca/editar/<%= b.id %>" class="btn btn-outline-primary btn-sm" title="Editar Boleto">
                                                 <i class="fa-solid fa-pen-to-square"></i>
+                                            </a>
+                                            <a href="/cobranca/duplicar/<%= b.id %>" class="btn btn-outline-secondary btn-sm" title="Duplicar Lançamento">
+                                                <i class="fa-solid fa-copy"></i>
                                             </a>
                                             <form action="/cobranca/excluir/<%= b.id %>" method="POST" onsubmit="return confirm('Tem certeza de que deseja excluir este boleto permanentemente?');" class="d-inline">
                                                 <button type="submit" class="btn btn-outline-danger btn-sm" title="Excluir Boleto">

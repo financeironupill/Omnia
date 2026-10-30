@@ -852,7 +852,8 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
         let queryText = `
             SELECT b.*, cl.nome AS cliente_nome, cl.cnpj_cpf AS cliente_cnpj, cl.email AS cliente_email, cl.telefone AS cliente_telefone,
                    g.nome_resumido AS gerente_nome, g.email AS gerente_email,
-                   v.nome_resumido AS vendedor_nome, v.email AS vendedor_email
+                   v.nome_resumido AS vendedor_nome, v.email AS vendedor_email,
+                   (SELECT COUNT(*) FROM boletos b2 WHERE b2.cliente_id = b.cliente_id AND b2.situacao_boleto = 'Vencido') AS total_vencidos_cliente
             FROM boletos b 
             LEFT JOIN clientes cl ON b.cliente_id = cl.id 
             LEFT JOIN gerentes g ON b.gerente_id = g.id 
@@ -902,6 +903,7 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
             b.cliente_cnpj = formatarCnpjCpf(b.cliente_cnpj);
             b.valor_original_fmt = formatarMoedaSemSimbolo(b.valor_original);
             b.valor_custas_fmt = formatarMoedaSemSimbolo(b.valor_custas);
+            b.reincidente_vencido = parseInt(b.total_vencidos_cliente, 10) > 1;
         });
 
         res.render('cobranca-lista', { 
@@ -979,7 +981,7 @@ app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
             tratarData(data_emissao),
             tratarData(data_vencimento),
             situacao_boleto || 'Vencido',
-            status_cobranca || 'Aviso 1 (Notificação)',
+            status_cobranca || 'Aguardando Régua',
             tratarData(data_previsao_pagamento),
             formatarCapitalizacao(observacoes)
         ]);
@@ -1115,6 +1117,51 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
     } catch (err) {
         console.error('ERRO AO EDITAR BOLETO:', err);
         res.redirect(`/cobranca/editar/${boletoId}?erro=Erro ao atualizar boleto.`);
+    }
+});
+
+// DUPLICAR LANÇAMENTO DE BOLETO
+app.get('/cobranca/duplicar/:id', verificarAutenticacao, async (req, res) => {
+    try {
+        const boletoOriginal = await pool.query('SELECT * FROM boletos WHERE id = $1', [req.params.id]);
+        if (boletoOriginal.rows.length === 0) {
+            return res.redirect('/cobranca?erro=Boleto para duplicação não encontrado.');
+        }
+
+        const clientes = await pool.query(`
+            SELECT c.id, c.nome, c.gerente_id, c.vendedor_id, 
+                   g.nome_resumido AS gerente_nome, v.nome_resumido AS vendedor_nome 
+            FROM clientes c 
+            LEFT JOIN gerentes g ON c.gerente_id = g.id 
+            LEFT JOIN vendedores v ON c.vendedor_id = v.id 
+            WHERE c.ativo = 1 
+            ORDER BY c.nome ASC
+        `);
+        const gerentes = await pool.query('SELECT id, nome_resumido FROM gerentes WHERE ativo = 1 ORDER BY nome_resumido ASC');
+        const vendedores = await pool.query('SELECT v.id, v.nome_resumido, v.gerente_id FROM vendedores v WHERE v.ativo = 1 ORDER BY v.nome_resumido ASC');
+
+        const boletoDuplicado = {
+            ...boletoOriginal.rows[0],
+            id: null,
+            data_vencimento: null,
+            valor_original: formatarMoedaSemSimbolo(boletoOriginal.rows[0].valor_original),
+            valor_custas: '0,00',
+            situacao_boleto: 'Vencido',
+            status_cobranca: 'Aguardando Régua'
+        };
+
+        res.render('cobranca-form', { 
+            conta: boletoDuplicado, 
+            clientes: clientes.rows, 
+            gerentes: gerentes.rows, 
+            vendedores: vendedores.rows, 
+            historico: [],
+            erro: null, 
+            sucesso: 'Lançamento duplicado! Informe a nova data de vencimento.' 
+        });
+    } catch (err) {
+        console.error('ERRO AO DUPLICAR BOLETO:', err);
+        res.redirect('/cobranca?erro=Erro ao duplicar boleto.');
     }
 });
 
