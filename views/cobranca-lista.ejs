@@ -160,9 +160,16 @@
                                         <% } %>
                                     </td>
                                     <td class="text-center">
-                                        <a href="/cobranca/editar/<%= b.id %>" class="btn btn-outline-primary btn-sm me-1" title="Gerenciar Régua / Editar">
-                                            <i class="fa-solid fa-pen-to-square"></i>
-                                        </a>
+                                        <div class="d-inline-flex gap-1">
+                                            <a href="/cobranca/editar/<%= b.id %>" class="btn btn-outline-primary btn-sm" title="Editar Boleto">
+                                                <i class="fa-solid fa-pen-to-square"></i>
+                                            </a>
+                                            <form action="/cobranca/excluir/<%= b.id %>" method="POST" onsubmit="return confirm('Tem certeza de que deseja excluir este boleto permanentemente?');" class="d-inline">
+                                                <button type="submit" class="btn btn-outline-danger btn-sm" title="Excluir Boleto">
+                                                    <i class="fa-solid fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
                                     </td>
                                 </tr>
                             <% }) %>

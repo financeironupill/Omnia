@@ -221,22 +221,13 @@
                     </div>
                 </div>
 
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <div>
-                        <% if (conta && conta.id) { %>
-                            <button type="button" class="btn btn-danger fw-semibold" onclick="confirmarExclusao()"><i class="fa-solid fa-trash me-1"></i> Excluir Boleto</button>
-                        <% } %>
-                    </div>
-                    <div class="d-flex gap-2">
-                        <a href="/cobranca" class="btn btn-secondary">Cancelar</a>
-                        <button type="submit" class="btn btn-primary fw-semibold px-4"><i class="fa-solid fa-save me-1"></i> <%= conta && conta.id ? 'Salvar Alterações' : 'Gravar Boleto' %></button>
-                    </div>
+                <div class="d-flex justify-content-end align-items-center gap-2 mb-4">
+                    <a href="/cobranca" class="btn btn-secondary">Cancelar</a>
+                    <button type="submit" class="btn btn-primary fw-semibold px-4"><i class="fa-solid fa-save me-1"></i> <%= conta && conta.id ? 'Salvar Alterações' : 'Gravar Boleto' %></button>
                 </div>
             </form>
 
             <% if (conta && conta.id) { %>
-                <form id="formExcluirBoleto" action="/cobranca/excluir/<%= conta.id %>" method="POST" style="display: none;"></form>
-
                 <!-- SEÇÃO DE AÇÕES RÁPIDAS E E-MAILS -->
                 <div class="card mb-4 border-primary">
                     <div class="card-header bg-primary text-white fw-semibold d-flex justify-content-between align-items-center">
@@ -344,7 +335,7 @@
         </div>
     <% } %>
 
-    <!-- MODAL DE COPIAR TEXTO DO E-MAIL (BACKUP CASO NÃO TENHA CLIENTE NATIVO) -->
+    <!-- MODAL DE COPIAR TEXTO DO E-MAIL -->
     <div class="modal fade" id="modalCopiarEmail" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
@@ -458,12 +449,6 @@
     <!-- SCRIPTS DA APLICAÇÃO -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        function confirmarExclusao() {
-            if (confirm('Tem certeza de que deseja excluir este boleto permanentemente?')) {
-                document.getElementById('formExcluirBoleto').submit();
-            }
-        }
-
         const dadosBoleto = {
             id: "<%= conta ? conta.id : '' %>",
             numero_documento: "<%= conta ? conta.numero_documento : '' %>",
