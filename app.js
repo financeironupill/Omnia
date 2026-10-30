@@ -13,6 +13,9 @@ app.set('views', path.join(__dirname, 'views'));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
+// CORREÇÃO: Servir arquivos estáticos (CSS, JS, imagens) da pasta public
+app.use(express.static(path.join(__dirname, 'public')));
+
 app.use(session({
     secret: process.env.SESSION_SECRET || 'omnia_chave_secreta_2026',
     resave: false,
@@ -846,7 +849,7 @@ app.post('/ocorrencias/excluir/:id', verificarAutenticacao, async (req, res) => 
     }
 });
 
-// MÓDULO DE BOLETOS E RÉGUA DE COBRANÇA (COM CONTAGEM DE PENDENTES/VENCIDOS PARA CNPJ VERMELHO)
+// MÓDULO DE BOLETOS E RÉGUA DE COBRANÇA
 app.get('/cobranca', verificarAutenticacao, async (req, res) => {
     try {
         const { busca, status_boleto, status_cobranca, gerente_id, vendedor_id } = req.query;
