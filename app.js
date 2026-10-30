@@ -846,7 +846,7 @@ app.post('/ocorrencias/excluir/:id', verificarAutenticacao, async (req, res) => 
     }
 });
 
-// MÓDULO DE BOLETOS E RÉGUA DE COBRANÇA
+// MÓDULO DE BOLETOS E RÉGUA DE COBRANÇA (COM CONTAGEM DE PENDENTES/VENCIDOS PARA CNPJ VERMELHO)
 app.get('/cobranca', verificarAutenticacao, async (req, res) => {
     try {
         const { busca, status_boleto, status_cobranca, gerente_id, vendedor_id } = req.query;
@@ -854,7 +854,7 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
             SELECT b.*, cl.nome AS cliente_nome, cl.cnpj_cpf AS cliente_cnpj, cl.email AS cliente_email, cl.telefone AS cliente_telefone,
                    g.nome_resumido AS gerente_nome, g.email AS gerente_email,
                    v.nome_resumido AS vendedor_nome, v.email AS vendedor_email,
-                   (SELECT COUNT(*) FROM boletos b2 WHERE b2.cliente_id = b.cliente_id AND b2.situacao_boleto = 'Vencido') AS total_vencidos_cliente
+                   (SELECT COUNT(*) FROM boletos b2 WHERE b2.cliente_id = b.cliente_id AND b2.situacao_boleto IN ('Vencido', 'Pago com Pendência')) AS total_pendentes_cliente
             FROM boletos b 
             LEFT JOIN clientes cl ON b.cliente_id = cl.id 
             LEFT JOIN gerentes g ON b.gerente_id = g.id 
@@ -904,7 +904,7 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
             b.cliente_cnpj = formatarCnpjCpf(b.cliente_cnpj);
             b.valor_original_fmt = formatarMoedaSemSimbolo(b.valor_original);
             b.valor_custas_fmt = formatarMoedaSemSimbolo(b.valor_custas);
-            b.reincidente_vencido = parseInt(b.total_vencidos_cliente, 10) > 1;
+            b.reincidente_pendente = parseInt(b.total_pendentes_cliente, 10) > 1;
         });
 
         res.render('cobranca-lista', { 
