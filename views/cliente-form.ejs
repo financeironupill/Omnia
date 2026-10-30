@@ -87,12 +87,12 @@
 
                     <div class="col-md-4">
                         <label class="form-label small fw-bold">Telefone</label>
-                        <input type="text" name="telefone" class="form-control" value="<%= cliente ? cliente.telefone : '' %>">
+                        <input type="text" name="telefone" id="inputTelefone" class="form-control" value="<%= cliente ? cliente.telefone : '' %>">
                     </div>
 
                     <div class="col-md-4">
                         <label class="form-label small fw-bold">E-mail</label>
-                        <input type="email" name="email" class="form-control" value="<%= cliente ? cliente.email : '' %>">
+                        <input type="email" name="email" id="inputEmail" class="form-control" value="<%= cliente ? cliente.email : '' %>">
                     </div>
                 </div>
 
@@ -107,7 +107,13 @@
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const campoCnpjCpf = document.getElementById('campoCnpjCpf');
-            const tipoPessoa = document.getElementById('tipoPessoa');
+            const btnBuscarCnpj = document.getElementById('btnBuscarCnpj');
+            const inputRazaoSocial = document.getElementById('inputRazaoSocial');
+            const inputNomeFantasia = document.getElementById('inputNomeFantasia');
+            const inputCidade = document.getElementById('inputCidade');
+            const inputUf = document.getElementById('inputUf');
+            const inputTelefone = document.getElementById('inputTelefone');
+            const inputEmail = document.getElementById('inputEmail');
 
             function aplicarMascara(v) {
                 v = v.replace(/\D/g, '');
@@ -125,6 +131,40 @@
             if (campoCnpjCpf.value) {
                 campoCnpjCpf.value = aplicarMascara(campoCnpjCpf.value);
             }
+
+            btnBuscarCnpj.addEventListener('click', async function() {
+                const cnpjLimpo = campoCnpjCpf.value.replace(/\D/g, '');
+                if (cnpjLimpo.length !== 14) {
+                    alert('Por favor, informe um CNPJ válido com 14 dígitos.');
+                    return;
+                }
+
+                btnBuscarCnpj.disabled = true;
+                btnBuscarCnpj.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+
+                try {
+                    const response = await fetch(`/api/consultar-cnpj/${cnpjLimpo}`);
+                    if (!response.ok) {
+                        alert('CNPJ não encontrado ou erro na consulta.');
+                        return;
+                    }
+
+                    const data = await response.json();
+                    if (data.razao_social) inputRazaoSocial.value = data.razao_social;
+                    if (data.nome_fantasia) inputNomeFantasia.value = data.nome_fantasia;
+                    if (data.municipio) inputCidade.value = data.municipio;
+                    if (data.uf) inputUf.value = data.uf;
+                    if (data.ddd_telefone_1) inputTelefone.value = data.ddd_telefone_1;
+                    if (data.email) inputEmail.value = data.email;
+
+                } catch (err) {
+                    console.error(err);
+                    alert('Erro ao consultar o CNPJ.');
+                } finally {
+                    btnBuscarCnpj.disabled = false;
+                    btnBuscarCnpj.innerHTML = 'Buscar';
+                }
+            });
         });
     </script>
 </body>
