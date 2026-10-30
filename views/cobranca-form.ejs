@@ -335,7 +335,7 @@
         </div>
     <% } %>
 
-    <!-- MODAL DE COPIAR TEXTO DO E-MAIL -->
+    <!-- MODAL DE COPIAR TEXTO DO E-MAIL (BACKUP CASO NÃO TENHA CLIENTE NATIVO) -->
     <div class="modal fade" id="modalCopiarEmail" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
@@ -449,6 +449,7 @@
     <!-- SCRIPTS DA APLICAÇÃO -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Dados estáticos do boleto carregado
         const dadosBoleto = {
             id: "<%= conta ? conta.id : '' %>",
             numero_documento: "<%= conta ? conta.numero_documento : '' %>",
@@ -462,10 +463,12 @@
             vendedor_email: "<%= conta ? conta.vendedor_email : '' %>"
         };
 
+        // Função de envio / fallback de e-mail
         function dispararEmail(para, cc, assunto, corpo) {
             const mailtoUrl = `mailto:${encodeURIComponent(para)}?cc=${encodeURIComponent(cc)}&subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
             window.location.href = mailtoUrl;
 
+            // Preenche modal backup caso precise copiar
             document.getElementById('emailParaModal').value = para;
             document.getElementById('emailCcModal').value = cc;
             document.getElementById('emailAssuntoModal').value = assunto;
@@ -529,6 +532,7 @@
             const valorCustas = document.getElementById('valorCustas');
             const btnCalcularCustas = document.getElementById('btnCalcularCustas');
 
+            // Cálculo Automático de Custas de Cartório
             if (btnCalcularCustas) {
                 btnCalcularCustas.addEventListener('click', function() {
                     const vOrig = parseFloat(valorOriginal.value.replace(/\./g, '').replace(',', '.')) || 0;
@@ -542,9 +546,9 @@
                     const diffTime = Math.max(0, dtHoje - dtVenc);
                     const diffDias = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
-                    const multa = vOrig * 0.02;
-                    const juros = vOrig * (0.02 * (diffDias / 30));
-                    const taxaBanco = 35.00;
+                    const multa = vOrig * 0.02; // Multa 2%
+                    const juros = vOrig * (0.02 * (diffDias / 30)); // Juros 2% ao mês pro-rata
+                    const taxaBanco = 35.00; // Taxa R$ 35,00
 
                     const totalCustas = multa + juros + taxaBanco;
 
@@ -592,6 +596,7 @@
                 atualizarVinculos();
             }
 
+            // Aplicar máscaras monetárias (Pilar 12)
             document.querySelectorAll('.mascara-moeda').forEach(input => {
                 input.addEventListener('input', function(e) {
                     let v = e.target.value.replace(/\D/g, '');
