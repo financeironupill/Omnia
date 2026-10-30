@@ -63,11 +63,11 @@
 
             <!-- FILTROS DE PESQUISA -->
             <form action="/cobranca" method="GET" class="row g-2 mb-4 bg-light p-3 rounded border">
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label class="form-label small fw-bold">Pesquisa Geral</label>
                     <input type="text" name="busca" class="form-control form-control-sm" placeholder="Nº Documento, Cliente ou Banco..." value="<%= buscaAtual %>">
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label small fw-bold">Situação</label>
                     <select name="status" class="form-select form-select-sm">
                         <option value="">Todas</option>
@@ -76,12 +76,21 @@
                         <option value="Liquidado" <%= statusAtual === 'Liquidado' ? 'selected' : '' %>>Liquidado</option>
                     </select>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label small fw-bold">Gerente</label>
-                    <select name="gerente_id" class="form-select form-select-sm">
+                    <select name="gerente_id" id="filtroGerente" class="form-select form-select-sm">
                         <option value="">Todos os Gerentes</option>
                         <% gerentes.forEach(g => { %>
                             <option value="<%= g.id %>" <%= gerenteAtual == g.id ? 'selected' : '' %>><%= g.nome_resumido %></option>
+                        <% }) %>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold">Vendedor</label>
+                    <select name="vendedor_id" id="filtroVendedor" class="form-select form-select-sm">
+                        <option value="">Todos os Vendedores</option>
+                        <% vendedores.forEach(v => { %>
+                            <option value="<%= v.id %>" data-gerente-id="<%= v.gerente_id %>" <%= vendedorAtual == v.id ? 'selected' : '' %>><%= v.nome_resumido %></option>
                         <% }) %>
                     </select>
                 </div>
@@ -147,7 +156,30 @@
         </div>
     </div>
 
-    <!-- Bootstrap JS -->
+    <!-- Bootstrap JS e Script de Filtro Encadeado Gerente -> Vendedor -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const filtroGerente = document.getElementById('filtroGerente');
+            const filtroVendedor = document.getElementById('filtroVendedor');
+
+            function filtrarVendedores() {
+                const gerenteSel = filtroGerente.value;
+                Array.from(filtroVendedor.options).forEach(opt => {
+                    if (!opt.value) return; // Opção "Todos os Vendedores"
+                    const gId = opt.getAttribute('data-gerente-id');
+                    if (!gerenteSel || gId === gerenteSel) {
+                        opt.style.display = '';
+                    } else {
+                        opt.style.display = 'none';
+                        if (opt.selected) filtroVendedor.value = '';
+                    }
+                });
+            }
+
+            filtroGerente.addEventListener('change', filtrarVendedores);
+            filtrarVendedores();
+        });
+    </script>
 </body>
 </html>

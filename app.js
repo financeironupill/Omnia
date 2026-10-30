@@ -828,7 +828,7 @@ app.post('/ocorrencias/editar/:id', verificarAutenticacao, async (req, res) => {
         const cli = await pool.query('SELECT nome FROM clientes WHERE id = $1', [cliente_id]);
         const cliNome = cli.rows.length > 0 ? cli.rows[0].nome : '';
         const sql = 'UPDATE ocorrencias SET tipo_ocorrencia_id = $1, cliente_id = $2, transportadora_id = $3, cliente_nome = $4, nf_origem = $5, valor_nf_origem = $6, vencimento_atual = $7, nfd = $8, tipo_financeiro = $9, valor_financeiro = $10, status = $11, descricao_problema = $12, solucao_aplicada = $13, atualizado_em = CURRENT_TIMESTAMP WHERE id = $14';
-        await pool.query(sql, [parseInt(tipo_ocorrencia_id, 10), parseInt(cliente_id, 10), transportadora_id ? parseInt(transportadora_id, 10) : null, cliNome, nf_origem ? nf_origem.trim().toUpperCase() : '', limparValorMonetario(valor_nf_origem), tratarData(vencimento_atual), nfd ? nfd.trim().toUpperCase() : '', tipo_financeiro || null, limparValorMonetario(valor_financeiro), status, formatarCapitalizacao(descricao_problema), formatarCapitalizacao(solucao_aplicada), req.params.id]);
+        await pool.query(sql, [parseInt(tipo_ocorrencia_id, 10), parseInt(cliente_id, 10), transportadora_id ? parseInt(transportadora_id, 10) : null, cliNome, limparValorMonetario(valor_nf_origem), tratarData(vencimento_atual), nfd ? nfd.trim().toUpperCase() : '', tipo_financeiro || null, limparValorMonetario(valor_financeiro), status, formatarCapitalizacao(descricao_problema), formatarCapitalizacao(solucao_aplicada), req.params.id]);
         res.redirect('/ocorrencias?sucesso=Atualizada com sucesso!');
     } catch (err) {
         console.error(err);
@@ -845,7 +845,7 @@ app.post('/ocorrencias/excluir/:id', verificarAutenticacao, async (req, res) => 
     }
 });
 
-// NOVO MÓDULO DE BOLETOS (LISTAGEM E CADASTRO)
+// MÓDULO DE BOLETOS (LISTAGEM, CADASTRO, EDIÇÃO E EXCLUSÃO)
 app.get('/cobranca', verificarAutenticacao, async (req, res) => {
     try {
         const { busca, status, gerente_id, vendedor_id } = req.query;
@@ -986,6 +986,99 @@ app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
             erro: 'Erro ao cadastrar boleto: ' + err.message, 
             sucesso: null 
         });
+    }
+});
+
+// EDITAR BOLETO
+app.get('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
+    try {
+        const boletoId = req.params.id;
+        const boletoRes = await pool.query('SELECT * FROM boletos WHERE id = $1', [boletoId]);
+        
+        if (boletoRes.rows.length === 0) {
+            return res.redirect('/cobranca?erro=Boleto não encontrado.');
+        }
+
+        const clientes = await pool.query(`
+            SELECT c.id, c.nome, c.gerente_id, c.vendedor_id, 
+                   g.nome_resumido AS gerente_nome, v.nome_resumido AS vendedor_nome 
+            FROM clientes c 
+            LEFT JOIN gerentes g ON c.gerente_id = g.id 
+            LEFT JOIN vendedores v ON c.vendedor_id = v.id 
+            WHERE c.ativo = 1 
+            ORDER BY c.nome ASC
+        `);
+        const gerentes = await pool.query('SELECT id, nome_resumido FROM gerentes WHERE ativo = 1 ORDER BY nome_resumido ASC');
+        const vendedores = await pool.query('SELECT v.id, v.nome_resumido, v.gerente_id FROM vendedores v WHERE v.ativo = 1 ORDER BY v.nome_resumido ASC');
+
+        const contaObj = {
+            ...boletoRes.rows[0],
+            valor_original: formatarMoedaSemSimbolo(boletoRes.rows[0].valor_original)
+        };
+
+        res.render('cobranca-form', { 
+            conta: contaObj, 
+            clientes: clientes.rows, 
+            gerentes: gerentes.rows, 
+            vendedores: vendedores.rows, 
+            erro: null, 
+            sucesso: null 
+        });
+    } catch (err) {
+        console.error(err);
+        res.redirect('/cobranca?erro=Erro ao carregar edição do boleto.');
+    }
+});
+
+// SALVAR ALTERAÇÕES DO BOLETO
+app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
+    const boletoId = req.params.id;
+    const { cliente_id, numero_documento, banco, carteira, valor_original, data_emissao, data_vencimento, situacao_boleto } = req.body;
+
+    try {
+        const cliRes = await pool.query('SELECT gerente_id, vendedor_id FROM clientes WHERE id = $1', [cliente_id]);
+        let gerenteId = null;
+        let vendedorId = null;
+        if (cliRes.rows.length > 0) {
+            gerenteId = cliRes.rows[0].gerente_id;
+            vendedorId = cliRes.rows[0].vendedor_id;
+        }
+
+        const sql = `UPDATE boletos SET 
+            cliente_id = $1, gerente_id = $2, vendedor_id = $3, numero_documento = $4, banco = $5, 
+            carteira = $6, valor_original = $7, data_emissao = $8, data_vencimento = $9, 
+            situacao_boleto = $10, atualizado_em = CURRENT_TIMESTAMP 
+            WHERE id = $11`;
+
+        await pool.query(sql, [
+            parseInt(cliente_id, 10),
+            gerenteId,
+            vendedorId,
+            numero_documento ? numero_documento.trim().toUpperCase() : '',
+            banco || null,
+            carteira || 'Simples',
+            limparValorMonetario(valor_original),
+            tratarData(data_emissao),
+            tratarData(data_vencimento),
+            situacao_boleto || 'Vencido',
+            parseInt(boletoId, 10)
+        ]);
+
+        res.redirect('/cobranca?sucesso=Boleto atualizado com sucesso!');
+    } catch (err) {
+        console.error('ERRO AO EDITAR BOLETO:', err);
+        res.redirect('/cobranca?erro=Erro ao atualizar boleto.');
+    }
+});
+
+// EXCLUIR BOLETO
+app.post('/cobranca/excluir/:id', verificarAutenticacao, async (req, res) => {
+    try {
+        await pool.query('DELETE FROM boletos WHERE id = $1', [req.params.id]);
+        res.redirect('/cobranca?sucesso=Boleto excluído com sucesso!');
+    } catch (err) {
+        console.error('ERRO AO EXCLUIR BOLETO:', err);
+        res.redirect('/cobranca?erro=Erro ao excluir boleto.');
     }
 });
 
