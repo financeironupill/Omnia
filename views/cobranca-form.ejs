@@ -159,64 +159,76 @@
                     </div>
                     <div class="card-body">
                         <div class="row g-3">
-                            <div class="col-md-4">
-                                <label class="form-label small fw-bold">Situação do Boleto *</label>
-                                <% if (conta && conta.id) { %>
+                            <% if (conta && conta.id) { %>
+                                <!-- MODO EDIÇÃO: EXIBE TODOS OS CAMPOS DA RÉGUA E CARTÓRIO -->
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-bold">Situação do Boleto *</label>
                                     <select name="situacao_boleto" id="situacaoBoleto" class="form-select" required>
                                         <option value="Vencido" <%= conta.situacao_boleto === 'Vencido' ? 'selected' : '' %>>Vencido</option>
                                         <option value="Pago" <%= conta.situacao_boleto === 'Pago' ? 'selected' : '' %>>Pago</option>
                                         <option value="Pago com Pendência" <%= conta.situacao_boleto === 'Pago com Pendência' ? 'selected' : '' %>>Pago com Pendência</option>
                                     </select>
-                                <% } else { %>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-bold">Fase da Régua de Cobrança</label>
+                                    <select name="status_cobranca" class="form-select">
+                                        <option value="Aguardando Régua" <%= conta.status_cobranca === 'Aguardando Régua' ? 'selected' : '' %>>Aguardando Régua</option>
+                                        <option value="Aviso 1 (Notificação)" <%= conta.status_cobranca === 'Aviso 1 (Notificação)' ? 'selected' : '' %>>Aviso 1 (Notificação)</option>
+                                        <option value="Aviso 2 (Alerta Cartório)" <%= conta.status_cobranca === 'Aviso 2 (Alerta Cartório)' ? 'selected' : '' %>>Aviso 2 (Alerta Cartório)</option>
+                                        <option value="Aviso 3 (Aviso Final)" <%= conta.status_cobranca === 'Aviso 3 (Aviso Final)' ? 'selected' : '' %>>Aviso 3 (Aviso Final)</option>
+                                        <option value="Em Cartório / Negativado" <%= conta.status_cobranca === 'Em Cartório / Negativado' ? 'selected' : '' %>>Em Cartório / Negativado</option>
+                                        <option value="Custas Pendentes (Cartório)" <%= conta.status_cobranca === 'Custas Pendentes (Cartório)' ? 'selected' : '' %>>Custas Pendentes (Cartório)</option>
+                                        <option value="Concluído" <%= conta.status_cobranca === 'Concluído' ? 'selected' : '' %>>Concluído</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-bold">Previsão de Pagamento</label>
+                                    <input type="date" name="data_previsao_pagamento" class="form-control" value="<%= conta.data_previsao_pagamento ? new Date(conta.data_previsao_pagamento).toISOString().split('T')[0] : '' %>">
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-bold">Data Envio Cartório/Negativação</label>
+                                    <input type="date" name="data_cartorio" id="dataCartorio" class="form-control" value="<%= conta.data_cartorio ? new Date(conta.data_cartorio).toISOString().split('T')[0] : '' %>">
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-bold">Valor Custas (Multa + Juros + R$ 35,00)</label>
+                                    <div class="input-group">
+                                        <input type="text" name="valor_custas" id="valorCustas" class="form-control text-end mascara-moeda" value="<%= conta.valor_custas %>">
+                                        <button type="button" class="btn btn-outline-secondary" id="btnCalcularCustas" title="Calcular Custas Padrão"><i class="fa-solid fa-calculator"></i></button>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-bold">Data Pagamento Boleto</label>
+                                    <input type="date" name="data_pagamento" class="form-control" value="<%= conta.data_pagamento ? new Date(conta.data_pagamento).toISOString().split('T')[0] : '' %>">
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-bold">Data Pagamento Custas</label>
+                                    <input type="date" name="data_pagamento_custas" class="form-control" value="<%= conta.data_pagamento_custas ? new Date(conta.data_pagamento_custas).toISOString().split('T')[0] : '' %>">
+                                </div>
+
+                                <div class="col-md-8">
+                                    <label class="form-label small fw-bold">Observações Internas</label>
+                                    <input type="text" name="observacoes" class="form-control" value="<%= conta.observacoes || '' %>" placeholder="Notas sobre o acordo ou cliente...">
+                                </div>
+                            <% } else { %>
+                                <!-- MODO INCLUSÃO: ENXUTO APENAS COM SITUAÇÃO E OBSERVAÇÕES -->
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-bold">Situação do Boleto *</label>
                                     <input type="text" class="form-control bg-light" value="Vencido" readonly disabled>
                                     <input type="hidden" name="situacao_boleto" value="Vencido">
-                                <% } %>
-                            </div>
-
-                            <div class="col-md-4">
-                                <label class="form-label small fw-bold">Fase da Régua de Cobrança</label>
-                                <select name="status_cobranca" class="form-select">
-                                    <option value="Aviso 1 (Notificação)" <%= !conta || conta.status_cobranca === 'Aviso 1 (Notificação)' ? 'selected' : '' %>>Aviso 1 (Notificação)</option>
-                                    <option value="Aviso 2 (Alerta Cartório)" <%= conta && conta.status_cobranca === 'Aviso 2 (Alerta Cartório)' ? 'selected' : '' %>>Aviso 2 (Alerta Cartório)</option>
-                                    <option value="Aviso 3 (Aviso Final)" <%= conta && conta.status_cobranca === 'Aviso 3 (Aviso Final)' ? 'selected' : '' %>>Aviso 3 (Aviso Final)</option>
-                                    <option value="Em Cartório / Negativado" <%= conta && conta.status_cobranca === 'Em Cartório / Negativado' ? 'selected' : '' %>>Em Cartório / Negativado</option>
-                                    <option value="Custas Pendentes (Cartório)" <%= conta && conta.status_cobranca === 'Custas Pendentes (Cartório)' ? 'selected' : '' %>>Custas Pendentes (Cartório)</option>
-                                    <option value="Concluído" <%= conta && conta.status_cobranca === 'Concluído' ? 'selected' : '' %>>Concluído</option>
-                                </select>
-                            </div>
-
-                            <div class="col-md-4">
-                                <label class="form-label small fw-bold">Previsão de Pagamento</label>
-                                <input type="date" name="data_previsao_pagamento" class="form-control" value="<%= conta && conta.data_previsao_pagamento ? new Date(conta.data_previsao_pagamento).toISOString().split('T')[0] : '' %>">
-                            </div>
-
-                            <div class="col-md-4">
-                                <label class="form-label small fw-bold">Data Envio Cartório/Negativação</label>
-                                <input type="date" name="data_cartorio" id="dataCartorio" class="form-control" value="<%= conta && conta.data_cartorio ? new Date(conta.data_cartorio).toISOString().split('T')[0] : '' %>">
-                            </div>
-
-                            <div class="col-md-4">
-                                <label class="form-label small fw-bold">Valor Custas (Multa + Juros + R$ 35,00)</label>
-                                <div class="input-group">
-                                    <input type="text" name="valor_custas" id="valorCustas" class="form-control text-end mascara-moeda" value="<%= conta ? conta.valor_custas : '0,00' %>">
-                                    <button type="button" class="btn btn-outline-secondary" id="btnCalcularCustas" title="Calcular Custas Padrão"><i class="fa-solid fa-calculator"></i></button>
+                                    <input type="hidden" name="status_cobranca" value="Aguardando Régua">
                                 </div>
-                            </div>
 
-                            <div class="col-md-4">
-                                <label class="form-label small fw-bold">Data Pagamento Boleto</label>
-                                <input type="date" name="data_pagamento" class="form-control" value="<%= conta && conta.data_pagamento ? new Date(conta.data_pagamento).toISOString().split('T')[0] : '' %>">
-                            </div>
-
-                            <div class="col-md-4">
-                                <label class="form-label small fw-bold">Data Pagamento Custas</label>
-                                <input type="date" name="data_pagamento_custas" class="form-control" value="<%= conta && conta.data_pagamento_custas ? new Date(conta.data_pagamento_custas).toISOString().split('T')[0] : '' %>">
-                            </div>
-
-                            <div class="col-md-8">
-                                <label class="form-label small fw-bold">Observações Internas</label>
-                                <input type="text" name="observacoes" class="form-control" value="<%= conta ? conta.observacoes || '' : '' %>" placeholder="Notas sobre o acordo ou cliente...">
-                            </div>
+                                <div class="col-md-8">
+                                    <label class="form-label small fw-bold">Observações Internas</label>
+                                    <input type="text" name="observacoes" class="form-control" placeholder="Notas iniciais sobre o boleto ou cliente...">
+                                </div>
+                            <% } %>
                         </div>
                     </div>
                 </div>
@@ -449,7 +461,6 @@
     <!-- SCRIPTS DA APLICAÇÃO -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Dados estáticos do boleto carregado
         const dadosBoleto = {
             id: "<%= conta ? conta.id : '' %>",
             numero_documento: "<%= conta ? conta.numero_documento : '' %>",
@@ -463,12 +474,10 @@
             vendedor_email: "<%= conta ? conta.vendedor_email : '' %>"
         };
 
-        // Função de envio / fallback de e-mail
         function dispararEmail(para, cc, assunto, corpo) {
             const mailtoUrl = `mailto:${encodeURIComponent(para)}?cc=${encodeURIComponent(cc)}&subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
             window.location.href = mailtoUrl;
 
-            // Preenche modal backup caso precise copiar
             document.getElementById('emailParaModal').value = para;
             document.getElementById('emailCcModal').value = cc;
             document.getElementById('emailAssuntoModal').value = assunto;
@@ -532,7 +541,6 @@
             const valorCustas = document.getElementById('valorCustas');
             const btnCalcularCustas = document.getElementById('btnCalcularCustas');
 
-            // Cálculo Automático de Custas de Cartório
             if (btnCalcularCustas) {
                 btnCalcularCustas.addEventListener('click', function() {
                     const vOrig = parseFloat(valorOriginal.value.replace(/\./g, '').replace(',', '.')) || 0;
@@ -546,9 +554,9 @@
                     const diffTime = Math.max(0, dtHoje - dtVenc);
                     const diffDias = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
-                    const multa = vOrig * 0.02; // Multa 2%
-                    const juros = vOrig * (0.02 * (diffDias / 30)); // Juros 2% ao mês pro-rata
-                    const taxaBanco = 35.00; // Taxa R$ 35,00
+                    const multa = vOrig * 0.02;
+                    const juros = vOrig * (0.02 * (diffDias / 30));
+                    const taxaBanco = 35.00;
 
                     const totalCustas = multa + juros + taxaBanco;
 
@@ -596,7 +604,6 @@
                 atualizarVinculos();
             }
 
-            // Aplicar máscaras monetárias (Pilar 12)
             document.querySelectorAll('.mascara-moeda').forEach(input => {
                 input.addEventListener('input', function(e) {
                     let v = e.target.value.replace(/\D/g, '');
