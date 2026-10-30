@@ -46,7 +46,8 @@ function gerarNumeroOcorrencia() {
 }
 
 function limparValorMonetario(valor) {
-    if (!valor) return 0;
+    if (valor === null || valor === undefined) return 0;
+    if (typeof valor === 'number') return valor;
     let limpo = String(valor).replace(/\./g, '').replace(',', '.');
     return parseFloat(limpo) || 0;
 }
@@ -1066,7 +1067,7 @@ app.get('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
     }
 });
 
-// SALVAR ALTERAÇÕES DO BOLETO (E CALCULAR CUSTAS CASO VÁ PARA CARTÓRIO)
+// SALVAR ALTERAÇÕES DO BOLETO
 app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
     const boletoId = req.params.id;
     const { 
