@@ -151,6 +151,51 @@ app.get('/api/consultar-cnpj/:cnpj', verificarAutenticacao, (req, res) => {
     request.end();
 });
 
+// CADASTRAR CLIENTE VIA MODAL (AJAX/API)
+app.post('/api/clientes/novo', verificarAutenticacao, async (req, res) => {
+    const { tipo_pessoa, cnpj_cpf, nome, nome_fantasia, contato, email, telefone, cidade, uf, gerente_id, vendedor_id } = req.body;
+    try {
+        const sql = `
+            INSERT INTO clientes (tipo_pessoa, cnpj_cpf, nome, nome_fantasia, contato, email, telefone, cidade, uf, gerente_id, vendedor_id, ativo) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 1) 
+            RETURNING id, nome
+        `;
+        const novoCliRes = await pool.query(sql, [
+            tipo_pessoa || 'PJ (CNPJ)', 
+            cnpj_cpf ? cnpj_cpf.replace(/\D/g, '') : '', 
+            formatarCapitalizacao(nome), 
+            formatarCapitalizacao(nome_fantasia), 
+            formatarCapitalizacao(contato), 
+            email ? email.trim().toLowerCase() : '', 
+            telefone, 
+            formatarCapitalizacao(cidade), 
+            uf ? uf.trim().toUpperCase() : '', 
+            gerente_id ? parseInt(gerente_id, 10) : null,
+            vendedor_id ? parseInt(vendedor_id, 10) : null
+        ]);
+
+        const clienteCadastrado = novoCliRes.rows[0];
+
+        const gRes = gerente_id ? await pool.query('SELECT nome_resumido FROM gerentes WHERE id = $1', [gerente_id]) : { rows: [] };
+        const vRes = vendedor_id ? await pool.query('SELECT nome_resumido FROM vendedores WHERE id = $1', [vendedor_id]) : { rows: [] };
+
+        res.json({
+            sucesso: true,
+            cliente: {
+                id: clienteCadastrado.id,
+                nome: clienteCadastrado.nome,
+                gerente_id: gerente_id || '',
+                vendedor_id: vendedor_id || '',
+                gerente_nome: gRes.rows.length > 0 ? gRes.rows[0].nome_resumido : '',
+                vendedor_nome: vRes.rows.length > 0 ? vRes.rows[0].nome_resumido : ''
+            }
+        });
+    } catch (err) {
+        console.error('ERRO API CLIENTE:', err);
+        res.status(500).json({ sucesso: false, erro: 'Erro ao cadastrar cliente: ' + err.message });
+    }
+});
+
 // UTILIZADORES
 app.get('/usuarios', verificarAdmin, async (req, res) => {
     try {
@@ -981,7 +1026,17 @@ app.get('/cobranca/nova', verificarAutenticacao, async (req, res) => {
             WHERE c.ativo = 1 
             ORDER BY c.nome ASC
         `);
-        res.render('cobranca-form', { conta: null, clientes: clientes.rows, erro: null, sucesso: null });
+        const gerentes = await pool.query('SELECT id, nome_resumido FROM gerentes WHERE ativo = 1 ORDER BY nome_resumido ASC');
+        const vendedores = await pool.query('SELECT v.id, v.nome_resumido, v.gerente_id FROM vendedores v WHERE v.ativo = 1 ORDER BY v.nome_resumido ASC');
+
+        res.render('cobranca-form', { 
+            conta: null, 
+            clientes: clientes.rows, 
+            gerentes: gerentes.rows, 
+            vendedores: vendedores.rows, 
+            erro: null, 
+            sucesso: null 
+        });
     } catch (err) {
         console.error(err);
         res.redirect('/cobranca?erro=Erro ao carregar formulário.');
@@ -1007,12 +1062,16 @@ app.get('/cobranca/duplicar/:id', verificarAutenticacao, async (req, res) => {
             WHERE c.ativo = 1 
             ORDER BY c.nome ASC
         `);
+        const gerentes = await pool.query('SELECT id, nome_resumido FROM gerentes WHERE ativo = 1 ORDER BY nome_resumido ASC');
+        const vendedores = await pool.query('SELECT v.id, v.nome_resumido, v.gerente_id FROM vendedores v WHERE v.ativo = 1 ORDER BY v.nome_resumido ASC');
 
         const contaDuplicada = { ...contaRes.rows[0], id: null };
 
         res.render('cobranca-form', { 
             conta: contaDuplicada, 
             clientes: clientes.rows, 
+            gerentes: gerentes.rows, 
+            vendedores: vendedores.rows, 
             erro: null, 
             sucesso: 'A carregar dados duplicados. Modifique os campos necessários e grave a nova cobrança.' 
         });
@@ -1040,10 +1099,14 @@ app.get('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
             WHERE c.ativo = 1 
             ORDER BY c.nome ASC
         `);
+        const gerentes = await pool.query('SELECT id, nome_resumido FROM gerentes WHERE ativo = 1 ORDER BY nome_resumido ASC');
+        const vendedores = await pool.query('SELECT v.id, v.nome_resumido, v.gerente_id FROM vendedores v WHERE v.ativo = 1 ORDER BY v.nome_resumido ASC');
 
         res.render('cobranca-form', { 
             conta: contaRes.rows[0], 
             clientes: clientes.rows, 
+            gerentes: gerentes.rows, 
+            vendedores: vendedores.rows, 
             erro: null, 
             sucesso: null 
         });
@@ -1113,9 +1176,14 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
     } catch (err) {
         console.error('ERRO AO EDITAR COBRANÇA:', err);
         const clientes = await pool.query('SELECT c.id, c.nome, c.gerente_id, c.vendedor_id, g.nome_resumido AS gerente_nome, v.nome_resumido AS vendedor_nome FROM clientes c LEFT JOIN gerentes g ON c.gerente_id = g.id LEFT JOIN vendedores v ON c.vendedor_id = v.id WHERE c.ativo = 1 ORDER BY c.nome ASC');
+        const gerentes = await pool.query('SELECT id, nome_resumido FROM gerentes WHERE ativo = 1 ORDER BY nome_resumido ASC');
+        const vendedores = await pool.query('SELECT v.id, v.nome_resumido, v.gerente_id FROM vendedores v WHERE v.ativo = 1 ORDER BY v.nome_resumido ASC');
+
         res.render('cobranca-form', { 
             conta: { id: contaId, ...req.body }, 
             clientes: clientes.rows, 
+            gerentes: gerentes.rows, 
+            vendedores: vendedores.rows, 
             erro: 'Erro ao atualizar cobrança: ' + err.message, 
             sucesso: null 
         });
@@ -1184,9 +1252,14 @@ app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
     } catch (err) {
         console.error('ERRO AO CADASTRAR COBRANÇA:', err);
         const clientes = await pool.query('SELECT c.id, c.nome, c.gerente_id, c.vendedor_id, g.nome_resumido AS gerente_nome, v.nome_resumido AS vendedor_nome FROM clientes c LEFT JOIN gerentes g ON c.gerente_id = g.id LEFT JOIN vendedores v ON c.vendedor_id = v.id WHERE c.ativo = 1 ORDER BY c.nome ASC');
+        const gerentes = await pool.query('SELECT id, nome_resumido FROM gerentes WHERE ativo = 1 ORDER BY nome_resumido ASC');
+        const vendedores = await pool.query('SELECT v.id, v.nome_resumido, v.gerente_id FROM vendedores v WHERE v.ativo = 1 ORDER BY v.nome_resumido ASC');
+
         res.render('cobranca-form', { 
             conta: req.body, 
             clientes: clientes.rows, 
+            gerentes: gerentes.rows, 
+            vendedores: vendedores.rows, 
             erro: 'Erro ao cadastrar cobrança: ' + err.message, 
             sucesso: null 
         });
