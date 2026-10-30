@@ -49,9 +49,9 @@
             <div class="d-flex align-items-center justify-content-between mb-3 border-bottom pb-3">
                 <div>
                     <h3 class="fw-bold text-dark mb-1">
-                        <i class="fa-solid fa-file-invoice-dollar text-primary me-2"></i>Gestão de Cobrança (Boletos)
+                        <i class="fa-solid fa-file-invoice-dollar text-primary me-2"></i>Gestão de Cobrança & Régua
                     </h3>
-                    <p class="text-muted small mb-0">Consulte, filtre e gira os boletos registados no sistema.</p>
+                    <p class="text-muted small mb-0">Consulte, filtre e gira o fluxo de liquidação dos boletos.</p>
                 </div>
                 <a href="/cobranca/nova" class="btn btn-primary fw-semibold px-3">
                     <i class="fa-solid fa-plus me-1"></i> Cadastrar Boleto
@@ -61,19 +61,29 @@
             <% if (locals.erro && erro) { %> <div class="alert alert-danger py-2"><%= erro %></div> <% } %>
             <% if (locals.sucesso && sucesso) { %> <div class="alert alert-success py-2"><%= sucesso %></div> <% } %>
 
-            <!-- FILTROS DE PESQUISA -->
+            <!-- FILTROS DE PESQUISA DA RÉGUA -->
             <form action="/cobranca" method="GET" class="row g-2 mb-4 bg-light p-3 rounded border">
                 <div class="col-md-3">
                     <label class="form-label small fw-bold">Pesquisa Geral</label>
                     <input type="text" name="busca" class="form-control form-control-sm" placeholder="Nº Documento, Cliente ou Banco..." value="<%= buscaAtual %>">
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label small fw-bold">Situação</label>
-                    <select name="status" class="form-select form-select-sm">
+                    <label class="form-label small fw-bold">Situação do Boleto</label>
+                    <select name="status_boleto" class="form-select form-select-sm">
                         <option value="">Todas</option>
-                        <option value="Vencido" <%= statusAtual === 'Vencido' ? 'selected' : '' %>>Vencido</option>
-                        <option value="Aguardando Custas" <%= statusAtual === 'Aguardando Custas' ? 'selected' : '' %>>Aguardando Custas</option>
-                        <option value="Liquidado" <%= statusAtual === 'Liquidado' ? 'selected' : '' %>>Liquidado</option>
+                        <option value="Vencido" <%= statusBoletoAtual === 'Vencido' ? 'selected' : '' %>>Vencido</option>
+                        <option value="Pago" <%= statusBoletoAtual === 'Pago' ? 'selected' : '' %>>Pago</option>
+                        <option value="Pago com Pendência" <%= statusBoletoAtual === 'Pago com Pendência' ? 'selected' : '' %>>Pago com Pendência</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold">Fase da Régua</label>
+                    <select name="status_cobranca" class="form-select form-select-sm">
+                        <option value="">Todas as Fases</option>
+                        <option value="Aviso 1 (Notificação)" <%= statusCobrancaAtual === 'Aviso 1 (Notificação)' ? 'selected' : '' %>>Aviso 1 (Notificação)</option>
+                        <option value="Aviso 2 (Alerta Cartório)" <%= statusCobrancaAtual === 'Aviso 2 (Alerta Cartório)' ? 'selected' : '' %>>Aviso 2 (Alerta Cartório)</option>
+                        <option value="Aviso 3 (Aviso Final)" <%= statusCobrancaAtual === 'Aviso 3 (Aviso Final)' ? 'selected' : '' %>>Aviso 3 (Aviso Final)</option>
+                        <option value="Em Cartório / Negativado" <%= statusCobrancaAtual === 'Em Cartório / Negativado' ? 'selected' : '' %>>Em Cartório / Negativado</option>
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -85,7 +95,7 @@
                         <% }) %>
                     </select>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label small fw-bold">Vendedor</label>
                     <select name="vendedor_id" id="filtroVendedor" class="form-select form-select-sm">
                         <option value="">Todos os Vendedores</option>
@@ -94,9 +104,9 @@
                         <% }) %>
                     </select>
                 </div>
-                <div class="col-md-2 d-flex align-items-end gap-2">
-                    <button type="submit" class="btn btn-secondary btn-sm w-100 fw-semibold"><i class="fa-solid fa-filter me-1"></i> Filtrar</button>
-                    <a href="/cobranca" class="btn btn-outline-secondary btn-sm fw-semibold"><i class="fa-solid fa-rotate-left"></i></a>
+                <div class="col-md-1 d-flex align-items-end gap-1">
+                    <button type="submit" class="btn btn-secondary btn-sm w-100 fw-semibold" title="Filtrar"><i class="fa-solid fa-filter"></i></button>
+                    <a href="/cobranca" class="btn btn-outline-secondary btn-sm fw-semibold" title="Limpar"><i class="fa-solid fa-rotate-left"></i></a>
                 </div>
             </form>
 
@@ -105,13 +115,14 @@
                 <table class="table table-hover align-middle border">
                     <thead class="table-dark">
                         <tr>
-                            <th>Nº Documento</th>
+                            <th>Nº Doc</th>
                             <th>Cliente</th>
-                            <th>Banco</th>
-                            <th>Carteira</th>
                             <th>Vencimento</th>
-                            <th class="text-end">Valor Original</th>
+                            <th>Previsão Pagto</th>
+                            <th class="text-end">Valor Orig.</th>
+                            <th class="text-end">Custas</th>
                             <th class="text-center">Situação</th>
+                            <th class="text-center">Fase Régua</th>
                             <th class="text-center">Ações</th>
                         </tr>
                     </thead>
@@ -124,21 +135,26 @@
                                         <div class="fw-semibold"><%= b.cliente_nome || 'N/A' %></div>
                                         <small class="text-muted"><%= b.cliente_cnpj || '' %></small>
                                     </td>
-                                    <td><%= b.banco || '-' %></td>
-                                    <td><span class="badge bg-secondary"><%= b.carteira %></span></td>
                                     <td><%= b.data_vencimento ? new Date(b.data_vencimento).toLocaleDateString('pt-BR') : '-' %></td>
+                                    <td class="fw-semibold text-primary">
+                                        <%= b.data_previsao_pagamento ? new Date(b.data_previsao_pagamento).toLocaleDateString('pt-BR') : '-' %>
+                                    </td>
                                     <td class="text-end fw-bold">R$ <%= b.valor_original_fmt %></td>
+                                    <td class="text-end text-danger fw-semibold">R$ <%= b.valor_custas_fmt %></td>
                                     <td class="text-center">
-                                        <% if (b.situacao_boleto === 'Liquidado') { %>
-                                            <span class="badge bg-success">Liquidado</span>
-                                        <% } else if (b.situacao_boleto === 'Aguardando Custas') { %>
-                                            <span class="badge bg-warning text-dark">Aguardando Custas</span>
+                                        <% if (b.situacao_boleto === 'Pago') { %>
+                                            <span class="badge bg-success">Pago</span>
+                                        <% } else if (b.situacao_boleto === 'Pago com Pendência') { %>
+                                            <span class="badge bg-warning text-dark">Pago com Pendência</span>
                                         <% } else { %>
                                             <span class="badge bg-danger">Vencido</span>
                                         <% } %>
                                     </td>
                                     <td class="text-center">
-                                        <a href="/cobranca/editar/<%= b.id %>" class="btn btn-outline-primary btn-sm me-1" title="Editar">
+                                        <span class="badge bg-info text-dark"><%= b.status_cobranca || 'Aviso 1' %></span>
+                                    </td>
+                                    <td class="text-center">
+                                        <a href="/cobranca/editar/<%= b.id %>" class="btn btn-outline-primary btn-sm me-1" title="Gerenciar Régua / Editar">
                                             <i class="fa-solid fa-pen-to-square"></i>
                                         </a>
                                     </td>
@@ -146,7 +162,7 @@
                             <% }) %>
                         <% } else { %>
                             <tr>
-                                <td colspan="8" class="text-center py-4 text-muted">Nenhum boleto encontrado.</td>
+                                <td colspan="9" class="text-center py-4 text-muted">Nenhum boleto encontrado.</td>
                             </tr>
                         <% } %>
                     </tbody>
@@ -156,7 +172,6 @@
         </div>
     </div>
 
-    <!-- Bootstrap JS e Script de Filtro Encadeado Gerente -> Vendedor -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -166,7 +181,7 @@
             function filtrarVendedores() {
                 const gerenteSel = filtroGerente.value;
                 Array.from(filtroVendedor.options).forEach(opt => {
-                    if (!opt.value) return; // Opção "Todos os Vendedores"
+                    if (!opt.value) return;
                     const gId = opt.getAttribute('data-gerente-id');
                     if (!gerenteSel || gId === gerenteSel) {
                         opt.style.display = '';

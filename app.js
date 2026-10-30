@@ -90,7 +90,7 @@ app.post('/login', async (req, res) => {
 app.get('/dashboard', verificarAutenticacao, (req, res) => res.render('dashboard', { usuario: req.session.usuario, erro: req.query.erro || null }));
 app.get('/solucao', verificarAutenticacao, (req, res) => res.render('dashboard-solucao', { usuario: req.session.usuario }));
 
-// CONSULTA CNPJ COM HTTPS NATIVO DO NODE.JS
+// CONSULTA CNPJ COM HTTPS NATIVO
 app.get('/api/consultar-cnpj/:cnpj', verificarAutenticacao, (req, res) => {
     const cnpjClean = req.params.cnpj.replace(/\D/g, '');
     if (cnpjClean.length !== 14) {
@@ -444,7 +444,7 @@ app.post('/clientes/excluir/:id', verificarAutenticacao, async (req, res) => {
     }
 });
 
-// GERENTES E VENDEDORES E OCORRÊNCIAS
+// GERENTES E VENDEDORES
 app.get('/gerentes', verificarAutenticacao, async (req, res) => {
     try {
         const { busca, ordenar, ordem, status } = req.query;
@@ -845,13 +845,14 @@ app.post('/ocorrencias/excluir/:id', verificarAutenticacao, async (req, res) => 
     }
 });
 
-// MÓDULO DE BOLETOS (LISTAGEM, CADASTRO, EDIÇÃO E EXCLUSÃO)
+// MÓDULO DE BOLETOS E RÉGUA DE COBRANÇA
 app.get('/cobranca', verificarAutenticacao, async (req, res) => {
     try {
-        const { busca, status, gerente_id, vendedor_id } = req.query;
+        const { busca, status_boleto, status_cobranca, gerente_id, vendedor_id } = req.query;
         let queryText = `
-            SELECT b.*, cl.nome AS cliente_nome, cl.cnpj_cpf AS cliente_cnpj, 
-                   g.nome_resumido AS gerente_nome, v.nome_resumido AS vendedor_nome 
+            SELECT b.*, cl.nome AS cliente_nome, cl.cnpj_cpf AS cliente_cnpj, cl.email AS cliente_email, cl.telefone AS cliente_telefone,
+                   g.nome_resumido AS gerente_nome, g.email AS gerente_email,
+                   v.nome_resumido AS vendedor_nome, v.email AS vendedor_email
             FROM boletos b 
             LEFT JOIN clientes cl ON b.cliente_id = cl.id 
             LEFT JOIN gerentes g ON b.gerente_id = g.id 
@@ -867,9 +868,15 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
             idx++;
         }
 
-        if (status && status !== '') {
+        if (status_boleto && status_boleto !== '') {
             queryText += ' AND b.situacao_boleto = $' + idx;
-            queryParams.push(status);
+            queryParams.push(status_boleto);
+            idx++;
+        }
+
+        if (status_cobranca && status_cobranca !== '') {
+            queryText += ' AND b.status_cobranca = $' + idx;
+            queryParams.push(status_cobranca);
             idx++;
         }
 
@@ -894,6 +901,7 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
         result.rows.forEach(b => {
             b.cliente_cnpj = formatarCnpjCpf(b.cliente_cnpj);
             b.valor_original_fmt = formatarMoedaSemSimbolo(b.valor_original);
+            b.valor_custas_fmt = formatarMoedaSemSimbolo(b.valor_custas);
         });
 
         res.render('cobranca-lista', { 
@@ -901,7 +909,8 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
             gerentes: gerentes.rows,
             vendedores: vendedores.rows,
             buscaAtual: busca || '', 
-            statusAtual: status || '', 
+            statusBoletoAtual: status_boleto || '', 
+            statusCobrancaAtual: status_cobranca || '',
             gerenteAtual: gerente_id || '',
             vendedorAtual: vendedor_id || '',
             erro: req.query.erro || null, 
@@ -932,6 +941,7 @@ app.get('/cobranca/nova', verificarAutenticacao, async (req, res) => {
             clientes: clientes.rows, 
             gerentes: gerentes.rows, 
             vendedores: vendedores.rows, 
+            historico: [],
             erro: null, 
             sucesso: null 
         });
@@ -942,7 +952,7 @@ app.get('/cobranca/nova', verificarAutenticacao, async (req, res) => {
 });
 
 app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
-    const { cliente_id, numero_documento, banco, carteira, valor_original, data_emissao, data_vencimento, situacao_boleto } = req.body;
+    const { cliente_id, numero_documento, banco, carteira, valor_original, data_emissao, data_vencimento, situacao_boleto, status_cobranca, data_previsao_pagamento, observacoes } = req.body;
 
     try {
         const cliRes = await pool.query('SELECT gerente_id, vendedor_id FROM clientes WHERE id = $1', [cliente_id]);
@@ -955,8 +965,8 @@ app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
 
         const sql = `INSERT INTO boletos (
             cliente_id, gerente_id, vendedor_id, numero_documento, banco, carteira, valor_original, 
-            data_emissao, data_vencimento, situacao_boleto, criado_em, atualizado_em
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`;
+            data_emissao, data_vencimento, situacao_boleto, status_cobranca, data_previsao_pagamento, observacoes, criado_em, atualizado_em
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`;
 
         await pool.query(sql, [
             parseInt(cliente_id, 10),
@@ -968,7 +978,10 @@ app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
             limparValorMonetario(valor_original),
             tratarData(data_emissao),
             tratarData(data_vencimento),
-            situacao_boleto || 'Vencido'
+            situacao_boleto || 'Vencido',
+            status_cobranca || 'Aviso 1 (Notificação)',
+            tratarData(data_previsao_pagamento),
+            formatarCapitalizacao(observacoes)
         ]);
 
         res.redirect('/cobranca?sucesso=Boleto cadastrado com sucesso!');
@@ -983,17 +996,27 @@ app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
             clientes: clientes.rows, 
             gerentes: gerentes.rows, 
             vendedores: vendedores.rows, 
+            historico: [],
             erro: 'Erro ao cadastrar boleto: ' + err.message, 
             sucesso: null 
         });
     }
 });
 
-// EDITAR BOLETO
+// EDITAR BOLETO E EXIBIR HISTÓRICO DA RÉGUA
 app.get('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
     try {
         const boletoId = req.params.id;
-        const boletoRes = await pool.query('SELECT * FROM boletos WHERE id = $1', [boletoId]);
+        const boletoRes = await pool.query(`
+            SELECT b.*, cl.nome AS cliente_nome, cl.email AS cliente_email, cl.telefone AS cliente_telefone,
+                   g.nome_resumido AS gerente_nome, g.email AS gerente_email,
+                   v.nome_resumido AS vendedor_nome, v.email AS vendedor_email
+            FROM boletos b 
+            LEFT JOIN clientes cl ON b.cliente_id = cl.id 
+            LEFT JOIN gerentes g ON b.gerente_id = g.id 
+            LEFT JOIN vendedores v ON b.vendedor_id = v.id 
+            WHERE b.id = $1
+        `, [boletoId]);
         
         if (boletoRes.rows.length === 0) {
             return res.redirect('/cobranca?erro=Boleto não encontrado.');
@@ -1011,9 +1034,19 @@ app.get('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
         const gerentes = await pool.query('SELECT id, nome_resumido FROM gerentes WHERE ativo = 1 ORDER BY nome_resumido ASC');
         const vendedores = await pool.query('SELECT v.id, v.nome_resumido, v.gerente_id FROM vendedores v WHERE v.ativo = 1 ORDER BY v.nome_resumido ASC');
 
+        // Buscar histórico de contatos/interações
+        const historicoRes = await pool.query(`
+            SELECT h.*, u.nome AS usuario_nome 
+            FROM boletos_historico h 
+            LEFT JOIN usuarios u ON h.usuario_id = u.id 
+            WHERE h.boleto_id = $1 
+            ORDER BY h.data_hora DESC
+        `, [boletoId]);
+
         const contaObj = {
             ...boletoRes.rows[0],
-            valor_original: formatarMoedaSemSimbolo(boletoRes.rows[0].valor_original)
+            valor_original: formatarMoedaSemSimbolo(boletoRes.rows[0].valor_original),
+            valor_custas: formatarMoedaSemSimbolo(boletoRes.rows[0].valor_custas)
         };
 
         res.render('cobranca-form', { 
@@ -1021,8 +1054,9 @@ app.get('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
             clientes: clientes.rows, 
             gerentes: gerentes.rows, 
             vendedores: vendedores.rows, 
+            historico: historicoRes.rows,
             erro: null, 
-            sucesso: null 
+            sucesso: req.query.sucesso || null 
         });
     } catch (err) {
         console.error(err);
@@ -1030,10 +1064,14 @@ app.get('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
     }
 });
 
-// SALVAR ALTERAÇÕES DO BOLETO
+// SALVAR ALTERAÇÕES DO BOLETO (E CALCULAR CUSTAS CASO VÁ PARA CARTÓRIO)
 app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
     const boletoId = req.params.id;
-    const { cliente_id, numero_documento, banco, carteira, valor_original, data_emissao, data_vencimento, situacao_boleto } = req.body;
+    const { 
+        cliente_id, numero_documento, banco, carteira, valor_original, data_emissao, data_vencimento, 
+        situacao_boleto, status_cobranca, data_previsao_pagamento, data_cartorio, valor_custas, 
+        data_pagamento, data_pagamento_custas, observacoes 
+    } = req.body;
 
     try {
         const cliRes = await pool.query('SELECT gerente_id, vendedor_id FROM clientes WHERE id = $1', [cliente_id]);
@@ -1047,8 +1085,10 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
         const sql = `UPDATE boletos SET 
             cliente_id = $1, gerente_id = $2, vendedor_id = $3, numero_documento = $4, banco = $5, 
             carteira = $6, valor_original = $7, data_emissao = $8, data_vencimento = $9, 
-            situacao_boleto = $10, atualizado_em = CURRENT_TIMESTAMP 
-            WHERE id = $11`;
+            situacao_boleto = $10, status_cobranca = $11, data_previsao_pagamento = $12, 
+            data_cartorio = $13, valor_custas = $14, data_pagamento = $15, data_pagamento_custas = $16,
+            observacoes = $17, atualizado_em = CURRENT_TIMESTAMP 
+            WHERE id = $18`;
 
         await pool.query(sql, [
             parseInt(cliente_id, 10),
@@ -1061,13 +1101,45 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
             tratarData(data_emissao),
             tratarData(data_vencimento),
             situacao_boleto || 'Vencido',
+            status_cobranca || 'Aviso 1 (Notificação)',
+            tratarData(data_previsao_pagamento),
+            tratarData(data_cartorio),
+            limparValorMonetario(valor_custas),
+            tratarData(data_pagamento),
+            tratarData(data_pagamento_custas),
+            formatarCapitalizacao(observacoes),
             parseInt(boletoId, 10)
         ]);
 
-        res.redirect('/cobranca?sucesso=Boleto atualizado com sucesso!');
+        res.redirect(`/cobranca/editar/${boletoId}?sucesso=Boleto atualizado com sucesso!`);
     } catch (err) {
         console.error('ERRO AO EDITAR BOLETO:', err);
-        res.redirect('/cobranca?erro=Erro ao atualizar boleto.');
+        res.redirect(`/cobranca/editar/${boletoId}?erro=Erro ao atualizar boleto.`);
+    }
+});
+
+// REGISTRAR HISTÓRICO DE INTERAÇÃO (FONE, WHATSAPP, E-MAIL)
+app.post('/cobranca/historico/novo/:id', verificarAutenticacao, async (req, res) => {
+    const boletoId = req.params.id;
+    const { tipo_contato, canal, contato_nome, resumo } = req.body;
+
+    try {
+        const sql = `INSERT INTO boletos_historico (boleto_id, usuario_id, tipo_contato, canal, contato_nome, resumo, data_hora) 
+                     VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)`;
+        
+        await pool.query(sql, [
+            parseInt(boletoId, 10),
+            req.session.usuario.id,
+            tipo_contato,
+            canal,
+            formatarCapitalizacao(contato_nome),
+            formatarCapitalizacao(resumo)
+        ]);
+
+        res.redirect(`/cobranca/editar/${boletoId}?sucesso=Histórico registrado com sucesso!`);
+    } catch (err) {
+        console.error('ERRO AO GRAVAR HISTÓRICO:', err);
+        res.redirect(`/cobranca/editar/${boletoId}?erro=Erro ao gravar histórico.`);
     }
 });
 

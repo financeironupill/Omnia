@@ -48,9 +48,9 @@
             <div class="d-flex align-items-center justify-content-between mb-3 border-bottom pb-3">
                 <div>
                     <h3 class="fw-bold text-dark mb-1">
-                        <i class="fa-solid fa-file-invoice-dollar text-primary me-2"></i><%= conta && conta.id ? 'Editar' : 'Cadastrar Novo' %> Boleto
+                        <i class="fa-solid fa-file-invoice-dollar text-primary me-2"></i><%= conta && conta.id ? 'Editar / Gerenciar' : 'Cadastrar Novo' %> Boleto
                     </h3>
-                    <p class="text-muted small mb-0">Preencha os dados completos organizados por secções.</p>
+                    <p class="text-muted small mb-0">Dados do documento e régua de acompanhamento de cobrança.</p>
                 </div>
                 <a href="/cobranca" class="btn btn-outline-secondary btn-sm"><i class="fa-solid fa-arrow-left me-1"></i> Voltar</a>
             </div>
@@ -58,7 +58,7 @@
             <% if (locals.erro && erro) { %> <div class="alert alert-danger py-2"><%= erro %></div> <% } %>
             <% if (locals.sucesso && sucesso) { %> <div class="alert alert-success py-2"><%= sucesso %></div> <% } %>
 
-            <form action="/cobranca/<%= conta && conta.id ? 'editar/' + conta.id : 'novo' %>" method="POST">
+            <form action="/cobranca/<%= conta && conta.id ? 'editar/' + conta.id : 'novo' %>" method="POST" id="formBoleto">
                 
                 <!-- SEÇÃO 1: DADOS DO DEVEDOR -->
                 <div class="card mb-4 border-0 bg-light">
@@ -121,7 +121,7 @@
 
                             <div class="col-md-4">
                                 <label class="form-label small fw-bold">Data de Vencimento *</label>
-                                <input type="date" name="data_vencimento" class="form-control" value="<%= conta && conta.data_vencimento ? new Date(conta.data_vencimento).toISOString().split('T')[0] : '' %>" required>
+                                <input type="date" name="data_vencimento" id="dataVencimento" class="form-control" value="<%= conta && conta.data_vencimento ? new Date(conta.data_vencimento).toISOString().split('T')[0] : '' %>" required>
                             </div>
 
                             <div class="col-md-4">
@@ -146,27 +146,80 @@
 
                             <div class="col-md-4">
                                 <label class="form-label small fw-bold">Valor Original *</label>
-                                <input type="text" name="valor_original" id="valorOriginal" class="form-control text-end" value="<%= conta ? conta.valor_original : '0,00' %>" placeholder="0,00" required>
+                                <input type="text" name="valor_original" id="valorOriginal" class="form-control text-end mascara-moeda" value="<%= conta ? conta.valor_original : '0,00' %>" placeholder="0,00" required>
                             </div>
+                        </div>
+                    </div>
+                </div>
 
-                            <div class="col-md-12">
+                <!-- SEÇÃO 3: GESTÃO DE COBRANÇA E CARTÓRIO -->
+                <div class="card mb-4 border-0 bg-light">
+                    <div class="card-header bg-dark text-white fw-semibold">
+                        <i class="fa-solid fa-bullhorn me-2"></i>Gestão de Cobrança e Cartório
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-4">
                                 <label class="form-label small fw-bold">Situação do Boleto *</label>
                                 <% if (conta && conta.id) { %>
-                                    <select name="situacao_boleto" class="form-select" required>
+                                    <select name="situacao_boleto" id="situacaoBoleto" class="form-select" required>
                                         <option value="Vencido" <%= conta.situacao_boleto === 'Vencido' ? 'selected' : '' %>>Vencido</option>
-                                        <option value="Aguardando Custas" <%= conta.situacao_boleto === 'Aguardando Custas' ? 'selected' : '' %>>Aguardando Custas</option>
-                                        <option value="Liquidado" <%= conta.situacao_boleto === 'Liquidado' ? 'selected' : '' %>>Liquidado</option>
+                                        <option value="Pago" <%= conta.situacao_boleto === 'Pago' ? 'selected' : '' %>>Pago</option>
+                                        <option value="Pago com Pendência" <%= conta.situacao_boleto === 'Pago com Pendência' ? 'selected' : '' %>>Pago com Pendência</option>
                                     </select>
                                 <% } else { %>
                                     <input type="text" class="form-control bg-light" value="Vencido" readonly disabled>
                                     <input type="hidden" name="situacao_boleto" value="Vencido">
                                 <% } %>
                             </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Fase da Régua de Cobrança</label>
+                                <select name="status_cobranca" class="form-select">
+                                    <option value="Aviso 1 (Notificação)" <%= !conta || conta.status_cobranca === 'Aviso 1 (Notificação)' ? 'selected' : '' %>>Aviso 1 (Notificação)</option>
+                                    <option value="Aviso 2 (Alerta Cartório)" <%= conta && conta.status_cobranca === 'Aviso 2 (Alerta Cartório)' ? 'selected' : '' %>>Aviso 2 (Alerta Cartório)</option>
+                                    <option value="Aviso 3 (Aviso Final)" <%= conta && conta.status_cobranca === 'Aviso 3 (Aviso Final)' ? 'selected' : '' %>>Aviso 3 (Aviso Final)</option>
+                                    <option value="Em Cartório / Negativado" <%= conta && conta.status_cobranca === 'Em Cartório / Negativado' ? 'selected' : '' %>>Em Cartório / Negativado</option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Previsão de Pagamento</label>
+                                <input type="date" name="data_previsao_pagamento" class="form-control" value="<%= conta && conta.data_previsao_pagamento ? new Date(conta.data_previsao_pagamento).toISOString().split('T')[0] : '' %>">
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Data Envio Cartório/Negativação</label>
+                                <input type="date" name="data_cartorio" id="dataCartorio" class="form-control" value="<%= conta && conta.data_cartorio ? new Date(conta.data_cartorio).toISOString().split('T')[0] : '' %>">
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Valor Custas (Multa + Juros + R$ 35,00)</label>
+                                <div class="input-group">
+                                    <input type="text" name="valor_custas" id="valorCustas" class="form-control text-end mascara-moeda" value="<%= conta ? conta.valor_custas : '0,00' %>">
+                                    <button type="button" class="btn btn-outline-secondary" id="btnCalcularCustas" title="Calcular Custas Padrão"><i class="fa-solid fa-calculator"></i></button>
+                                </div>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Data Pagamento Boleto</label>
+                                <input type="date" name="data_pagamento" class="form-control" value="<%= conta && conta.data_pagamento ? new Date(conta.data_pagamento).toISOString().split('T')[0] : '' %>">
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Data Pagamento Custas</label>
+                                <input type="date" name="data_pagamento_custas" class="form-control" value="<%= conta && conta.data_pagamento_custas ? new Date(conta.data_pagamento_custas).toISOString().split('T')[0] : '' %>">
+                            </div>
+
+                            <div class="col-md-8">
+                                <label class="form-label small fw-bold">Observações Internas</label>
+                                <input type="text" name="observacoes" class="form-control" value="<%= conta ? conta.observacoes || '' : '' %>" placeholder="Notas sobre o acordo ou cliente...">
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="d-flex justify-content-between align-items-center">
+                <div class="d-flex justify-content-between align-items-center mb-4">
                     <div>
                         <% if (conta && conta.id) { %>
                             <button type="button" class="btn btn-danger fw-semibold" onclick="confirmarExclusao()"><i class="fa-solid fa-trash me-1"></i> Excluir Boleto</button>
@@ -181,17 +234,155 @@
 
             <% if (conta && conta.id) { %>
                 <form id="formExcluirBoleto" action="/cobranca/excluir/<%= conta.id %>" method="POST" style="display: none;"></form>
+
+                <!-- SEÇÃO DE AÇÕES RÁPIDAS E E-MAILS -->
+                <div class="card mb-4 border-primary">
+                    <div class="card-header bg-primary text-white fw-semibold d-flex justify-content-between align-items-center">
+                        <span><i class="fa-solid fa-paper-plane me-2"></i>Ações e Disparo de E-mails da Régua</span>
+                        <small>Utiliza o leitor de e-mail local do usuário</small>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="prepararEmailRégua(1)">
+                                <i class="fa-solid fa-envelope me-1"></i> 1º E-mail (Aviso 1)
+                            </button>
+                            <button type="button" class="btn btn-outline-warning text-dark btn-sm" onclick="prepararEmailRégua(2)">
+                                <i class="fa-solid fa-triangle-exclamation me-1"></i> 2º E-mail (Alerta Cartório)
+                            </button>
+                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="prepararEmailRégua(3)">
+                                <i class="fa-solid fa-gavel me-1"></i> 3º E-mail (Notificação Final + Vendedor)
+                            </button>
+                            <button type="button" class="btn btn-success btn-sm" onclick="prepararEmailAvisoComercial()">
+                                <i class="fa-solid fa-user-check me-1"></i> Avisar Gerente/Vendedor (Liquidação/Custas)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SEÇÃO DE HISTÓRICO DE INTERAÇÕES (TIMELINE) -->
+                <div class="card border-0 bg-light mb-3">
+                    <div class="card-header bg-secondary text-white fw-semibold d-flex justify-content-between align-items-center">
+                        <span><i class="fa-solid fa-comments me-2"></i>Registro de Interações (WhatsApp / Fone / E-mail)</span>
+                        <button type="button" class="btn btn-light btn-sm fw-semibold text-dark" data-bs-toggle="modal" data-bs-target="#modalNovaInteracao">
+                            <i class="fa-solid fa-plus me-1"></i> Nova Interação
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <% if (historico && historico.length > 0) { %>
+                            <div class="list-group">
+                                <% historico.forEach(h => { %>
+                                    <div class="list-group-item list-group-item-action flex-column align-items-start">
+                                        <div class="d-flex w-100 justify-content-between">
+                                            <h6 class="mb-1 fw-bold text-primary">
+                                                <i class="fa-solid <%= h.canal === 'WhatsApp' ? 'fa-square-whatsapp text-success' : (h.canal === 'E-mail' ? 'fa-envelope text-info' : 'fa-phone text-warning') %> me-2"></i>
+                                                <%= h.tipo_contato %> - <%= h.contato_nome || 'N/A' %>
+                                            </h6>
+                                            <small class="text-muted"><%= new Date(h.data_hora).toLocaleString('pt-BR') %></small>
+                                        </div>
+                                        <p class="mb-1 text-dark small"><%= h.resumo %></p>
+                                        <small class="text-muted">Registrado por: <%= h.usuario_nome || 'Sistema' %></small>
+                                    </div>
+                                <% }) %>
+                            </div>
+                        <% } else { %>
+                            <p class="text-muted small mb-0 text-center py-2">Nenhuma interação registrada até o momento.</p>
+                        <% } %>
+                    </div>
+                </div>
             <% } %>
+
+        </div>
+    </div>
+
+    <!-- MODAL PARA REGISTRAR NOVA INTERAÇÃO -->
+    <% if (conta && conta.id) { %>
+        <div class="modal fade" id="modalNovaInteracao" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-secondary text-white">
+                        <h5 class="modal-title fw-bold"><i class="fa-solid fa-comments me-2"></i>Registrar Interação</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <form action="/cobranca/historico/novo/<%= conta.id %>" method="POST">
+                        <div class="modal-body bg-light">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-bold">Tipo de Contato</label>
+                                    <select name="tipo_contato" class="form-select" required>
+                                        <option value="Cliente">Cliente</option>
+                                        <option value="Gerente">Gerente</option>
+                                        <option value="Vendedor">Vendedor</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-bold">Canal</label>
+                                    <select name="canal" class="form-select" required>
+                                        <option value="Telefone">Telefone</option>
+                                        <option value="WhatsApp">WhatsApp</option>
+                                        <option value="E-mail">E-mail</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-12">
+                                    <label class="form-label small fw-bold">Pessoa Contatada</label>
+                                    <input type="text" name="contato_nome" class="form-control" placeholder="Ex: Sr. João (Financeiro)" required>
+                                </div>
+                                <div class="col-md-12">
+                                    <label class="form-label small fw-bold">Resumo da Conversa</label>
+                                    <textarea name="resumo" class="form-control" rows="3" placeholder="Descreva o que foi tratado..." required></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="submit" class="btn btn-primary fw-semibold">Gravar Registro</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    <% } %>
+
+    <!-- MODAL DE COPIAR TEXTO DO E-MAIL (BACKUP CASO NÃO TENHA CLIENTE NATIVO) -->
+    <div class="modal fade" id="modalCopiarEmail" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-copy me-2"></i>Conteúdo do E-mail para Envio</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body bg-light">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Para:</label>
+                        <input type="text" id="emailParaModal" class="form-control bg-white" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Em Cópia (CC):</label>
+                        <input type="text" id="emailCcModal" class="form-control bg-white" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Assunto:</label>
+                        <input type="text" id="emailAssuntoModal" class="form-control bg-white" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Corpo da Mensagem:</label>
+                        <textarea id="emailTextoModal" class="form-control bg-white" rows="8" readonly></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                    <button type="button" class="btn btn-primary fw-semibold" onclick="copiarTextoEmail()"><i class="fa-solid fa-clipboard me-1"></i> Copiar Texto</button>
+                </div>
+            </div>
         </div>
     </div>
 
     <!-- MODAL DE CADASTRO RÁPIDO DE CLIENTE -->
-    <div class="modal fade" id="modalNovoCliente" tabindex="-1" aria-labelledby="modalNovoClienteLabel" aria-hidden="true">
+    <div class="modal fade" id="modalNovoCliente" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title fw-bold" id="modalNovoClienteLabel"><i class="fa-solid fa-user-plus me-2"></i>Cadastrar Novo Cliente Rápido</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-user-plus me-2"></i>Cadastrar Novo Cliente Rápido</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body bg-light">
                     <form id="formModalCliente">
@@ -271,12 +462,115 @@
             }
         }
 
+        // Dados estáticos do boleto carregado
+        const dadosBoleto = {
+            id: "<%= conta ? conta.id : '' %>",
+            numero_documento: "<%= conta ? conta.numero_documento : '' %>",
+            valor_original: "<%= conta ? conta.valor_original : '0,00' %>",
+            valor_custas: "<%= conta ? conta.valor_custas : '0,00' %>",
+            data_vencimento: "<%= conta && conta.data_vencimento ? new Date(conta.data_vencimento).toLocaleDateString('pt-BR') : '' %>",
+            situacao_boleto: "<%= conta ? conta.situacao_boleto : '' %>",
+            cliente_nome: "<%= conta ? conta.cliente_nome : '' %>",
+            cliente_email: "<%= conta ? conta.cliente_email : '' %>",
+            gerente_email: "<%= conta ? conta.gerente_email : '' %>",
+            vendedor_email: "<%= conta ? conta.vendedor_email : '' %>"
+        };
+
+        // Função de envio / fallback de e-mail
+        function dispararEmail(para, cc, assunto, corpo) {
+            const mailtoUrl = `mailto:${encodeURIComponent(para)}?cc=${encodeURIComponent(cc)}&subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
+            window.location.href = mailtoUrl;
+
+            // Preenche modal backup caso precise copiar
+            document.getElementById('emailParaModal').value = para;
+            document.getElementById('emailCcModal').value = cc;
+            document.getElementById('emailAssuntoModal').value = assunto;
+            document.getElementById('emailTextoModal').value = corpo;
+
+            setTimeout(() => {
+                const modalCopiar = new bootstrap.Modal(document.getElementById('modalCopiarEmail'));
+                modalCopiar.show();
+            }, 1000);
+        }
+
+        function copiarTextoEmail() {
+            const txt = document.getElementById('emailTextoModal');
+            txt.select();
+            document.execCommand('copy');
+            alert('Texto copiado com sucesso para a área de transferência!');
+        }
+
+        function prepararEmailRégua(etapa) {
+            let assunto = "";
+            let corpo = "";
+            const cc = [dadosBoleto.gerente_email, dadosBoleto.vendedor_email].filter(Boolean).join(',');
+
+            if (etapa === 1) {
+                assunto = `Aviso de Cobrança - Boleto Nº ${dadosBoleto.numero_documento}`;
+                corpo = `Prezados,\n\nIdentificamos o boleto de número ${dadosBoleto.numero_documento} no valor de R$ ${dadosBoleto.valor_original}, vencido em ${dadosBoleto.data_vencimento}, pendente de pagamento.\n\nSolicitamos a gentileza de nos informar a previsão de pagamento ou nos enviar o comprovante de quitação.\n\nAtenciosamente,\nSetor de Cobrança - Omnia`;
+            } else if (etapa === 2) {
+                assunto = `RE: Lembrete de Cobrança - Boleto Nº ${dadosBoleto.numero_documento}`;
+                corpo = `Prezados,\n\nReforçamos o contato anterior referente ao boleto Nº ${dadosBoleto.numero_documento} (Valor: R$ ${dadosBoleto.valor_original}, Vencimento: ${dadosBoleto.data_vencimento}).\n\nRessaltamos que os títulos não quitados sujeitam-se ao envio para cartório/negativação após 3 dias úteis do vencimento. Caso o pagamento já tenha sido efetuado, por favor nos envie o comprovante.\n\nAtenciosamente,\nSetor de Cobrança - Omnia`;
+            } else if (etapa === 3) {
+                assunto = `URGENTE: Notificação Final de Envio a Cartório - Boleto Nº ${dadosBoleto.numero_documento}`;
+                corpo = `Prezados,\n\nInformamos que o boleto Nº ${dadosBoleto.numero_documento} no valor de R$ ${dadosBoleto.valor_original} será encaminhado para Cartório no próximo dia útil.\n\nSolicitamos o envio imediato do comprovante de pagamento caso já tenha sido liquidado.\n\nAtenciosamente,\nSetor de Cobrança - Omnia`;
+            }
+
+            dispararEmail(dadosBoleto.cliente_email, cc, assunto, corpo);
+        }
+
+        function prepararEmailAvisoComercial() {
+            const destinatarios = [dadosBoleto.gerente_email, dadosBoleto.vendedor_email].filter(Boolean).join(',');
+            let assunto = "";
+            let corpo = "";
+
+            if (dadosBoleto.situacao_boleto === 'Pago') {
+                assunto = `AVISO DE LIQUIDAÇÃO: Cliente ${dadosBoleto.cliente_nome} - Boleto Nº ${dadosBoleto.numero_documento}`;
+                corpo = `Prezados Gerente e Vendedor,\n\nO boleto Nº ${dadosBoleto.numero_documento} referente ao cliente ${dadosBoleto.cliente_nome} foi totalmente liquidado sem pendências.\n\nO cadastro do cliente está liberado para novos pedidos no sistema.\n\nAtenciosamente,\nSetor Financeiro - Omnia`;
+            } else {
+                assunto = `PENDÊNCIA DE CUSTAS: Cliente ${dadosBoleto.cliente_nome} - Boleto Nº ${dadosBoleto.numero_documento}`;
+                corpo = `Prezados Gerente e Vendedor,\n\nO boleto Nº ${dadosBoleto.numero_documento} referente ao cliente ${dadosBoleto.cliente_nome} foi pago, porém possui pendência de custas bancárias/cartório no valor de R$ ${dadosBoleto.valor_custas}.\n\nInformamos que novos pedidos permanecerão bloqueados até a quitação integral destas custas.\n\nAtenciosamente,\nSetor Financeiro - Omnia`;
+            }
+
+            dispararEmail(destinatarios, '', assunto, corpo);
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             const buscaCliente = document.getElementById('buscaCliente');
             const selectCliente = document.getElementById('selectCliente');
             const inputGerenteNome = document.getElementById('inputGerenteNome');
             const inputVendedorNome = document.getElementById('inputVendedorNome');
             const valorOriginal = document.getElementById('valorOriginal');
+            const dataVencimento = document.getElementById('dataVencimento');
+            const valorCustas = document.getElementById('valorCustas');
+            const btnCalcularCustas = document.getElementById('btnCalcularCustas');
+
+            // Cálculo Automático de Custas de Cartório
+            if (btnCalcularCustas) {
+                btnCalcularCustas.addEventListener('click', function() {
+                    const vOrig = parseFloat(valorOriginal.value.replace(/\./g, '').replace(',', '.')) || 0;
+                    if (vOrig === 0 || !dataVencimento.value) {
+                        alert('Informe o Valor Original e a Data de Vencimento para calcular as custas.');
+                        return;
+                    }
+
+                    const dtVenc = new Date(dataVencimento.value);
+                    const dtHoje = new Date();
+                    const diffTime = Math.max(0, dtHoje - dtVenc);
+                    const diffDias = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+                    const multa = vOrig * 0.02; // Multa 2%
+                    const juros = vOrig * (0.02 * (diffDias / 30)); // Juros 2% ao mês pro-rata
+                    const taxaBanco = 35.00; // Taxa R$ 35,00
+
+                    const totalCustas = multa + juros + taxaBanco;
+
+                    let v = totalCustas.toFixed(2);
+                    let partes = v.split('.');
+                    partes[0] = partes[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                    valorCustas.value = partes.join(',');
+                });
+            }
 
             buscaCliente.addEventListener('input', function() {
                 const termo = this.value.toLowerCase().trim();
@@ -315,109 +609,118 @@
                 atualizarVinculos();
             }
 
-            valorOriginal.addEventListener('input', function(e) {
-                let v = e.target.value.replace(/\D/g, '');
-                if (v === '') {
-                    e.target.value = '0,00';
-                    return;
-                }
-                v = (parseInt(v, 10) / 100).toFixed(2);
-                let partes = v.split('.');
-                partes[0] = partes[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-                e.target.value = partes.join(',');
+            // Aplicar máscaras monetárias (Pilar 12)
+            document.querySelectorAll('.mascara-moeda').forEach(input => {
+                input.addEventListener('input', function(e) {
+                    let v = e.target.value.replace(/\D/g, '');
+                    if (v === '') {
+                        e.target.value = '0,00';
+                        return;
+                    }
+                    v = (parseInt(v, 10) / 100).toFixed(2);
+                    let partes = v.split('.');
+                    partes[0] = partes[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                    e.target.value = partes.join(',');
+                });
             });
 
             const modalCnpjCpf = document.getElementById('modalCnpjCpf');
-            modalCnpjCpf.addEventListener('input', function(e) {
-                let v = e.target.value.replace(/\D/g, '');
-                if (v.length > 11) {
-                    e.target.value = v.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5').slice(0, 18);
-                } else {
-                    e.target.value = v.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4').slice(0, 14);
-                }
-            });
+            if (modalCnpjCpf) {
+                modalCnpjCpf.addEventListener('input', function(e) {
+                    let v = e.target.value.replace(/\D/g, '');
+                    if (v.length > 11) {
+                        e.target.value = v.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5').slice(0, 18);
+                    } else {
+                        e.target.value = v.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4').slice(0, 14);
+                    }
+                });
+            }
 
             const btnBuscarCnpjModal = document.getElementById('btnBuscarCnpjModal');
-            btnBuscarCnpjModal.addEventListener('click', async function() {
-                const cnpj = modalCnpjCpf.value.replace(/\D/g, '');
-                if (cnpj.length !== 14) {
-                    alert('Informe um CNPJ válido com 14 dígitos.');
-                    return;
-                }
-                btnBuscarCnpjModal.disabled = true;
-                btnBuscarCnpjModal.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+            if (btnBuscarCnpjModal) {
+                btnBuscarCnpjModal.addEventListener('click', async function() {
+                    const cnpj = modalCnpjCpf.value.replace(/\D/g, '');
+                    if (cnpj.length !== 14) {
+                        alert('Informe um CNPJ válido com 14 dígitos.');
+                        return;
+                    }
+                    btnBuscarCnpjModal.disabled = true;
+                    btnBuscarCnpjModal.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
 
-                try {
-                    const res = await fetch(`/api/consultar-cnpj/${cnpj}`);
-                    if (!res.ok) throw new Error();
-                    const data = await res.json();
-                    if (data.razao_social) document.getElementById('modalNome').value = data.razao_social;
-                    if (data.nome_fantasia) document.getElementById('modalNomeFantasia').value = data.nome_fantasia;
-                    if (data.municipio) document.getElementById('modalCidade').value = data.municipio;
-                    if (data.uf) document.getElementById('modalUf').value = data.uf;
-                } catch (e) {
-                    alert('CNPJ não encontrado ou erro na consulta.');
-                } finally {
-                    btnBuscarCnpjModal.disabled = false;
-                    btnBuscarCnpjModal.innerHTML = 'Buscar';
-                }
-            });
+                    try {
+                        const res = await fetch(`/api/consultar-cnpj/${cnpj}`);
+                        if (!res.ok) throw new Error();
+                        const data = await res.json();
+                        if (data.razao_social) document.getElementById('modalNome').value = data.razao_social;
+                        if (data.nome_fantasia) document.getElementById('modalNomeFantasia').value = data.nome_fantasia;
+                        if (data.municipio) document.getElementById('modalCidade').value = data.municipio;
+                        if (data.uf) document.getElementById('modalUf').value = data.uf;
+                    } catch (e) {
+                        alert('CNPJ não encontrado ou erro na consulta.');
+                    } finally {
+                        btnBuscarCnpjModal.disabled = false;
+                        btnBuscarCnpjModal.innerHTML = 'Buscar';
+                    }
+                });
+            }
 
             const btnSalvarClienteModal = document.getElementById('btnSalvarClienteModal');
-            btnSalvarClienteModal.addEventListener('click', async function() {
-                const payload = {
-                    tipo_pessoa: document.getElementById('modalTipoPessoa').value,
-                    cnpj_cpf: document.getElementById('modalCnpjCpf').value,
-                    nome: document.getElementById('modalNome').value,
-                    nome_fantasia: document.getElementById('modalNomeFantasia').value,
-                    cidade: document.getElementById('modalCidade').value,
-                    uf: document.getElementById('modalUf').value,
-                    gerente_id: document.getElementById('modalGerenteId').value,
-                    vendedor_id: document.getElementById('modalVendedorId').value
-                };
+            if (btnSalvarClienteModal) {
+                btnSalvarClienteModal.addEventListener('click', async function() {
+                    const payload = {
+                        tipo_pessoa: document.getElementById('modalTipoPessoa').value,
+                        cnpj_cpf: document.getElementById('modalCnpjCpf').value,
+                        nome: document.getElementById('modalNome').value,
+                        nome_fantasia: document.getElementById('modalNomeFantasia').value,
+                        cidade: document.getElementById('modalCidade').value,
+                        uf: document.getElementById('modalUf').value,
+                        gerente_id: document.getElementById('modalGerenteId').value,
+                        vendedor_id: document.getElementById('modalVendedorId').value
+                    };
 
-                if (!payload.nome || !payload.gerente_id || !payload.vendedor_id) {
-                    alert('Por favor, preencha a Razão Social, Gerente e Vendedor.');
-                    return;
-                }
-
-                btnSalvarClienteModal.disabled = true;
-
-                try {
-                    const res = await fetch('/api/clientes/novo', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                    const data = await res.json();
-
-                    if (data.sucesso) {
-                        const newOption = document.createElement('option');
-                        newOption.value = data.cliente.id;
-                        newOption.text = data.cliente.nome;
-                        newOption.setAttribute('data-gerente-id', data.cliente.gerente_id);
-                        newOption.setAttribute('data-vendedor-id', data.cliente.vendedor_id);
-                        newOption.setAttribute('data-gerente-nome', data.cliente.gerente_nome);
-                        newOption.setAttribute('data-vendedor-nome', data.cliente.vendedor_nome);
-                        newOption.selected = true;
-
-                        selectCliente.appendChild(newOption);
-                        atualizarVinculos();
-
-                        const modalEl = document.getElementById('modalNovoCliente');
-                        const modalInstance = bootstrap.Modal.getInstance(modalEl);
-                        modalInstance.hide();
-
-                        document.getElementById('formModalCliente').reset();
-                    } else {
-                        alert(data.erro || 'Erro ao cadastrar cliente.');
+                    if (!payload.nome || !payload.gerente_id || !payload.vendedor_id) {
+                        alert('Por favor, preencha a Razão Social, Gerente e Vendedor.');
+                        return;
                     }
-                } catch (e) {
-                    alert('Erro de conexão ao salvar cliente.');
-                } finally {
-                    btnSalvarClienteModal.disabled = false;
-                }
-            });
+
+                    btnSalvarClienteModal.disabled = true;
+
+                    try {
+                        const res = await fetch('/api/clientes/novo', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        const data = await res.json();
+
+                        if (data.sucesso) {
+                            const newOption = document.createElement('option');
+                            newOption.value = data.cliente.id;
+                            newOption.text = data.cliente.nome;
+                            newOption.setAttribute('data-gerente-id', data.cliente.gerente_id);
+                            newOption.setAttribute('data-vendedor-id', data.cliente.vendedor_id);
+                            newOption.setAttribute('data-gerente-nome', data.cliente.gerente_nome);
+                            newOption.setAttribute('data-vendedor-nome', data.cliente.vendedor_nome);
+                            newOption.selected = true;
+
+                            selectCliente.appendChild(newOption);
+                            atualizarVinculos();
+
+                            const modalEl = document.getElementById('modalNovoCliente');
+                            const modalInstance = bootstrap.Modal.getInstance(modalEl);
+                            modalInstance.hide();
+
+                            document.getElementById('formModalCliente').reset();
+                        } else {
+                            alert(data.erro || 'Erro ao cadastrar cliente.');
+                        }
+                    } catch (e) {
+                        alert('Erro de conexão ao salvar cliente.');
+                    } finally {
+                        btnSalvarClienteModal.disabled = false;
+                    }
+                });
+            }
         });
     </script>
 </body>
