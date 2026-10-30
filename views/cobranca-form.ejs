@@ -70,23 +70,23 @@
                             <div class="col-md-12">
                                 <label class="form-label small fw-bold">Cliente *</label>
                                 <div class="input-group">
-                                    <select name="cliente_id" id="selectCliente" class="form-select" required>
-                                        <option value="">Selecione ou digite o nome do cliente...</option>
-                                        <% clientes.forEach(c => { %>
-                                            <option value="<%= c.id %>" 
-                                                    data-gerente-id="<%= c.gerente_id %>" 
-                                                    data-vendedor-id="<%= c.vendedor_id %>"
-                                                    data-gerente-nome="<%= c.gerente_nome || '' %>" 
-                                                    data-vendedor-nome="<%= c.vendedor_nome || '' %>"
-                                                    <%= conta && conta.cliente_id == c.id ? 'selected' : '' %>>
-                                                <%= c.nome %>
-                                            </option>
-                                        <% }) %>
-                                    </select>
+                                    <input type="text" id="buscaCliente" class="form-control" placeholder="Digite um trecho do nome para filtrar..." autocomplete="off">
                                     <button type="button" class="btn btn-primary fw-semibold" data-bs-toggle="modal" data-bs-target="#modalNovoCliente">
                                         <i class="fa-solid fa-user-plus me-1"></i> Cadastrar Cliente
                                     </button>
                                 </div>
+                                <select name="cliente_id" id="selectCliente" class="form-select mt-2" size="4" required style="display: none;">
+                                    <% clientes.forEach(c => { %>
+                                        <option value="<%= c.id %>" 
+                                                data-gerente-id="<%= c.gerente_id %>" 
+                                                data-vendedor-id="<%= c.vendedor_id %>"
+                                                data-gerente-nome="<%= c.gerente_nome || '' %>" 
+                                                data-vendedor-nome="<%= c.vendedor_nome || '' %>"
+                                                <%= conta && conta.cliente_id == c.id ? 'selected' : '' %>>
+                                            <%= c.nome %>
+                                        </option>
+                                    <% }) %>
+                                </select>
                             </div>
 
                             <div class="col-md-6">
@@ -126,15 +126,21 @@
 
                             <div class="col-md-4">
                                 <label class="form-label small fw-bold">Banco</label>
-                                <input type="text" name="banco" class="form-control" value="<%= conta ? conta.banco : '' %>" placeholder="Ex: Itaú, Bradesco...">
+                                <select name="banco" class="form-select">
+                                    <option value="">Selecione um Banco...</option>
+                                    <option value="Banco do Brasil" <%= conta && conta.banco === 'Banco do Brasil' ? 'selected' : '' %>>Banco do Brasil</option>
+                                    <option value="Bradesco" <%= conta && conta.banco === 'Bradesco' ? 'selected' : '' %>>Bradesco</option>
+                                    <option value="Caixa Econômica Federal" <%= conta && conta.banco === 'Caixa Econômica Federal' ? 'selected' : '' %>>Caixa Econômica Federal</option>
+                                    <option value="Itaú" <%= conta && conta.banco === 'Itaú' ? 'selected' : '' %>>Itaú</option>
+                                    <option value="Santander" <%= conta && conta.banco === 'Santander' ? 'selected' : '' %>>Santander</option>
+                                </select>
                             </div>
 
                             <div class="col-md-4">
                                 <label class="form-label small fw-bold">Carteira</label>
                                 <select name="carteira" class="form-select">
-                                    <option value="Simples" <%= conta && conta.carteira === 'Simples' ? 'selected' : '' %>>Simples</option>
+                                    <option value="Simples" <%= !conta || conta.carteira === 'Simples' ? 'selected' : '' %>>Simples</option>
                                     <option value="Descontada" <%= conta && conta.carteira === 'Descontada' ? 'selected' : '' %>>Descontada</option>
-                                    <option value="Vinculada" <%= conta && conta.carteira === 'Vinculada' ? 'selected' : '' %>>Vinculada</option>
                                 </select>
                             </div>
 
@@ -145,11 +151,8 @@
 
                             <div class="col-md-12">
                                 <label class="form-label small fw-bold">Situação do Boleto *</label>
-                                <select name="situacao_boleto" class="form-select" required>
-                                    <option value="Vencido" <%= !conta || conta.situacao_boleto === 'Vencido' ? 'selected' : '' %>>Vencido</option>
-                                    <option value="Aguardando Custas" <%= conta && conta.situacao_boleto === 'Aguardando Custas' ? 'selected' : '' %>>Aguardando Custas</option>
-                                    <option value="Liquidado" <%= conta && conta.situacao_boleto === 'Liquidado' ? 'selected' : '' %>>Liquidado</option>
-                                </select>
+                                <input type="text" class="form-control bg-light" value="Vencido" readonly disabled>
+                                <input type="hidden" name="situacao_boleto" value="Vencido">
                             </div>
                         </div>
                     </div>
@@ -244,16 +247,39 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            const buscaCliente = document.getElementById('buscaCliente');
             const selectCliente = document.getElementById('selectCliente');
             const inputGerenteNome = document.getElementById('inputGerenteNome');
             const inputVendedorNome = document.getElementById('inputVendedorNome');
+            const valorOriginal = document.getElementById('valorOriginal');
 
-            // Atualiza Gerente e Vendedor vinculados ao selecionar o cliente
+            // 1. Pesquisa dinâmica de cliente
+            buscaCliente.addEventListener('input', function() {
+                const termo = this.value.toLowerCase().trim();
+                let visiveis = 0;
+
+                Array.from(selectCliente.options).forEach(opt => {
+                    if (!opt.value) return;
+                    const texto = opt.text.toLowerCase();
+                    if (texto.includes(termo)) {
+                        opt.style.display = '';
+                        visiveis++;
+                    } else {
+                        opt.style.display = 'none';
+                    }
+                });
+
+                selectCliente.style.display = visiveis > 0 && termo.length > 0 ? 'block' : 'none';
+            });
+
+            // 2. Atualiza Gerente e Vendedor vinculados ao escolher cliente
             function atualizarVinculos() {
                 const opt = selectCliente.options[selectCliente.selectedIndex];
                 if (opt && opt.value) {
                     inputGerenteNome.value = opt.getAttribute('data-gerente-nome') || 'Não Vinculado';
                     inputVendedorNome.value = opt.getAttribute('data-vendedor-nome') || 'Não Vinculado';
+                    buscaCliente.value = opt.text.trim();
+                    selectCliente.style.display = 'none';
                 } else {
                     inputGerenteNome.value = '';
                     inputVendedorNome.value = '';
@@ -261,7 +287,24 @@
             }
 
             selectCliente.addEventListener('change', atualizarVinculos);
-            atualizarVinculos();
+
+            // Seleção ao carregar página em modo de edição
+            if (selectCliente.value) {
+                atualizarVinculos();
+            }
+
+            // 5. Máscara de Moeda Brasileira com exatamente 2 casas decimais (Pilar 12)
+            valorOriginal.addEventListener('input', function(e) {
+                let v = e.target.value.replace(/\D/g, '');
+                if (v === '') {
+                    e.target.value = '0,00';
+                    return;
+                }
+                v = (parseInt(v, 10) / 100).toFixed(2);
+                let partes = v.split('.');
+                partes[0] = partes[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                e.target.value = partes.join(',');
+            });
 
             // Máscara CNPJ/CPF no Modal
             const modalCnpjCpf = document.getElementById('modalCnpjCpf');
@@ -292,4 +335,72 @@
                     if (data.razao_social) document.getElementById('modalNome').value = data.razao_social;
                     if (data.nome_fantasia) document.getElementById('modalNomeFantasia').value = data.nome_fantasia;
                     if (data.municipio) document.getElementById('modalCidade').value = data.municipio;
-                    if (data.uf) document.getElementById('modalUf').value = data
+                    if (data.uf) document.getElementById('modalUf').value = data.uf;
+                } catch (e) {
+                    alert('CNPJ não encontrado ou erro na consulta.');
+                } finally {
+                    btnBuscarCnpjModal.disabled = false;
+                    btnBuscarCnpjModal.innerHTML = 'Buscar';
+                }
+            });
+
+            // Salvar Cliente via Modal (AJAX)
+            const btnSalvarClienteModal = document.getElementById('btnSalvarClienteModal');
+            btnSalvarClienteModal.addEventListener('click', async function() {
+                const payload = {
+                    tipo_pessoa: document.getElementById('modalTipoPessoa').value,
+                    cnpj_cpf: document.getElementById('modalCnpjCpf').value,
+                    nome: document.getElementById('modalNome').value,
+                    nome_fantasia: document.getElementById('modalNomeFantasia').value,
+                    cidade: document.getElementById('modalCidade').value,
+                    uf: document.getElementById('modalUf').value,
+                    gerente_id: document.getElementById('modalGerenteId').value,
+                    vendedor_id: document.getElementById('modalVendedorId').value
+                };
+
+                if (!payload.nome || !payload.gerente_id || !payload.vendedor_id) {
+                    alert('Por favor, preencha a Razão Social, Gerente e Vendedor.');
+                    return;
+                }
+
+                btnSalvarClienteModal.disabled = true;
+
+                try {
+                    const res = await fetch('/api/clientes/novo', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const data = await res.json();
+
+                    if (data.sucesso) {
+                        const newOption = document.createElement('option');
+                        newOption.value = data.cliente.id;
+                        newOption.text = data.cliente.nome;
+                        newOption.setAttribute('data-gerente-id', data.cliente.gerente_id);
+                        newOption.setAttribute('data-vendedor-id', data.cliente.vendedor_id);
+                        newOption.setAttribute('data-gerente-nome', data.cliente.gerente_nome);
+                        newOption.setAttribute('data-vendedor-nome', data.cliente.vendedor_nome);
+                        newOption.selected = true;
+
+                        selectCliente.appendChild(newOption);
+                        atualizarVinculos();
+
+                        const modalEl = document.getElementById('modalNovoCliente');
+                        const modalInstance = bootstrap.Modal.getInstance(modalEl);
+                        modalInstance.hide();
+
+                        document.getElementById('formModalCliente').reset();
+                    } else {
+                        alert(data.erro || 'Erro ao cadastrar cliente.');
+                    }
+                } catch (e) {
+                    alert('Erro de conexão ao salvar cliente.');
+                } finally {
+                    btnSalvarClienteModal.disabled = false;
+                }
+            });
+        });
+    </script>
+</body>
+</html>
