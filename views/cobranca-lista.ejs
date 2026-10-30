@@ -174,12 +174,20 @@
                                     </td>
                                     <td class="text-center">
                                         <div class="d-inline-flex gap-1">
+                                            <!-- Botão de Editar Boleto -->
                                             <a href="/cobranca/editar/<%= b.id %>" class="btn btn-outline-primary btn-sm" title="Editar Boleto">
                                                 <i class="fa-solid fa-pen-to-square"></i>
                                             </a>
+                                            <!-- Botão de Estorno de Comissão (Abre o Modal) -->
+                                            <button type="button" class="btn btn-outline-success btn-sm" title="Controle de Estorno de Comissão" 
+                                                data-bs-toggle="modal" data-bs-target="#modalEstorno<%= b.id %>">
+                                                <i class="fa-solid fa-hand-holding-dollar"></i>
+                                            </button>
+                                            <!-- Botão de Duplicar -->
                                             <a href="/cobranca/duplicar/<%= b.id %>" class="btn btn-outline-secondary btn-sm" title="Duplicar Lançamento">
                                                 <i class="fa-solid fa-copy"></i>
                                             </a>
+                                            <!-- Botão de Excluir -->
                                             <form action="/cobranca/excluir/<%= b.id %>" method="POST" onsubmit="return confirm('Tem certeza de que deseja excluir este boleto permanentemente?');" class="d-inline">
                                                 <button type="submit" class="btn btn-outline-danger btn-sm" title="Excluir Boleto">
                                                     <i class="fa-solid fa-trash"></i>
@@ -188,6 +196,55 @@
                                         </div>
                                     </td>
                                 </tr>
+
+                                <!-- MODAL (POP-UP) DE ESTORNO DE COMISSÃO PARA CADA BOLETO -->
+                                <div class="modal fade" id="modalEstorno<%= b.id %>" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <form action="/cobranca/estorno/<%= b.id %>" method="POST">
+                                                <div class="modal-header bg-dark text-white">
+                                                    <h5 class="modal-title fs-6">
+                                                        <i class="fa-solid fa-hand-holding-dollar text-success me-1"></i> Estorno de Comissão - Doc: <%= b.numero_documento %>
+                                                    </h5>
+                                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                                                </div>
+                                                <div class="modal-body text-start">
+                                                    <p class="small text-muted mb-3">Cliente: <strong><%= b.cliente_nome %></strong></p>
+                                                    
+                                                    <div class="mb-3">
+                                                        <label class="form-label small fw-bold">Data do Estorno</label>
+                                                        <input type="date" name="data_estorno" class="form-control form-control-sm" 
+                                                            value="<%= b.data_estorno ? new Date(b.data_estorno).toISOString().split('T')[0] : '' %>">
+                                                    </div>
+
+                                                    <div class="mb-3">
+                                                        <label class="form-label small fw-bold">Valor Estornado (R$)</label>
+                                                        <input type="text" name="valor_estornado" class="form-control form-control-sm" 
+                                                            value="<%= b.valor_estornado ? b.valor_estornado_fmt : '0,00' %>" placeholder="0,00">
+                                                    </div>
+
+                                                    <div class="mb-3">
+                                                        <label class="form-label small fw-bold">Data de Restituição (Devolução ao Representante)</label>
+                                                        <input type="date" name="data_restituicao" class="form-control form-control-sm" 
+                                                            value="<%= b.data_restituicao ? new Date(b.data_restituicao).toISOString().split('T')[0] : '' %>">
+                                                        <div class="form-text small">Preencher após o cliente quitar o débito em cartório.</div>
+                                                    </div>
+
+                                                    <div class="mb-3">
+                                                        <label class="form-label small fw-bold">Observações</label>
+                                                        <textarea name="observacoes" class="form-control form-control-sm" rows="2" placeholder="Detalhes adicionais..."><%= b.estorno_obs || '' %></textarea>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                                                    <button type="submit" class="btn btn-success btn-sm fw-semibold">Salvar Estorno</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- FIM DO MODAL -->
+
                             <% }) %>
                         <% } else { %>
                             <tr>

@@ -849,7 +849,7 @@ app.post('/ocorrencias/excluir/:id', verificarAutenticacao, async (req, res) => 
     }
 });
 
-// MÓDULO DE BOLETOS E RÉGUA DE COBRANÇA (COM CÁLCULO DE DIAS EM ATRASO DIRETO NO POSTGRESQL)
+// MÓDULO DE BOLETOS E RÉGUA DE COBRANÇA
 app.get('/cobranca', verificarAutenticacao, async (req, res) => {
     try {
         const { busca, status_boleto, status_cobranca, gerente_id, vendedor_id } = req.query;
@@ -858,16 +858,17 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
                    g.nome_resumido AS gerente_nome, g.email AS gerente_email,
                    v.nome_resumido AS vendedor_nome, v.email AS vendedor_email,
                    (SELECT COUNT(*) FROM boletos b2 WHERE b2.cliente_id = b.cliente_id AND b2.situacao_boleto IN ('Vencido', 'Pago com Pendência')) AS total_pendentes_cliente,
-                   -- CÁLCULO DE DIAS OTIMIZADO DIRETAMENTE NO BANCO DE DADOS
                    CASE 
                        WHEN b.situacao_boleto = 'Vencido' THEN (CURRENT_DATE - b.data_vencimento)
                        WHEN b.situacao_boleto IN ('Pago', 'Pago com Pendência') AND b.data_pagamento IS NOT NULL THEN (b.data_pagamento - b.data_vencimento)
                        ELSE 0
-                   END AS dias_atraso
+                   END AS dias_atraso,
+                   ce.id AS estorno_id, ce.data_estorno, ce.valor_estornado, ce.data_restituicao, ce.observacoes AS estorno_obs
             FROM boletos b 
             LEFT JOIN clientes cl ON b.cliente_id = cl.id 
             LEFT JOIN gerentes g ON b.gerente_id = g.id 
             LEFT JOIN vendedores v ON b.vendedor_id = v.id 
+            LEFT JOIN comissoes_estornos ce ON ce.boleto_id = b.id
             WHERE 1=1
         `;
         let queryParams = [];
@@ -913,6 +914,7 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
             b.cliente_cnpj = formatarCnpjCpf(b.cliente_cnpj);
             b.valor_original_fmt = formatarMoedaSemSimbolo(b.valor_original);
             b.valor_custas_fmt = formatarMoedaSemSimbolo(b.valor_custas);
+            b.valor_estornado_fmt = formatarMoedaSemSimbolo(b.valor_estornado);
             b.reincidente_pendente = parseInt(b.total_pendentes_cliente, 10) > 1;
             b.dias_atraso = parseInt(b.dias_atraso, 10) > 0 ? parseInt(b.dias_atraso, 10) : 0;
         });
@@ -932,6 +934,49 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
     } catch (err) {
         console.error('ERRO EM GET /cobranca:', err);
         res.status(500).send('Erro interno');
+    }
+});
+
+// ROTA PARA SALVAR / ATUALIZAR ESTORNO DE COMISSÃO VIA MODAL
+app.post('/cobranca/estorno/:id', verificarAutenticacao, async (req, res) => {
+    const boletoId = req.params.id;
+    const { data_estorno, valor_estornado, data_restituicao, observacoes } = req.body;
+
+    try {
+        // Buscar o vendedor_id vinculado ao boleto
+        const bolRes = await pool.query('SELECT vendedor_id FROM boletos WHERE id = $1', [boletoId]);
+        let vendedorId = bolRes.rows.length > 0 ? bolRes.rows[0].vendedor_id : null;
+
+        // Verificar se já existe estorno para este boleto
+        const estRes = await pool.query('SELECT id FROM comissoes_estornos WHERE boleto_id = $1', [boletoId]);
+
+        if (estRes.rows.length > 0) {
+            // Atualizar
+            const sqlUpdate = `UPDATE comissoes_estornos SET data_estorno = $1, valor_estornado = $2, data_restituicao = $3, observacoes = $4 WHERE boleto_id = $5`;
+            await pool.query(sqlUpdate, [
+                tratarData(data_estorno),
+                limparValorMonetario(valor_estornado),
+                tratarData(data_restituicao),
+                formatarCapitalizacao(observacoes),
+                boletoId
+            ]);
+        } else {
+            // Inserir novo
+            const sqlInsert = `INSERT INTO comissoes_estornos (boleto_id, vendedor_id, data_estorno, valor_estornado, data_restituicao, observacoes) VALUES ($1, $2, $3, $4, $5, $6)`;
+            await pool.query(sqlInsert, [
+                boletoId,
+                vendedorId,
+                tratarData(data_estorno),
+                limparValorMonetario(valor_estornado),
+                tratarData(data_restituicao),
+                formatarCapitalizacao(observacoes)
+            ]);
+        }
+
+        res.redirect('/cobranca?sucesso=Controle de estorno atualizado com sucesso!');
+    } catch (err) {
+        console.error('ERRO AO SALVAR ESTORNO:', err);
+        res.redirect('/cobranca?erro=Erro ao salvar estorno de comissão.');
     }
 });
 
