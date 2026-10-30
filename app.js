@@ -809,7 +809,7 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
 
         const result = await pool.query(queryText, queryParams);
         const gerentes = await pool.query('SELECT id, nome_resumido FROM gerentes WHERE ativo = 1 ORDER BY nome_resumido ASC');
-        const vendedores = await pool.query('SELECT id, nome_resumido FROM vendedores WHERE ativo = 1 ORDER BY nome_resumido ASC');
+        const vendedores = await pool.query('SELECT id, nome_resumido, gerente_id FROM vendedores WHERE ativo = 1 ORDER BY nome_resumido ASC');
         
         const contagemClientesPendentes = {};
         result.rows.forEach(c => {

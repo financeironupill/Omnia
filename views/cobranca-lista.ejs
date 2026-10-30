@@ -50,7 +50,7 @@
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <select name="gerente_id" class="form-select">
+                    <select name="gerente_id" id="selectGerente" class="form-select">
                         <option value="">Todos Gerentes</option>
                         <% gerentes.forEach(g => { %>
                             <option value="<%= g.id %>" <%= gerenteAtual == g.id ? 'selected' : '' %>><%= g.nome_resumido %></option>
@@ -58,10 +58,10 @@
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <select name="vendedor_id" class="form-select">
+                    <select name="vendedor_id" id="selectVendedor" class="form-select">
                         <option value="">Todos Vendedores</option>
                         <% vendedores.forEach(v => { %>
-                            <option value="<%= v.id %>" <%= vendedorAtual == v.id ? 'selected' : '' %>><%= v.nome_resumido %></option>
+                            <option value="<%= v.id %>" data-gerente="<%= v.gerente_id %>" <%= vendedorAtual == v.id ? 'selected' : '' %>><%= v.nome_resumido %></option>
                         <% }) %>
                     </select>
                 </div>
@@ -98,7 +98,7 @@
                                         <div class="fw-bold text-dark"><%= c.cliente_nome || 'Cliente não associado' %></div>
                                         <% if (c.cliente_cnpj) { %>
                                             <% const possuiMultiplasPendencias = c.cliente_id && contagemClientesPendentes[c.cliente_id] > 1; %>
-                                            <small class="<%= possuiMultiplasPendencias ? 'text-danger fw-bold' : 'text-muted' %>">
+                                            <small class="<%= possuiMultiplasPendencias ? 'text-danger' : 'text-muted' %>">
                                                 <%= c.cliente_cnpj %>
                                             </small>
                                         <% } %>
@@ -136,5 +136,40 @@
             </div>
         </div>
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const selectGerente = document.getElementById('selectGerente');
+            const selectVendedor = document.getElementById('selectVendedor');
+
+            function atualizarVendedores() {
+                const gerenteId = selectGerente.value;
+                const optionsVendedor = selectVendedor.querySelectorAll('option');
+
+                optionsVendedor.forEach(opt => {
+                    if (opt.value === '') {
+                        opt.style.display = 'block';
+                        return;
+                    }
+                    const gerenteDoVendedor = opt.getAttribute('data-gerente');
+                    if (!gerenteId || gerenteDoVendedor === gerenteId) {
+                        opt.style.display = 'block';
+                    } else {
+                        opt.style.display = 'none';
+                        if (opt.selected) {
+                            selectVendedor.value = '';
+                        }
+                    }
+                });
+            }
+
+            selectGerente.addEventListener('change', function() {
+                selectVendedor.value = '';
+                atualizarVendedores();
+            });
+
+            atualizarVendedores();
+        });
+    </script>
 </body>
 </html>
