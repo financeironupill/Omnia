@@ -2,6 +2,7 @@ const express = require('express');
 const session = require('express-session');
 const bcrypt = require('bcryptjs');
 const path = require('path');
+const https = require('https');
 const pool = require('./db');
 
 const app = express();
@@ -111,19 +112,43 @@ app.post('/login', async (req, res) => {
 app.get('/dashboard', verificarAutenticacao, (req, res) => res.render('dashboard', { usuario: req.session.usuario, erro: req.query.erro || null }));
 app.get('/solucao', verificarAutenticacao, (req, res) => res.render('dashboard-solucao', { usuario: req.session.usuario }));
 
-app.get('/api/consultar-cnpj/:cnpj', verificarAutenticacao, async (req, res) => {
-    try {
-        const cnpjClean = req.params.cnpj.replace(/\D/g, '');
-        const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpjClean}`);
-        if (!response.ok) {
-            return res.status(404).json({ erro: 'CNPJ não encontrado' });
-        }
-        const data = await response.json();
-        res.json(data);
-    } catch (error) {
-        console.error('Erro ao consultar CNPJ externo:', error);
-        res.status(500).json({ erro: 'Erro ao consultar API externa' });
+// CONSULTA CNPJ COM HTTPS NATIVO DO NODE.JS
+app.get('/api/consultar-cnpj/:cnpj', verificarAutenticacao, (req, res) => {
+    const cnpjClean = req.params.cnpj.replace(/\D/g, '');
+    if (cnpjClean.length !== 14) {
+        return res.status(400).json({ erro: 'CNPJ inválido' });
     }
+
+    const options = {
+        hostname: 'brasilapi.com.br',
+        path: `/api/cnpj/v1/${cnpjClean}`,
+        method: 'GET',
+        headers: { 'User-Agent': 'OmniaApp/1.0' }
+    };
+
+    const request = https.request(options, (response) => {
+        let data = '';
+        response.on('data', (chunk) => { data += chunk; });
+        response.on('end', () => {
+            if (response.statusCode === 200) {
+                try {
+                    const parsedData = JSON.parse(data);
+                    return res.json(parsedData);
+                } catch (e) {
+                    return res.status(500).json({ erro: 'Erro ao processar dados do CNPJ' });
+                }
+            } else {
+                return res.status(404).json({ erro: 'CNPJ não encontrado' });
+            }
+        });
+    });
+
+    request.on('error', (error) => {
+        console.error('Erro na requisição HTTPS do CNPJ:', error);
+        res.status(500).json({ erro: 'Erro de conexão na consulta externa' });
+    });
+
+    request.end();
 });
 
 // UTILIZADORES
@@ -396,7 +421,7 @@ app.post('/clientes/excluir/:id', verificarAutenticacao, async (req, res) => {
     }
 });
 
-// GERENTES
+// GERENTES E VENDEDORES E OCORRÊNCIAS
 app.get('/gerentes', verificarAutenticacao, async (req, res) => {
     try {
         const { busca, ordenar, ordem, status } = req.query;
