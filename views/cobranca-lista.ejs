@@ -84,6 +84,8 @@
                         <option value="Aviso 2 (Alerta Cartório)" <%= statusCobrancaAtual === 'Aviso 2 (Alerta Cartório)' ? 'selected' : '' %>>Aviso 2 (Alerta Cartório)</option>
                         <option value="Aviso 3 (Aviso Final)" <%= statusCobrancaAtual === 'Aviso 3 (Aviso Final)' ? 'selected' : '' %>>Aviso 3 (Aviso Final)</option>
                         <option value="Em Cartório / Negativado" <%= statusCobrancaAtual === 'Em Cartório / Negativado' ? 'selected' : '' %>>Em Cartório / Negativado</option>
+                        <option value="Custas Pendentes (Cartório)" <%= statusCobrancaAtual === 'Custas Pendentes (Cartório)' ? 'selected' : '' %>>Custas Pendentes (Cartório)</option>
+                        <option value="Concluído" <%= statusCobrancaAtual === 'Concluído' ? 'selected' : '' %>>Concluído</option>
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -151,7 +153,11 @@
                                         <% } %>
                                     </td>
                                     <td class="text-center">
-                                        <span class="badge bg-info text-dark"><%= b.status_cobranca || 'Aviso 1' %></span>
+                                        <% if (b.status_cobranca === 'Custas Pendentes (Cartório)') { %>
+                                            <span class="badge bg-warning text-dark"><i class="fa-solid fa-triangle-exclamation me-1"></i>Custas Pendentes</span>
+                                        <% } else { %>
+                                            <span class="badge bg-info text-dark"><%= b.status_cobranca || 'Aviso 1' %></span>
+                                        <% } %>
                                     </td>
                                     <td class="text-center">
                                         <a href="/cobranca/editar/<%= b.id %>" class="btn btn-outline-primary btn-sm me-1" title="Gerenciar Régua / Editar">

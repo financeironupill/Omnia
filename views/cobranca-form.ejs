@@ -180,6 +180,8 @@
                                     <option value="Aviso 2 (Alerta Cartório)" <%= conta && conta.status_cobranca === 'Aviso 2 (Alerta Cartório)' ? 'selected' : '' %>>Aviso 2 (Alerta Cartório)</option>
                                     <option value="Aviso 3 (Aviso Final)" <%= conta && conta.status_cobranca === 'Aviso 3 (Aviso Final)' ? 'selected' : '' %>>Aviso 3 (Aviso Final)</option>
                                     <option value="Em Cartório / Negativado" <%= conta && conta.status_cobranca === 'Em Cartório / Negativado' ? 'selected' : '' %>>Em Cartório / Negativado</option>
+                                    <option value="Custas Pendentes (Cartório)" <%= conta && conta.status_cobranca === 'Custas Pendentes (Cartório)' ? 'selected' : '' %>>Custas Pendentes (Cartório)</option>
+                                    <option value="Concluído" <%= conta && conta.status_cobranca === 'Concluído' ? 'selected' : '' %>>Concluído</option>
                                 </select>
                             </div>
 
@@ -462,7 +464,6 @@
             }
         }
 
-        // Dados estáticos do boleto carregado
         const dadosBoleto = {
             id: "<%= conta ? conta.id : '' %>",
             numero_documento: "<%= conta ? conta.numero_documento : '' %>",
@@ -476,12 +477,10 @@
             vendedor_email: "<%= conta ? conta.vendedor_email : '' %>"
         };
 
-        // Função de envio / fallback de e-mail
         function dispararEmail(para, cc, assunto, corpo) {
             const mailtoUrl = `mailto:${encodeURIComponent(para)}?cc=${encodeURIComponent(cc)}&subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
             window.location.href = mailtoUrl;
 
-            // Preenche modal backup caso precise copiar
             document.getElementById('emailParaModal').value = para;
             document.getElementById('emailCcModal').value = cc;
             document.getElementById('emailAssuntoModal').value = assunto;
@@ -545,7 +544,6 @@
             const valorCustas = document.getElementById('valorCustas');
             const btnCalcularCustas = document.getElementById('btnCalcularCustas');
 
-            // Cálculo Automático de Custas de Cartório
             if (btnCalcularCustas) {
                 btnCalcularCustas.addEventListener('click', function() {
                     const vOrig = parseFloat(valorOriginal.value.replace(/\./g, '').replace(',', '.')) || 0;
@@ -559,9 +557,9 @@
                     const diffTime = Math.max(0, dtHoje - dtVenc);
                     const diffDias = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
-                    const multa = vOrig * 0.02; // Multa 2%
-                    const juros = vOrig * (0.02 * (diffDias / 30)); // Juros 2% ao mês pro-rata
-                    const taxaBanco = 35.00; // Taxa R$ 35,00
+                    const multa = vOrig * 0.02;
+                    const juros = vOrig * (0.02 * (diffDias / 30));
+                    const taxaBanco = 35.00;
 
                     const totalCustas = multa + juros + taxaBanco;
 
@@ -609,7 +607,6 @@
                 atualizarVinculos();
             }
 
-            // Aplicar máscaras monetárias (Pilar 12)
             document.querySelectorAll('.mascara-moeda').forEach(input => {
                 input.addEventListener('input', function(e) {
                     let v = e.target.value.replace(/\D/g, '');
