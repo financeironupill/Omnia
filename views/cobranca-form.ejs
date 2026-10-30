@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Omnia - <%= conta && conta.id ? 'Editar' : 'Nova' %> Cobrança</title>
-    <!-- Bootstrap 5 CSS -->
+    <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -182,40 +182,6 @@
                             <div class="col-md-3">
                                 <label class="form-label small fw-bold">Valor Custas</label>
                                 <input type="text" name="valor_custas" class="form-control text-end mascara-moeda" value="<%= conta ? conta.valor_custas : '0,00' %>">
-                            </div>
-
-                            <div class="col-md-3">
-                                <label class="form-label small fw-bold">Data de Pagamento</label>
-                                <input type="date" name="data_pagamento" class="form-control" value="<%= conta && conta.data_pagamento ? new Date(conta.data_pagamento).toISOString().split('T')[0] : '' %>">
-                            </div>
-
-                            <div class="col-md-3">
-                                <label class="form-label small fw-bold">Valor Recebido</label>
-                                <input type="text" name="valor_recebido" class="form-control text-end mascara-moeda" value="<%= conta ? conta.valor_recebido : '0,00' %>">
-                            </div>
-
-                            <div class="col-md-3">
-                                <label class="form-label small fw-bold">Débito Conta Corrente</label>
-                                <input type="date" name="debito_conta_corrente" class="form-control" value="<%= conta && conta.debito_conta_corrente ? new Date(conta.debito_conta_corrente).toISOString().split('T')[0] : '' %>">
-                            </div>
-
-                            <div class="col-md-3">
-                                <label class="form-label small fw-bold">Comissão</label>
-                                <select name="comissao" class="form-select">
-                                    <option value="Não Estornada" <%= !conta || conta.comissao === 'Não Estornada' ? 'selected' : '' %>>Não Estornada</option>
-                                    <option value="Estornada" <%= conta && conta.comissao === 'Estornada' ? 'selected' : '' %>>Estornada</option>
-                                    <option value="Comissão Reposta" <%= conta && conta.comissao === 'Comissão Reposta' ? 'selected' : '' %>>Comissão Reposta</option>
-                                </select>
-                            </div>
-
-                            <div class="col-md-6">
-                                <label class="form-label small fw-bold">Data Estorno Comissão</label>
-                                <input type="date" name="data_estorno" class="form-control" value="<%= conta && conta.data_estorno ? new Date(conta.data_estorno).toISOString().split('T')[0] : '' %>">
-                            </div>
-
-                            <div class="col-md-6">
-                                <label class="form-label small fw-bold">Data Reposição Comissão</label>
-                                <input type="date" name="data_reposicao" class="form-control" value="<%= conta && conta.data_reposicao ? new Date(conta.data_reposicao).toISOString().split('T')[0] : '' %>">
                             </div>
 
                             <div class="col-md-12">
