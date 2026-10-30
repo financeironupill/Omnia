@@ -24,7 +24,6 @@ function formatarCapitalizacao(texto) {
     return texto.trim().toLowerCase().split(' ').map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
 }
 
-// FORMATADOR DE CNPJ (00.000.000/0000-00) E CPF (000.000.000-00)
 function formatarCnpjCpf(valor) {
     if (!valor) return '';
     const limpo = String(valor).replace(/\D/g, '');
@@ -36,7 +35,6 @@ function formatarCnpjCpf(valor) {
     return valor;
 }
 
-// FORMATADOR DE MOEDA BRASILEIRA SEM R$ (Ex: 2.205,60)
 function formatarMoedaSemSimbolo(valor) {
     const num = parseFloat(valor) || 0;
     return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -667,7 +665,7 @@ app.get('/vendedores/editar/:id', verificarAutenticacao, async (req, res) => {
 app.post('/vendedores/editar/:id', verificarAutenticacao, async (req, res) => {
     const { gerente_id, nome_resumido, nome_completo, telefone, email, banco, agencia, conta, tipo_chave_pix, chave_pix, ativo } = req.body;
     try {
-        const sql = 'UPDATE vendedores SET gerente_id = $1, nome_resumido = $2, nome_completo = $3, telefone = $4, email = $5, telefone = $6, cidade = $7, uf = $8, banco = $9, agencia = $10, conta = $11, tipo_chave_pix = $12, chave_pix = $13, ativo = $14 WHERE id = $15';
+        const sql = 'UPDATE vendedores SET gerente_id = $1, nome_resumido = $2, nome_completo = $3, telefone = $4, email = $5, banco = $6, agencia = $7, conta = $8, tipo_chave_pix = $9, chave_pix = $10, ativo = $11 WHERE id = $12';
         await pool.query(sql, [
             gerente_id ? parseInt(gerente_id, 10) : null,
             nome_resumido ? nome_resumido.trim().toUpperCase() : '',
@@ -847,7 +845,74 @@ app.post('/ocorrencias/excluir/:id', verificarAutenticacao, async (req, res) => 
     }
 });
 
-// NOVO MÓDULO DE BOLETOS (CONECTADO À TABELA BOLETOS)
+// NOVO MÓDULO DE BOLETOS (LISTAGEM E CADASTRO)
+app.get('/cobranca', verificarAutenticacao, async (req, res) => {
+    try {
+        const { busca, status, gerente_id, vendedor_id } = req.query;
+        let queryText = `
+            SELECT b.*, cl.nome AS cliente_nome, cl.cnpj_cpf AS cliente_cnpj, 
+                   g.nome_resumido AS gerente_nome, v.nome_resumido AS vendedor_nome 
+            FROM boletos b 
+            LEFT JOIN clientes cl ON b.cliente_id = cl.id 
+            LEFT JOIN gerentes g ON b.gerente_id = g.id 
+            LEFT JOIN vendedores v ON b.vendedor_id = v.id 
+            WHERE 1=1
+        `;
+        let queryParams = [];
+        let idx = 1;
+
+        if (busca && busca.trim() !== '') {
+            queryText += ' AND (b.numero_documento ILIKE $' + idx + ' OR cl.nome ILIKE $' + idx + ' OR b.banco ILIKE $' + idx + ')';
+            queryParams.push('%' + busca.trim() + '%');
+            idx++;
+        }
+
+        if (status && status !== '') {
+            queryText += ' AND b.situacao_boleto = $' + idx;
+            queryParams.push(status);
+            idx++;
+        }
+
+        if (gerente_id && gerente_id !== '') {
+            queryText += ' AND b.gerente_id = $' + idx;
+            queryParams.push(parseInt(gerente_id, 10));
+            idx++;
+        }
+
+        if (vendedor_id && vendedor_id !== '') {
+            queryText += ' AND b.vendedor_id = $' + idx;
+            queryParams.push(parseInt(vendedor_id, 10));
+            idx++;
+        }
+
+        queryText += ' ORDER BY b.data_vencimento ASC';
+
+        const result = await pool.query(queryText, queryParams);
+        const gerentes = await pool.query('SELECT id, nome_resumido FROM gerentes WHERE ativo = 1 ORDER BY nome_resumido ASC');
+        const vendedores = await pool.query('SELECT id, nome_resumido, gerente_id FROM vendedores WHERE ativo = 1 ORDER BY nome_resumido ASC');
+        
+        result.rows.forEach(b => {
+            b.cliente_cnpj = formatarCnpjCpf(b.cliente_cnpj);
+            b.valor_original_fmt = formatarMoedaSemSimbolo(b.valor_original);
+        });
+
+        res.render('cobranca-lista', { 
+            contas: result.rows, 
+            gerentes: gerentes.rows,
+            vendedores: vendedores.rows,
+            buscaAtual: busca || '', 
+            statusAtual: status || '', 
+            gerenteAtual: gerente_id || '',
+            vendedorAtual: vendedor_id || '',
+            erro: req.query.erro || null, 
+            sucesso: req.query.sucesso || null 
+        });
+    } catch (err) {
+        console.error('ERRO EM GET /cobranca:', err);
+        res.status(500).send('Erro interno');
+    }
+});
+
 app.get('/cobranca/nova', verificarAutenticacao, async (req, res) => {
     try {
         const clientes = await pool.query(`
