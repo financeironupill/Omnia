@@ -121,6 +121,7 @@
                             <th>Nº Doc</th>
                             <th>Cliente</th>
                             <th>Vencimento</th>
+                            <th class="text-center">Dias Aberto</th>
                             <th>Previsão Pagto</th>
                             <th class="text-end">Valor Orig.</th>
                             <th class="text-end">Custas</th>
@@ -136,12 +137,20 @@
                                     <td class="fw-bold"><%= b.numero_documento %></td>
                                     <td>
                                         <div class="fw-semibold"><%= b.cliente_nome || 'N/A' %></div>
-                                        <!-- CNPJ em vermelho (sem negrito) se o cliente tiver mais de 1 boleto Vencido ou Pago com Pendência -->
                                         <small class="<%= b.reincidente_pendente ? 'text-danger fw-normal' : 'text-muted' %>">
                                             <%= b.cliente_cnpj || '' %>
                                         </small>
                                     </td>
                                     <td><%= b.data_vencimento ? new Date(b.data_vencimento).toLocaleDateString('pt-BR') : '-' %></td>
+                                    <td class="text-center">
+                                        <% if (b.situacao_boleto === 'Vencido' && b.dias_atraso > 0) { %>
+                                            <span class="badge bg-danger"><%= b.dias_atraso %> dia(s)</span>
+                                        <% } else if (b.dias_atraso > 0) { %>
+                                            <span class="badge bg-secondary"><%= b.dias_atraso %> dia(s)</span>
+                                        <% } else { %>
+                                            <span class="text-muted">-</span>
+                                        <% } %>
+                                    </td>
                                     <td class="fw-semibold text-primary">
                                         <%= b.data_previsao_pagamento ? new Date(b.data_previsao_pagamento).toLocaleDateString('pt-BR') : '-' %>
                                     </td>
@@ -182,7 +191,7 @@
                             <% }) %>
                         <% } else { %>
                             <tr>
-                                <td colspan="9" class="text-center py-4 text-muted">Nenhum boleto encontrado.</td>
+                                <td colspan="10" class="text-center py-4 text-muted">Nenhum boleto encontrado.</td>
                             </tr>
                         <% } %>
                     </tbody>
