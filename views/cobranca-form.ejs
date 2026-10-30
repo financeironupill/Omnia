@@ -156,9 +156,13 @@
                             <div class="col-md-3">
                                 <label class="form-label small fw-bold">Status do Boleto</label>
                                 <select name="status_boleto" class="form-select">
+                                    <option value="Pendente" <%= conta && conta.status_boleto === 'Pendente' ? 'selected' : '' %>>Pendente</option>
                                     <option value="Vencido" <%= !conta || conta.status_boleto === 'Vencido' ? 'selected' : '' %>>Vencido</option>
                                     <option value="Pago" <%= conta && conta.status_boleto === 'Pago' ? 'selected' : '' %>>Pago</option>
                                     <option value="Pago com Pendência" <%= conta && conta.status_boleto === 'Pago com Pendência' ? 'selected' : '' %>>Pago com Pendência</option>
+                                    <option value="Protestado" <%= conta && conta.status_boleto === 'Protestado' ? 'selected' : '' %>>Protestado</option>
+                                    <option value="Devolvido" <%= conta && conta.status_boleto === 'Devolvido' ? 'selected' : '' %>>Devolvido</option>
+                                    <option value="Sustado" <%= conta && conta.status_boleto === 'Sustado' ? 'selected' : '' %>>Sustado</option>
                                     <option value="Cancelado" <%= conta && conta.status_boleto === 'Cancelado' ? 'selected' : '' %>>Cancelado</option>
                                 </select>
                             </div>
@@ -307,94 +311,4 @@
                 if (v.length > 11) {
                     e.target.value = v.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5').slice(0, 18);
                 } else {
-                    e.target.value = v.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4').slice(0, 14);
-                }
-            });
-
-            // Consulta CNPJ no Modal
-            const btnBuscarCnpjModal = document.getElementById('btnBuscarCnpjModal');
-            btnBuscarCnpjModal.addEventListener('click', async function() {
-                const cnpj = modalCnpjCpf.value.replace(/\D/g, '');
-                if (cnpj.length !== 14) {
-                    alert('Informe um CNPJ válido com 14 dígitos.');
-                    return;
-                }
-                btnBuscarCnpjModal.disabled = true;
-                btnBuscarCnpjModal.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-
-                try {
-                    const res = await fetch(`/api/consultar-cnpj/${cnpj}`);
-                    if (!res.ok) throw new Error();
-                    const data = await res.json();
-                    if (data.razao_social) document.getElementById('modalNome').value = data.razao_social;
-                    if (data.nome_fantasia) document.getElementById('modalNomeFantasia').value = data.nome_fantasia;
-                    if (data.municipio) document.getElementById('modalCidade').value = data.municipio;
-                    if (data.uf) document.getElementById('modalUf').value = data.uf;
-                } catch (e) {
-                    alert('CNPJ não encontrado ou erro na consulta.');
-                } finally {
-                    btnBuscarCnpjModal.disabled = false;
-                    btnBuscarCnpjModal.innerHTML = 'Buscar';
-                }
-            });
-
-            // Salvar Cliente via Modal (AJAX)
-            const btnSalvarClienteModal = document.getElementById('btnSalvarClienteModal');
-            btnSalvarClienteModal.addEventListener('click', async function() {
-                const payload = {
-                    tipo_pessoa: document.getElementById('modalTipoPessoa').value,
-                    cnpj_cpf: document.getElementById('modalCnpjCpf').value,
-                    nome: document.getElementById('modalNome').value,
-                    nome_fantasia: document.getElementById('modalNomeFantasia').value,
-                    cidade: document.getElementById('modalCidade').value,
-                    uf: document.getElementById('modalUf').value,
-                    gerente_id: document.getElementById('modalGerenteId').value,
-                    vendedor_id: document.getElementById('modalVendedorId').value
-                };
-
-                if (!payload.nome || !payload.gerente_id || !payload.vendedor_id) {
-                    alert('Por favor, preencha a Razão Social, Gerente e Vendedor.');
-                    return;
-                }
-
-                btnSalvarClienteModal.disabled = true;
-
-                try {
-                    const res = await fetch('/api/clientes/novo', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                    const data = await res.json();
-
-                    if (data.sucesso) {
-                        const newOption = document.createElement('option');
-                        newOption.value = data.cliente.id;
-                        newOption.text = data.cliente.nome;
-                        newOption.setAttribute('data-gerente-id', data.cliente.gerente_id);
-                        newOption.setAttribute('data-vendedor-id', data.cliente.vendedor_id);
-                        newOption.setAttribute('data-gerente-nome', data.cliente.gerente_nome);
-                        newOption.setAttribute('data-vendedor-nome', data.cliente.vendedor_nome);
-                        newOption.selected = true;
-
-                        selectCliente.appendChild(newOption);
-                        atualizarVinculos();
-
-                        const modalEl = document.getElementById('modalNovoCliente');
-                        const modalInstance = bootstrap.Modal.getInstance(modalEl);
-                        modalInstance.hide();
-
-                        document.getElementById('formModalCliente').reset();
-                    } else {
-                        alert(data.erro || 'Erro ao cadastrar cliente.');
-                    }
-                } catch (e) {
-                    alert('Erro de conexão ao salvar cliente.');
-                } finally {
-                    btnSalvarClienteModal.disabled = false;
-                }
-            });
-        });
-    </script>
-</body>
-</html>
+                    e.target.value = v.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$
