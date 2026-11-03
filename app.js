@@ -1261,6 +1261,74 @@ app.get('/cobranca/duplicar/:id', verificarAutenticacao, async (req, res) => {
     }
 });
 
+// PREPARAR O PRIMEIRO E-MAIL DE COBRANÇA E REGISTRAR A AÇÃO NO HISTÓRICO
+app.post('/cobranca/aviso1/:id', verificarAutenticacao, async (req, res) => {
+    const boletoId = Number(req.params.id);
+    if (!Number.isSafeInteger(boletoId) || boletoId <= 0) {
+        return res.status(400).json({ erro: 'Identificador de boleto inválido.' });
+    }
+
+    try {
+        const boletoRes = await pool.query(`
+            SELECT b.id, b.numero_documento, b.data_vencimento, b.valor_original,
+                   cl.nome, cl.nome_fantasia, cl.email
+            FROM boletos b
+            LEFT JOIN clientes cl ON cl.id = b.cliente_id
+            WHERE b.id = $1
+        `, [boletoId]);
+
+        if (boletoRes.rows.length === 0) {
+            return res.status(404).json({ erro: 'Boleto não encontrado.' });
+        }
+
+        const boleto = boletoRes.rows[0];
+        const email = boleto.email ? boleto.email.trim() : '';
+        if (!email) {
+            return res.status(400).json({ erro: 'O cliente não possui e-mail cadastrado.' });
+        }
+
+        const clienteNome = boleto.nome_fantasia || boleto.nome || 'Cliente';
+        const vencimento = boleto.data_vencimento
+            ? new Date(boleto.data_vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' })
+            : 'Não informado';
+        const valor = formatarMoedaSemSimbolo(boleto.valor_original);
+        const assunto = `1º E-mail (Aviso 1) - Boleto Nº ${boleto.numero_documento}`;
+        const corpo = `Prezado cliente,
+
+Esperamos que este e-mail o(a) encontre bem.
+
+Estamos entrando em contato para informar que, em nosso sistema, consta como em aberto o título:
+
+Vencimento: ${vencimento} - ${clienteNome} - R$ ${valor}
+
+Se o pagamento já foi efetuado, por favor, nos avise e nos envie o comprovante para que possamos dar baixa em nosso registro.
+
+Caso precise de qualquer informação para regularizar a situação, ou se houver alguma dúvida, estamos à disposição para ajudar. Você pode nos contatar em 11 4486-8977 ou responder a este e-mail.
+
+Agradecemos a sua atenção e colaboração.
+
+Atenciosamente,`;
+
+        await pool.query(`
+            INSERT INTO boletos_historico
+                (boleto_id, usuario_id, tipo_contato, canal, contato_nome, resumo, data_hora)
+            VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+        `, [
+            boletoId,
+            req.session.usuario.id,
+            'E-mail 1 - Aviso de Vencimento',
+            'E-mail',
+            clienteNome,
+            `1º E-mail (Aviso 1) acionado para ${email} via cliente de e-mail. O envio precisa ser confirmado no cliente.`
+        ]);
+
+        res.json({ para: email, assunto, corpo });
+    } catch (err) {
+        console.error('ERRO AO PREPARAR AVISO 1 DA COBRANÇA:', err);
+        res.status(500).json({ erro: 'Erro ao preparar o e-mail e registrar a interação.' });
+    }
+});
+
 // REGISTRAR HISTÓRICO DE INTERAÇÃO (FONE, WHATSAPP, E-MAIL)
 app.post('/cobranca/historico/novo/:id', verificarAutenticacao, async (req, res) => {
     const boletoId = req.params.id;

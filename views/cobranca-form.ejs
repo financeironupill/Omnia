@@ -246,7 +246,7 @@
                     </div>
                     <div class="card-body">
                         <div class="d-flex flex-wrap gap-2">
-                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="prepararEmailRégua(1)">
+                            <button type="button" id="btnAviso1" class="btn btn-outline-primary btn-sm" onclick="prepararEmailAviso1()">
                                 <i class="fa-solid fa-envelope me-1"></i> 1º E-mail (Aviso 1)
                             </button>
                             <button type="button" class="btn btn-outline-warning text-dark btn-sm" onclick="prepararEmailRégua(2)">
@@ -259,6 +259,7 @@
                                 <i class="fa-solid fa-user-check me-1"></i> Avisar Gerente/Vendedor (Liquidação/Custas)
                             </button>
                         </div>
+                        <div id="emailAvisoFeedback" class="alert d-none mt-3 mb-0" role="status" aria-live="polite"></div>
                     </div>
                 </div>
 
@@ -373,6 +374,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                    <button type="button" class="btn btn-outline-primary" onclick="abrirEmailPreparado()"><i class="fa-solid fa-envelope me-1"></i> Abrir cliente de e-mail</button>
                     <button type="button" class="btn btn-primary fw-semibold" onclick="copiarTextoEmail()"><i class="fa-solid fa-clipboard me-1"></i> Copiar Texto</button>
                 </div>
             </div>
@@ -459,6 +461,8 @@
     <!-- SCRIPTS DA APLICAÇÃO -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        let emailAvisoPreparadoUrl = '';
+
         const dadosBoleto = {
             id: "<%= conta ? conta.id : '' %>",
             numero_documento: "<%= conta ? conta.numero_documento : '' %>",
@@ -472,9 +476,58 @@
             vendedor_email: "<%= conta ? conta.vendedor_email : '' %>"
         };
 
+        async function prepararEmailAviso1() {
+            const botao = document.getElementById('btnAviso1');
+            const feedback = document.getElementById('emailAvisoFeedback');
+            let janelaEmail = null;
+            botao.disabled = true;
+            feedback.className = 'alert d-none mt-3 mb-0';
+
+            try {
+                janelaEmail = window.open('about:blank', '_blank');
+                const resposta = await fetch(`/cobranca/aviso1/${encodeURIComponent(dadosBoleto.id)}`, {
+                    method: 'POST',
+                    headers: { Accept: 'application/json' }
+                });
+                const resultado = await resposta.json();
+                if (!resposta.ok) {
+                    throw new Error(resultado.erro || 'Não foi possível preparar o e-mail.');
+                }
+
+                document.getElementById('emailParaModal').value = resultado.para;
+                document.getElementById('emailCcModal').value = '';
+                document.getElementById('emailAssuntoModal').value = resultado.assunto;
+                document.getElementById('emailTextoModal').value = resultado.corpo;
+                emailAvisoPreparadoUrl = `mailto:${encodeURIComponent(resultado.para)}?subject=${encodeURIComponent(resultado.assunto)}&body=${encodeURIComponent(resultado.corpo)}`;
+
+                if (janelaEmail && !janelaEmail.closed) {
+                    janelaEmail.location.href = emailAvisoPreparadoUrl;
+                    feedback.textContent = 'O cliente de e-mail foi acionado e a interação foi registrada. Confirme o envio no seu cliente de e-mail.';
+                    feedback.className = 'alert alert-success mt-3 mb-0';
+                } else {
+                    feedback.textContent = 'A interação foi registrada, mas o navegador bloqueou a nova janela. Use “Abrir cliente de e-mail” no modal e confirme o envio.';
+                    feedback.className = 'alert alert-warning mt-3 mb-0';
+                }
+
+                new bootstrap.Modal(document.getElementById('modalCopiarEmail')).show();
+            } catch (err) {
+                if (janelaEmail && !janelaEmail.closed) janelaEmail.close();
+                feedback.textContent = err.message;
+                feedback.className = 'alert alert-danger mt-3 mb-0';
+            } finally {
+                botao.disabled = false;
+            }
+        }
+
+        function abrirEmailPreparado() {
+            if (emailAvisoPreparadoUrl) {
+                window.open(emailAvisoPreparadoUrl, '_blank');
+            }
+        }
+
         function dispararEmail(para, cc, assunto, corpo) {
-            const mailtoUrl = `mailto:${encodeURIComponent(para)}?cc=${encodeURIComponent(cc)}&subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
-            window.location.href = mailtoUrl;
+            emailAvisoPreparadoUrl = `mailto:${encodeURIComponent(para)}?cc=${encodeURIComponent(cc)}&subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
+            window.location.href = emailAvisoPreparadoUrl;
 
             document.getElementById('emailParaModal').value = para;
             document.getElementById('emailCcModal').value = cc;
