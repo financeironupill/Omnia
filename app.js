@@ -137,6 +137,19 @@ app.get('/api/consultar-cnpj/:cnpj', verificarAutenticacao, (req, res) => {
 app.post('/api/clientes/novo', verificarAutenticacao, async (req, res) => {
     const { tipo_pessoa, cnpj_cpf, nome, nome_fantasia, contato, email, telefone, cidade, uf, gerente_id, vendedor_id } = req.body;
     try {
+        const cnpjCpfLimpo = String(cnpj_cpf || '').replace(/\D/g, '');
+        if (cnpjCpfLimpo) {
+            const clienteExistente = await pool.query(
+                `SELECT id FROM clientes
+                 WHERE regexp_replace(COALESCE(cnpj_cpf, ''), '[^0-9]', '', 'g') = $1
+                 LIMIT 1`,
+                [cnpjCpfLimpo]
+            );
+            if (clienteExistente.rows.length > 0) {
+                return res.status(409).json({ sucesso: false, erro: 'Este cliente já está cadastrado.' });
+            }
+        }
+
         const sql = `
             INSERT INTO clientes (tipo_pessoa, cnpj_cpf, nome, nome_fantasia, contato, email, telefone, cidade, uf, gerente_id, vendedor_id, ativo) 
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 1) 
@@ -359,6 +372,26 @@ app.get('/clientes/novo', verificarAutenticacao, async (req, res) => {
 app.post('/clientes/novo', verificarAutenticacao, async (req, res) => {
     const { tipo_pessoa, cnpj_cpf, nome, nome_fantasia, contato, email, telefone, cidade, uf, banco, agencia, conta, tipo_chave_pix, chave_pix, gerente_id, vendedor_id } = req.body;
     try {
+        const cnpjCpfLimpo = String(cnpj_cpf || '').replace(/\D/g, '');
+        if (cnpjCpfLimpo) {
+            const clienteExistente = await pool.query(
+                `SELECT id FROM clientes
+                 WHERE regexp_replace(COALESCE(cnpj_cpf, ''), '[^0-9]', '', 'g') = $1
+                 LIMIT 1`,
+                [cnpjCpfLimpo]
+            );
+            if (clienteExistente.rows.length > 0) {
+                const gerentes = await pool.query('SELECT id, nome_resumido FROM gerentes WHERE ativo = 1 ORDER BY nome_resumido ASC');
+                const vendedores = await pool.query('SELECT v.id, v.nome_resumido, v.gerente_id FROM vendedores v WHERE v.ativo = 1 ORDER BY v.nome_resumido ASC');
+                return res.status(409).render('cliente-form', {
+                    cliente: req.body,
+                    gerentes: gerentes.rows,
+                    vendedores: vendedores.rows,
+                    erro: 'Este cliente já está cadastrado.'
+                });
+            }
+        }
+
         const sql = 'INSERT INTO clientes (tipo_pessoa, cnpj_cpf, nome, nome_fantasia, contato, email, telefone, cidade, uf, banco, agencia, conta, tipo_chave_pix, chave_pix, gerente_id, vendedor_id, ativo) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 1)';
         await pool.query(sql, [
             tipo_pessoa, 
@@ -1053,6 +1086,29 @@ app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
     const { cliente_id, numero_documento, banco, carteira, valor_original, data_emissao, data_vencimento, situacao_boleto, status_cobranca, data_previsao_pagamento, observacoes } = req.body;
 
     try {
+        const clienteId = parseInt(cliente_id, 10);
+        const numeroDocumento = numero_documento ? numero_documento.trim().toUpperCase() : '';
+        const boletoExistente = await pool.query(
+            `SELECT id FROM boletos
+             WHERE cliente_id = $1 AND UPPER(numero_documento) = $2
+             LIMIT 1`,
+            [clienteId, numeroDocumento]
+        );
+        if (boletoExistente.rows.length > 0) {
+            const clientes = await pool.query('SELECT c.id, c.nome, c.gerente_id, c.vendedor_id, g.nome_resumido AS gerente_nome, v.nome_resumido AS vendedor_nome FROM clientes c LEFT JOIN gerentes g ON c.gerente_id = g.id LEFT JOIN vendedores v ON c.vendedor_id = v.id WHERE c.ativo = 1 ORDER BY c.nome ASC');
+            const gerentes = await pool.query('SELECT id, nome_resumido FROM gerentes WHERE ativo = 1 ORDER BY nome_resumido ASC');
+            const vendedores = await pool.query('SELECT v.id, v.nome_resumido, v.gerente_id FROM vendedores v WHERE v.ativo = 1 ORDER BY v.nome_resumido ASC');
+            return res.status(409).render('cobranca-form', {
+                conta: req.body,
+                clientes: clientes.rows,
+                gerentes: gerentes.rows,
+                vendedores: vendedores.rows,
+                historico: [],
+                erro: 'Este número de documento já foi lançado para este cliente.',
+                sucesso: null
+            });
+        }
+
         const cliRes = await pool.query('SELECT gerente_id, vendedor_id FROM clientes WHERE id = $1', [cliente_id]);
         let gerenteId = null;
         let vendedorId = null;
@@ -1070,7 +1126,7 @@ app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
             parseInt(cliente_id, 10),
             gerenteId,
             vendedorId,
-            numero_documento ? numero_documento.trim().toUpperCase() : '',
+            numeroDocumento,
             banco || null,
             carteira || 'Simples',
             limparValorMonetario(valor_original),
