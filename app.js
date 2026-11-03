@@ -1301,7 +1301,7 @@ async function carregarEmailRegua(boletoId, etapa, executor = pool) {
     const vencimento = boleto.data_vencimento
         ? new Date(boleto.data_vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' })
         : 'Não informado';
-    const identificacaoTitulo = `**Vencimento: ${vencimento} - ${clienteNome} - R$ ${formatarMoedaSemSimbolo(boleto.valor_original)}**`;
+    const identificacaoTitulo = `**Vencimento: ${vencimento} - Doc: ${boleto.numero_documento} - ${clienteNome} - R$ ${formatarMoedaSemSimbolo(boleto.valor_original)}**`;
     const etapaConfig = etapasEmailRegua[etapa];
     let assunto;
     let corpo;
