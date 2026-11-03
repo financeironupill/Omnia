@@ -1497,6 +1497,28 @@ app.post('/cobranca/historico/editar/:boletoId/:historicoId', verificarAutentica
     }
 });
 
+app.post('/cobranca/historico/excluir/:boletoId/:id', verificarAutenticacao, async (req, res) => {
+    const boletoId = Number(req.params.boletoId);
+    const historicoId = Number(req.params.id);
+    if (!Number.isSafeInteger(boletoId) || boletoId <= 0 || !Number.isSafeInteger(historicoId) || historicoId <= 0) {
+        return res.redirect('/cobranca?erro=Identificador de histórico inválido.');
+    }
+
+    try {
+        const result = await pool.query(
+            'DELETE FROM boletos_historico WHERE boleto_id = $1 AND id = $2',
+            [boletoId, historicoId]
+        );
+        if (result.rowCount === 0) {
+            return res.redirect(`/cobranca/editar/${boletoId}?erro=Interação não encontrada.`);
+        }
+        res.redirect(`/cobranca/editar/${boletoId}?sucesso=Interação excluída com sucesso.`);
+    } catch (err) {
+        console.error('ERRO AO EXCLUIR HISTÓRICO DA COBRANÇA:', err);
+        res.redirect(`/cobranca/editar/${boletoId}?erro=Erro ao excluir interação.`);
+    }
+});
+
 // EXCLUIR BOLETO
 app.post('/cobranca/excluir/:id', verificarAutenticacao, async (req, res) => {
     try {

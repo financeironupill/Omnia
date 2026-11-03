@@ -295,6 +295,12 @@
                                                     onclick="preencherEdicaoInteracao(this)" title="Editar interação">
                                                     <i class="fa-solid fa-pen"></i>
                                                 </button>
+                                                <form action="/cobranca/historico/excluir/<%= conta.id %>/<%= h.id %>" method="POST" class="d-inline"
+                                                    onsubmit="return confirm('Deseja realmente excluir esta interação?')">
+                                                    <button type="submit" class="btn btn-outline-danger btn-sm ms-1" title="Excluir interação">
+                                                        <i class="fa-solid fa-trash"></i>
+                                                    </button>
+                                                </form>
                                             </div>
                                         </div>
                                         <p class="mb-1 text-dark small"><%= h.resumo %></p>
@@ -640,9 +646,9 @@
                 document.getElementById('emailAvisoFeedback').className = 'alert alert-success mt-3 mb-0';
                 modalFeedback.textContent = resultado.sucesso;
                 modalFeedback.className = 'alert alert-success';
-                adicionarInteracaoConfirmada(resultado.interacao);
                 emailReguaEtapaPendente = null;
                 botao.hidden = true;
+                window.setTimeout(() => window.location.reload(), 900);
             } catch (err) {
                 modalFeedback.textContent = err.message;
                 modalFeedback.className = 'alert alert-danger';
@@ -653,50 +659,15 @@
         function preencherEdicaoInteracao(botao) {
             const form = document.getElementById('formEditarInteracao');
             form.action = `/cobranca/historico/editar/${encodeURIComponent(botao.dataset.boletoId)}/${encodeURIComponent(botao.dataset.historicoId)}`;
-            document.getElementById('editarTipoContato').value = botao.dataset.tipoContato;
+            const tipoContato = document.getElementById('editarTipoContato');
+            const tipoSalvo = botao.dataset.tipoContato;
+            if (![...tipoContato.options].some(option => option.value === tipoSalvo)) {
+                tipoContato.add(new Option(tipoSalvo, tipoSalvo));
+            }
+            tipoContato.value = tipoSalvo;
             document.getElementById('editarCanal').value = botao.dataset.canal;
             document.getElementById('editarContatoNome').value = botao.dataset.contatoNome;
             document.getElementById('editarResumo').value = botao.dataset.resumo;
-        }
-
-        function adicionarInteracaoConfirmada(interacao) {
-            const listaExistente = document.getElementById('listaHistoricoInteracoes');
-            const lista = listaExistente || document.createElement('div');
-            if (!listaExistente) {
-                lista.id = 'listaHistoricoInteracoes';
-                lista.className = 'list-group';
-                const avisoVazio = document.getElementById('historicoVazio');
-                if (avisoVazio) avisoVazio.replaceWith(lista);
-            }
-
-            const item = document.createElement('div');
-            item.className = 'list-group-item list-group-item-action flex-column align-items-start';
-            const cabecalho = document.createElement('div');
-            cabecalho.className = 'd-flex w-100 justify-content-between';
-            const titulo = document.createElement('h6');
-            titulo.className = 'mb-1 fw-bold text-primary';
-            const icone = document.createElement('i');
-            icone.className = 'fa-solid fa-envelope text-info me-2';
-            titulo.append(icone, document.createTextNode(`${interacao.tipo_contato} - ${interacao.contato_nome}`));
-            const statusData = document.createElement('div');
-            statusData.className = 'text-end';
-            const selo = document.createElement('span');
-            selo.className = 'badge bg-success me-2';
-            selo.textContent = interacao.status;
-            const data = document.createElement('small');
-            data.className = 'text-muted';
-            data.textContent = new Date(interacao.data_hora).toLocaleString('pt-BR');
-            statusData.append(selo, data);
-            cabecalho.append(titulo, statusData);
-
-            const resumo = document.createElement('p');
-            resumo.className = 'mb-1 text-dark small';
-            resumo.textContent = interacao.resumo;
-            const registrado = document.createElement('small');
-            registrado.className = 'text-muted';
-            registrado.textContent = `Registrado por: ${interacao.usuario_nome}`;
-            item.append(cabecalho, resumo, registrado);
-            lista.prepend(item);
         }
 
         function prepararEmailAvisoComercial() {
