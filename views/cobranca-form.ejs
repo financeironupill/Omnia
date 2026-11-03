@@ -258,6 +258,9 @@
                             <button type="button" class="btn btn-success btn-sm" onclick="prepararEmailAvisoComercial()">
                                 <i class="fa-solid fa-user-check me-1"></i> Avisar Gerente/Vendedor (Liquidação/Custas)
                             </button>
+                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="prepararEmailRetornado()">
+                                <i class="fa-solid fa-triangle-exclamation me-1"></i> Notificar E-mail Retornado (Gerente/Vendedor)
+                            </button>
                         </div>
                         <div id="emailAvisoFeedback" class="alert d-none mt-3 mb-0" role="status" aria-live="polite"></div>
                     </div>
@@ -696,8 +699,17 @@
             dispararEmail(destinatarios, '', assunto, corpo);
         }
 
+        function prepararEmailRetornado() {
+            const destinatarios = [dadosBoleto.gerente_email, dadosBoleto.vendedor_email].filter(Boolean).join(',');
+            const emailAtual = dadosBoleto.cliente_email || 'Não informado';
+            
+            const assunto = `FALHA NA ENTREGA DE E-MAIL: Cliente ${dadosBoleto.cliente_nome} - Boleto Nº ${dadosBoleto.numero_documento}`;
+            const corpo = `Prezados Gerente e Vendedor,\n\nInformamos que o e-mail de cobrança enviado para o cliente ${dadosBoleto.cliente_nome} através do endereço (${emailAtual}) retornou ou não pôde ser entregue (endereço incorreto ou caixa postal cheia).\n\nPrecisamos que por favor verifiquem e nos informem o e-mail correto do cliente para atualizarmos o cadastro, ou que entrem em contato diretamente com ele para alertá-lo sobre a cobrança em aberto do boleto Nº ${dadosBoleto.numero_documento}.\n\nContamos com a vossa colaboração.\n\nAtenciosamente,\nSetor Financeiro - Omnia`;
+
+            dispararEmail(destinatarios, '', assunto, corpo);
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
-            // Filtro de Vendedores por Gerente no Modal de Cadastro Rápido
             const modalGerenteId = document.getElementById('modalGerenteId');
             const modalVendedorId = document.getElementById('modalVendedorId');
 
