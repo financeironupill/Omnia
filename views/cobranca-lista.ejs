@@ -149,6 +149,13 @@
                     }
                     return '<i class="fa-solid fa-sort text-muted small"></i>';
                 }
+
+                // Verifica se há algum filtro ativo na tela
+                const temFiltroAtivo = (locals.buscaAtual && locals.buscaAtual.trim() !== '') ||
+                                       (locals.statusBoletoAtual && locals.statusBoletoAtual !== '') ||
+                                       (locals.statusCobrancaAtual && locals.statusCobrancaAtual !== '') ||
+                                       (locals.gerenteAtual && locals.gerenteAtual !== '') ||
+                                       (locals.vendedorAtual && locals.vendedorAtual !== '');
             %>
 
             <!-- TABELA DE BOLETOS -->
@@ -293,11 +300,17 @@
                             </tr>
                         <% } %>
                     </tbody>
-                    <!-- RODAPÉ COM TOTALIZADORES -->
+                    <!-- RODAPÉ COM TOTALIZADORES CONDICIONAIS -->
                     <% if (contas && contas.length > 0) { %>
                         <tfoot class="table-light fw-bold border-top">
                             <tr>
-                                <td colspan="5" class="text-end text-muted small text-uppercase">TOTAIS (<%= contas.length %> registros filtrados):</td>
+                                <td colspan="5" class="text-end text-muted small text-uppercase">
+                                    <% if (temFiltroAtivo) { %>
+                                        TOTAIS (<%= contas.length %> registros filtrados):
+                                    <% } else { %>
+                                        TOTAIS (Geral / <%= contas.length %> registros):
+                                    <% } %>
+                                </td>
                                 <td class="text-end text-dark"><%= locals.totalValorOriginalFmt || '0,00' %></td>
                                 <td class="text-end text-danger"><%= locals.totalCustasFmt || '0,00' %></td>
                                 <td colspan="3"></td>
