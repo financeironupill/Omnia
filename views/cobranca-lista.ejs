@@ -8,6 +8,18 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .th-ordenavel {
+            color: #fff;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .th-ordenavel:hover {
+            color: #ffc107;
+        }
+    </style>
 </head>
 <body class="bg-light">
 
@@ -63,6 +75,10 @@
 
             <!-- FILTROS DE PESQUISA DA RÉGUA -->
             <form action="/cobranca" method="GET" class="row g-2 mb-4 bg-light p-3 rounded border">
+                <!-- Mantém os filtros atuais ocultos se ordenar -->
+                <input type="hidden" name="ordenar" value="<%= locals.ordenarAtual || '' %>">
+                <input type="hidden" name="ordem" value="<%= locals.ordemAtual || '' %>">
+
                 <div class="col-md-3">
                     <label class="form-label small fw-bold">Pesquisa Geral</label>
                     <input type="text" name="busca" class="form-control form-control-sm" placeholder="Nº Documento, Cliente ou Banco..." value="<%= buscaAtual %>">
@@ -113,20 +129,44 @@
                 </div>
             </form>
 
+            <%
+                // Função auxiliar para gerar o link de ordenação mantendo os filtros ativos
+                function gerarLinkOrdenacao(coluna) {
+                    let novaOrdem = 'ASC';
+                    if (locals.ordenarAtual === coluna && locals.ordemAtual === 'ASC') {
+                        novaOrdem = 'DESC';
+                    }
+                    let url = `/cobranca?ordenar=${coluna}&ordem=${novaOrdem}`;
+                    if (locals.buscaAtual) url += `&busca=${encodeURIComponent(locals.buscaAtual)}`;
+                    if (locals.statusBoletoAtual) url += `&status_boleto=${encodeURIComponent(locals.statusBoletoAtual)}`;
+                    if (locals.statusCobrancaAtual) url += `&status_cobranca=${encodeURIComponent(locals.statusCobrancaAtual)}`;
+                    if (locals.gerenteAtual) url += `&gerente_id=${locals.gerenteAtual}`;
+                    if (locals.vendedorAtual) url += `&vendedor_id=${locals.vendedorAtual}`;
+                    return url;
+                }
+
+                function iconeSeta(coluna) {
+                    if (locals.ordenarAtual === coluna) {
+                        return locals.ordemAtual === 'ASC' ? '<i class="fa-solid fa-arrow-up-a-z text-warning small"></i>' : '<i class="fa-solid fa-arrow-down-z-a text-warning small"></i>';
+                    }
+                    return '<i class="fa-solid fa-sort text-muted small"></i>';
+                }
+            %>
+
             <!-- TABELA DE BOLETOS -->
             <div class="table-responsive">
                 <table class="table table-hover align-middle border">
                     <thead class="table-dark">
                         <tr>
-                            <th>Nº Doc</th>
-                            <th>Cliente</th>
-                            <th>Vencimento</th>
+                            <th><a href="<%= gerarLinkOrdenacao('documento') %>" class="th-ordenavel">Nº Doc <%- iconeSeta('documento') %></a></th>
+                            <th><a href="<%= gerarLinkOrdenacao('cliente') %>" class="th-ordenavel">Cliente <%- iconeSeta('cliente') %></a></th>
+                            <th><a href="<%= gerarLinkOrdenacao('vencimento') %>" class="th-ordenavel">Vencimento <%- iconeSeta('vencimento') %></a></th>
                             <th class="text-center">Dias Aberto</th>
-                            <th>Previsão Pagto</th>
-                            <th class="text-end">Valor Orig.</th>
+                            <th><a href="<%= gerarLinkOrdenacao('previsao') %>" class="th-ordenavel">Previsão Pagto <%- iconeSeta('previsao') %></a></th>
+                            <th class="text-end"><a href="<%= gerarLinkOrdenacao('valor') %>" class="th-ordenavel justify-content-end">Valor Orig. <%- iconeSeta('valor') %></a></th>
                             <th class="text-end">Custas</th>
-                            <th class="text-center">Situação</th>
-                            <th class="text-center">Fase Régua</th>
+                            <th class="text-center"><a href="<%= gerarLinkOrdenacao('situacao') %>" class="th-ordenavel justify-content-center">Situação <%- iconeSeta('situacao') %></a></th>
+                            <th class="text-center"><a href="<%= gerarLinkOrdenacao('regua') %>" class="th-ordenavel justify-content-center">Fase Régua <%- iconeSeta('regua') %></a></th>
                             <th class="text-center">Ações</th>
                         </tr>
                     </thead>
@@ -179,7 +219,7 @@
                                                 <i class="fa-solid fa-pen-to-square"></i>
                                             </a>
                                             
-                                            <!-- Botão de Estorno de Comissão Inteligente (Muda de cor se houver estorno) -->
+                                            <!-- Botão de Estorno de Comissão Inteligente -->
                                             <% if (b.data_estorno) { %>
                                                 <button type="button" class="btn btn-warning btn-sm" title="Comissão Estornada em <%= new Date(b.data_estorno).toLocaleDateString('pt-BR') %>" 
                                                     data-bs-toggle="modal" data-bs-target="#modalEstorno<%= b.id %>">
@@ -206,7 +246,7 @@
                                     </td>
                                 </tr>
 
-                                <!-- MODAL (POP-UP) DE ESTORNO DE COMISSÃO PARA CADA BOLETO -->
+                                <!-- MODAL (POP-UP) DE ESTORNO DE COMISSÃO -->
                                 <div class="modal fade" id="modalEstorno<%= b.id %>" tabindex="-1" aria-hidden="true">
                                     <div class="modal-dialog">
                                         <div class="modal-content">

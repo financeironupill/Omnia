@@ -852,7 +852,20 @@ app.post('/ocorrencias/excluir/:id', verificarAutenticacao, async (req, res) => 
 // MÓDULO DE BOLETOS E RÉGUA DE COBRANÇA
 app.get('/cobranca', verificarAutenticacao, async (req, res) => {
     try {
-        const { busca, status_boleto, status_cobranca, gerente_id, vendedor_id } = req.query;
+        const { busca, status_boleto, status_cobranca, gerente_id, vendedor_id, ordenar, ordem } = req.query;
+        const colunasOrdenacao = {
+            documento: 'b.numero_documento',
+            cliente: 'cl.nome',
+            vencimento: 'b.data_vencimento',
+            previsao: 'b.data_previsao_pagamento',
+            valor: 'b.valor_original',
+            situacao: 'b.situacao_boleto',
+            regua: 'b.status_cobranca'
+        };
+        const ordenarAtual = typeof ordenar === 'string' && Object.prototype.hasOwnProperty.call(colunasOrdenacao, ordenar)
+            ? ordenar
+            : 'vencimento';
+        const ordemAtual = ordem === 'DESC' ? 'DESC' : 'ASC';
         let queryText = `
             SELECT b.*, cl.nome AS cliente_nome, cl.cnpj_cpf AS cliente_cnpj, cl.email AS cliente_email, cl.telefone AS cliente_telefone,
                    g.nome_resumido AS gerente_nome, g.email AS gerente_email,
@@ -904,7 +917,7 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
             idx++;
         }
 
-        queryText += ' ORDER BY b.data_vencimento ASC';
+        queryText += ' ORDER BY ' + colunasOrdenacao[ordenarAtual] + ' ' + ordemAtual;
 
         const result = await pool.query(queryText, queryParams);
         const gerentes = await pool.query('SELECT id, nome_resumido FROM gerentes WHERE ativo = 1 ORDER BY nome_resumido ASC');
@@ -928,6 +941,8 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
             statusCobrancaAtual: status_cobranca || '',
             gerenteAtual: gerente_id || '',
             vendedorAtual: vendedor_id || '',
+            ordenarAtual,
+            ordemAtual,
             erro: req.query.erro || null, 
             sucesso: req.query.sucesso || null 
         });
