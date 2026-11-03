@@ -211,7 +211,9 @@
                                         <% } %>
                                     </td>
                                     <td class="text-center">
-                                        <% if (b.status_cobranca === 'Custas Pendentes (Cartório)') { %>
+                                        <% if (b.status_cobranca === 'Em Cartório / Negativado') { %>
+                                            <span class="badge" style="background-color: #b02a37; color: #fff;">Em Cartório / Negativado</span>
+                                        <% } else if (b.status_cobranca === 'Custas Pendentes (Cartório)') { %>
                                             <span class="badge bg-warning text-dark"><i class="fa-solid fa-triangle-exclamation me-1"></i>Custas Pendentes</span>
                                         <% } else { %>
                                             <span class="badge bg-info text-dark"><%= b.status_cobranca || 'Aguardando Régua' %></span>
