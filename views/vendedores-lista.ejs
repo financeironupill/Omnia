@@ -74,6 +74,7 @@
                                     </span>
                                 </a>
                             </th>
+                            <th class="py-3">CPF</th>
                             <th class="py-3">
                                 <% let novaOrdemComp = (ordenarAtual === 'nome_completo' && ordemAtual === 'ASC') ? 'DESC' : 'ASC'; %>
                                 <a href="/vendedores?busca=<%= buscaAtual %>&status=<%= statusAtual %>&ordenar=nome_completo&ordem=<%= novaOrdemComp %>" class="sort-link">
@@ -108,12 +109,13 @@
                     </thead>
                     <tbody>
                         <% if (vendedores.length === 0) { %>
-                            <tr><td colspan="8" class="text-center text-muted py-4">Nenhum vendedor encontrado.</td></tr>
+                            <tr><td colspan="9" class="text-center text-muted py-4">Nenhum vendedor encontrado.</td></tr>
                         <% } else { %>
                             <% vendedores.forEach(v => { %>
                                 <tr>
                                     <td class="fw-bold text-secondary">#<%= v.id %></td>
                                     <td><span class="badge text-white px-2 py-1" style="background-color: #20c997; font-size: 0.9rem;"><%= v.nome_resumido %></span></td>
+                                    <td><%= v.cpf_formatado || '--' %></td>
                                     <td class="fw-bold text-dark"><%= v.nome_completo %></td>
                                     <td><span class="badge bg-secondary"><%= v.gerente_nome || '--' %></span></td>
                                     <td>

@@ -608,6 +608,9 @@ app.get('/vendedores', verificarAutenticacao, async (req, res) => {
         query += ' ORDER BY ' + col + ' ' + dir;
 
         const result = await pool.query(query, params);
+        result.rows.forEach(v => {
+            v.cpf_formatado = formatarCnpjCpf(v.cpf);
+        });
         res.render('vendedores-lista', { 
             vendedores: result.rows, 
             buscaAtual: busca || '', 
@@ -633,13 +636,20 @@ app.get('/vendedores/novo', verificarAutenticacao, async (req, res) => {
 });
 
 app.post('/vendedores/novo', verificarAutenticacao, async (req, res) => {
-    const { gerente_id, nome_resumido, nome_completo, telefone, email, banco, agencia, conta, tipo_chave_pix, chave_pix, ativo } = req.body;
+    const { gerente_id, nome_resumido, nome_completo, cpf, telefone, email, banco, agencia, conta, tipo_chave_pix, chave_pix, ativo } = req.body;
+    const cpfInformado = typeof cpf === 'string' && cpf.trim() !== '';
+    const cpfLimpo = cpfInformado ? cpf.replace(/\D/g, '') : '';
+    if ((cpf && typeof cpf !== 'string') || (cpfInformado && cpfLimpo.length !== 11)) {
+        return res.redirect('/vendedores?erro=CPF deve conter 11 dígitos.');
+    }
+
     try {
-        const sql = 'INSERT INTO vendedores (gerente_id, nome_resumido, nome_completo, telefone, email, banco, agencia, conta, tipo_chave_pix, chave_pix, ativo) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)';
+        const sql = 'INSERT INTO vendedores (gerente_id, nome_resumido, nome_completo, cpf, telefone, email, banco, agencia, conta, tipo_chave_pix, chave_pix, ativo) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)';
         await pool.query(sql, [
             gerente_id ? parseInt(gerente_id, 10) : null,
             nome_resumido ? nome_resumido.trim().toUpperCase() : '',
             formatarCapitalizacao(nome_completo),
+            cpfLimpo || null,
             telefone,
             email ? email.trim().toLowerCase() : '',
             formatarCapitalizacao(banco),
@@ -651,6 +661,7 @@ app.post('/vendedores/novo', verificarAutenticacao, async (req, res) => {
         ]);
         res.redirect('/vendedores?sucesso=Vendedor cadastrado com sucesso!');
     } catch (err) {
+        console.error('ERRO AO CADASTRAR VENDEDOR:', err);
         res.redirect('/vendedores?erro=Erro ao cadastrar.');
     }
 });
@@ -667,13 +678,20 @@ app.get('/vendedores/editar/:id', verificarAutenticacao, async (req, res) => {
 });
 
 app.post('/vendedores/editar/:id', verificarAutenticacao, async (req, res) => {
-    const { gerente_id, nome_resumido, nome_completo, telefone, email, banco, agencia, conta, tipo_chave_pix, chave_pix, ativo } = req.body;
+    const { gerente_id, nome_resumido, nome_completo, cpf, telefone, email, banco, agencia, conta, tipo_chave_pix, chave_pix, ativo } = req.body;
+    const cpfInformado = typeof cpf === 'string' && cpf.trim() !== '';
+    const cpfLimpo = cpfInformado ? cpf.replace(/\D/g, '') : '';
+    if ((cpf && typeof cpf !== 'string') || (cpfInformado && cpfLimpo.length !== 11)) {
+        return res.redirect('/vendedores?erro=CPF deve conter 11 dígitos.');
+    }
+
     try {
-        const sql = 'UPDATE vendedores SET gerente_id = $1, nome_resumido = $2, nome_completo = $3, telefone = $4, email = $5, banco = $6, agencia = $7, conta = $8, tipo_chave_pix = $9, chave_pix = $10, ativo = $11 WHERE id = $12';
+        const sql = 'UPDATE vendedores SET gerente_id = $1, nome_resumido = $2, nome_completo = $3, cpf = $4, telefone = $5, email = $6, banco = $7, agencia = $8, conta = $9, tipo_chave_pix = $10, chave_pix = $11, ativo = $12 WHERE id = $13';
         await pool.query(sql, [
             gerente_id ? parseInt(gerente_id, 10) : null,
             nome_resumido ? nome_resumido.trim().toUpperCase() : '',
             formatarCapitalizacao(nome_completo),
+            cpfLimpo || null,
             telefone,
             email ? email.trim().toLowerCase() : '',
             banco,
@@ -686,6 +704,7 @@ app.post('/vendedores/editar/:id', verificarAutenticacao, async (req, res) => {
         ]);
         res.redirect('/vendedores?sucesso=Vendedor atualizado com sucesso!');
     } catch (err) {
+        console.error('ERRO AO ATUALIZAR VENDEDOR:', err);
         res.redirect('/vendedores?erro=Erro ao atualizar.');
     }
 });

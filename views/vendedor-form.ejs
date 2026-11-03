@@ -51,6 +51,10 @@
                     </div>
 
                     <div class="col-md-6">
+                        <label class="form-label fw-semibold">CPF</label>
+                        <input type="text" name="cpf" id="cpf" class="form-control" maxlength="14" inputmode="numeric" placeholder="000.000.000-00" value="<%= vendedor ? vendedor.cpf : '' %>">
+                    </div>
+                    <div class="col-md-6">
                         <label class="form-label fw-semibold">Telefone</label>
                         <input type="text" name="telefone" class="form-control" placeholder="(00) 00000-0000" value="<%= vendedor ? vendedor.telefone : '' %>">
                     </div>
@@ -96,5 +100,21 @@
             </form>
         </div>
     </div>
+    <script>
+        const campoCpf = document.getElementById('cpf');
+
+        function aplicarMascaraCpf(valor) {
+            const digitos = valor.replace(/\D/g, '').slice(0, 11);
+            if (digitos.length <= 3) return digitos;
+            if (digitos.length <= 6) return digitos.replace(/^(\d{3})(\d+)/, '$1.$2');
+            if (digitos.length <= 9) return digitos.replace(/^(\d{3})(\d{3})(\d+)/, '$1.$2.$3');
+            return digitos.replace(/^(\d{3})(\d{3})(\d{3})(\d{1,2})$/, '$1.$2.$3-$4');
+        }
+
+        campoCpf.addEventListener('input', () => {
+            campoCpf.value = aplicarMascaraCpf(campoCpf.value);
+        });
+        campoCpf.value = aplicarMascaraCpf(campoCpf.value);
+    </script>
 </body>
 </html>
