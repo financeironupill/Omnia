@@ -1106,7 +1106,8 @@ app.get('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
     try {
         const boletoId = req.params.id;
         const boletoRes = await pool.query(`
-            SELECT b.*, cl.nome AS cliente_nome, cl.email AS cliente_email, cl.telefone AS cliente_telefone,
+            SELECT b.*, cl.nome AS cliente_nome, cl.nome_fantasia AS cliente_nome_fantasia,
+                   cl.email AS cliente_email, cl.telefone AS cliente_telefone,
                    g.nome_resumido AS gerente_nome, g.email AS gerente_email,
                    v.nome_resumido AS vendedor_nome, v.email AS vendedor_email
             FROM boletos b 
@@ -1293,7 +1294,11 @@ app.post('/cobranca/aviso1/:id', verificarAutenticacao, async (req, res) => {
             return res.status(400).json({ erro: 'O cliente não possui e-mail cadastrado.' });
         }
 
-        const clienteNome = boleto.nome_fantasia || boleto.nome || 'Cliente';
+        const razaoSocial = boleto.nome ? boleto.nome.trim() : '';
+        const nomeFantasia = boleto.nome_fantasia ? boleto.nome_fantasia.trim() : '';
+        const clienteNome = razaoSocial
+            ? (nomeFantasia ? `${razaoSocial} (${nomeFantasia})` : razaoSocial)
+            : (nomeFantasia || 'Cliente');
         const vencimento = boleto.data_vencimento
             ? new Date(boleto.data_vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' })
             : 'Não informado';
@@ -1305,7 +1310,7 @@ Esperamos que este e-mail o(a) encontre bem.
 
 Estamos entrando em contato para informar que, em nosso sistema, consta como em aberto o título:
 
-Vencimento: ${vencimento} - ${clienteNome} - R$ ${valor}
+**Vencimento: ${vencimento} - ${clienteNome} - R$ ${valor}**
 
 Se o pagamento já foi efetuado, por favor, nos avise e nos envie o comprovante para que possamos dar baixa em nosso registro.
 

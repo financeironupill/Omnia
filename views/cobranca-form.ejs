@@ -471,6 +471,7 @@
             data_vencimento: "<%= conta && conta.data_vencimento ? new Date(conta.data_vencimento).toLocaleDateString('pt-BR') : '' %>",
             situacao_boleto: "<%= conta ? conta.situacao_boleto : '' %>",
             cliente_nome: "<%= conta ? conta.cliente_nome : '' %>",
+            cliente_nome_fantasia: "<%= conta ? conta.cliente_nome_fantasia || '' : '' %>",
             cliente_email: "<%= conta ? conta.cliente_email : '' %>",
             gerente_email: "<%= conta && conta.gerente_email ? conta.gerente_email : '' %>",
             vendedor_email: "<%= conta && conta.vendedor_email ? conta.vendedor_email : '' %>"
@@ -548,6 +549,15 @@
             alert('Texto copiado com sucesso para a área de transferência!');
         }
 
+        function obterIdentificacaoTitulo() {
+            const razaoSocial = (dadosBoleto.cliente_nome || '').trim();
+            const nomeFantasia = (dadosBoleto.cliente_nome_fantasia || '').trim();
+            const cliente = razaoSocial
+                ? (nomeFantasia ? `${razaoSocial} (${nomeFantasia})` : razaoSocial)
+                : (nomeFantasia || 'Cliente');
+            return `**Vencimento: ${dadosBoleto.data_vencimento || 'Não informado'} - ${cliente} - R$ ${dadosBoleto.valor_original}**`;
+        }
+
         function prepararEmailRégua(etapa) {
             let assunto = "";
             let corpo = "";
@@ -557,13 +567,13 @@
 
             if (etapa === 1) {
                 assunto = `Aviso de Cobrança - Boleto Nº ${dadosBoleto.numero_documento}`;
-                corpo = `Prezados,\n\nIdentificamos o boleto de número ${dadosBoleto.numero_documento} no valor de ${dadosBoleto.valor_original}, vencido em ${dadosBoleto.data_vencimento}, pendente de pagamento.\n\nSolicitamos a gentileza de nos informar a previsão de pagamento ou nos enviar o comprovante de quitação.\n\nAtenciosamente,\nSetor de Cobrança - Omnia`;
+                corpo = `Prezados,\n\nIdentificamos que consta em aberto o título:\n\n${obterIdentificacaoTitulo()}\n\nSolicitamos a gentileza de nos informar a previsão de pagamento ou nos enviar o comprovante de quitação.\n\nAtenciosamente,\nSetor de Cobrança - Omnia`;
             } else if (etapa === 2) {
                 assunto = `RE: Lembrete de Cobrança - Boleto Nº ${dadosBoleto.numero_documento}`;
-                corpo = `Prezados,\n\nReforçamos o contato anterior referente ao boleto Nº ${dadosBoleto.numero_documento} (Valor: ${dadosBoleto.valor_original}, Vencimento: ${dadosBoleto.data_vencimento}).\n\nRessaltamos que os títulos não quitados sujeitam-se ao envio para cartório/negativação após 3 dias úteis do vencimento. Caso o pagamento já tenha sido efetuado, por favor nos envie o comprovante.\n\nAtenciosamente,\nSetor de Cobrança - Omnia`;
+                corpo = `Prezados,\n\nReforçamos o contato referente ao título em aberto:\n\n${obterIdentificacaoTitulo()}\n\nRessaltamos que os títulos não quitados sujeitam-se ao envio para cartório/negativação após 3 dias úteis do vencimento. Caso o pagamento já tenha sido efetuado, por favor nos envie o comprovante.\n\nAtenciosamente,\nSetor de Cobrança - Omnia`;
             } else if (etapa === 3) {
                 assunto = `URGENTE: Notificação Final de Envio a Cartório - Boleto Nº ${dadosBoleto.numero_documento}`;
-                corpo = `Prezados,\n\nInformamos que o boleto Nº ${dadosBoleto.numero_documento} no valor de ${dadosBoleto.valor_original} será encaminhado para Cartório no próximo dia útil.\n\nSolicitamos o envio imediato do comprovante de pagamento caso já tenha sido liquidado.\n\nAtenciosamente,\nSetor de Cobrança - Omnia`;
+                corpo = `Prezados,\n\nInformamos que o seguinte título em aberto será encaminhado para Cartório no próximo dia útil:\n\n${obterIdentificacaoTitulo()}\n\nSolicitamos o envio imediato do comprovante de pagamento caso já tenha sido liquidado.\n\nAtenciosamente,\nSetor de Cobrança - Omnia`;
             }
 
             dispararEmail(dadosBoleto.cliente_email, cc, assunto, corpo);
