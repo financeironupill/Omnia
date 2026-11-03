@@ -475,7 +475,7 @@
                                 <select id="modalVendedorId" class="form-select" required>
                                     <option value="">Selecione o Vendedor...</option>
                                     <% if (locals.vendedores) { vendedores.forEach(v => { %>
-                                        <option value="<%= v.id %>"><%= v.nome_resumido %></option>
+                                        <option value="<%= v.id %>" data-gerente-id="<%= v.gerente_id %>"><%= v.nome_resumido %></option>
                                     <% }) } %>
                                 </select>
                             </div>
@@ -697,6 +697,26 @@
         }
 
         document.addEventListener('DOMContentLoaded', function() {
+            // Filtro de Vendedores por Gerente no Modal de Cadastro Rápido
+            const modalGerenteId = document.getElementById('modalGerenteId');
+            const modalVendedorId = document.getElementById('modalVendedorId');
+
+            if (modalGerenteId && modalVendedorId) {
+                modalGerenteId.addEventListener('change', function() {
+                    const gerenteSel = this.value;
+                    Array.from(modalVendedorId.options).forEach(opt => {
+                        if (!opt.value) return;
+                        const gId = opt.getAttribute('data-gerente-id');
+                        if (!gerenteSel || gId === gerenteSel) {
+                            opt.style.display = '';
+                        } else {
+                            opt.style.display = 'none';
+                            if (opt.selected) modalVendedorId.value = '';
+                        }
+                    });
+                });
+            }
+
             const buscaCliente = document.getElementById('buscaCliente');
             const selectCliente = document.getElementById('selectCliente');
             const inputGerenteNome = document.getElementById('inputGerenteNome');
