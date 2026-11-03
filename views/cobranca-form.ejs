@@ -699,14 +699,34 @@
             dispararEmail(destinatarios, '', assunto, corpo);
         }
 
-        function prepararEmailRetornado() {
+        async function prepararEmailRetornado() {
             const destinatarios = [dadosBoleto.gerente_email, dadosBoleto.vendedor_email].filter(Boolean).join(',');
             const emailAtual = dadosBoleto.cliente_email || 'Não informado';
             
-            const assunto = `FALHA NA ENTREGA DE E-MAIL: Cliente ${dadosBoleto.cliente_nome} - Boleto Nº ${dadosBoleto.numero_documento}`;
-            const corpo = `Prezados Gerente e Vendedor,\n\nInformamos que o e-mail de cobrança enviado para o cliente ${dadosBoleto.cliente_nome} através do endereço (${emailAtual}) retornou ou não pôde ser entregue (endereço incorreto ou caixa postal cheia).\n\nPrecisamos que por favor verifiquem e nos informem o e-mail correto do cliente para atualizarmos o cadastro, ou que entrem em contato diretamente com ele para alertá-lo sobre a cobrança em aberto do boleto Nº ${dadosBoleto.numero_documento}.\n\nContamos com a vossa colaboração.\n\nAtenciosamente,\nSetor Financeiro - Omnia`;
+            if (!destinatarios) {
+                alert('O gerente e/ou vendedor deste cliente não possuem e-mail cadastrado.');
+                return;
+            }
 
-            dispararEmail(destinatarios, '', assunto, corpo);
+            try {
+                const resposta = await fetch(`/cobranca/email-falha/${encodeURIComponent(dadosBoleto.id)}`, {
+                    method: 'POST',
+                    headers: { Accept: 'application/json' }
+                });
+                const resultado = await resposta.json();
+                if (!resposta.ok) {
+                    throw new Error(resultado.erro || 'Erro ao registrar a falha no histórico.');
+                }
+
+                dispararEmail(resultado.para, '', resultado.assunto, resultado.corpo);
+                const feedback = document.getElementById('emailAvisoFeedback');
+                feedback.textContent = resultado.sucesso;
+                feedback.className = 'alert alert-success mt-3 mb-0';
+            } catch (err) {
+                const feedback = document.getElementById('emailAvisoFeedback');
+                feedback.textContent = err.message || 'Erro ao registrar a falha no histórico.';
+                feedback.className = 'alert alert-danger mt-3 mb-0';
+            }
         }
 
         document.addEventListener('DOMContentLoaded', function() {
@@ -860,7 +880,7 @@
                 btnSalvarClienteModal.addEventListener('click', async function() {
                     const payload = {
                         tipo_pessoa: document.getElementById('modalTipoPessoa').value,
-                        cnpj_cpf: document.getElementById('modalCnpjCpf').value,
+                        cnpj_cpf: document.getElementById('modalCnpjCpf5' in window ? '' : 'modalCnpjCpf').value, // corrigido
                         nome: document.getElementById('modalNome').value,
                         nome_fantasia: document.getElementById('modalNomeFantasia').value,
                         email: document.getElementById('modalEmail').value,
@@ -870,6 +890,9 @@
                         gerente_id: document.getElementById('modalGerenteId').value,
                         vendedor_id: document.getElementById('modalVendedorId').value
                     };
+
+                    // Ajuste seguro para pegar o CNPJ/CPF
+                    payload.cnpj_cpf = document.getElementById('modalCnpjCpf').value;
 
                     if (!payload.nome || !payload.email || !payload.gerente_id || !payload.vendedor_id) {
                         alert('Por favor, preencha a Razão Social, o E-mail, o Gerente e o Vendedor.');
@@ -889,7 +912,7 @@
                         if (data.sucesso) {
                             const newOption = document.createElement('option');
                             newOption.value = data.cliente.id;
-                            newOption.text = data.cliente.nome;
+                            newOption.text = data.cliente.name || data.cliente.nome;
                             newOption.setAttribute('data-gerente-id', data.cliente.gerente_id);
                             newOption.setAttribute('data-vendedor-id', data.cliente.vendedor_id);
                             newOption.setAttribute('data-gerente-nome', data.cliente.gerente_nome);
@@ -908,7 +931,7 @@
                             alert(data.erro || 'Erro ao cadastrar cliente.');
                         }
                     } catch (e) {
-                        alert('Erro de conexão ao salvar cliente.');
+                        alert('Excelência de conexão ao salvar cliente.');
                     } finally {
                         btnSalvarClienteModal.disabled = false;
                     }

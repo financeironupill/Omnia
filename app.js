@@ -1533,6 +1533,65 @@ app.post('/cobranca/historico/excluir/:boletoId/:id', verificarAutenticacao, asy
     }
 });
 
+// ROTA PARA REGISTAR FALHA NA ENTREGA DE E-MAIL NO HISTÓRICO
+app.post('/cobranca/email-falha/:id', verificarAutenticacao, async (req, res) => {
+    const boletoId = Number(req.params.id);
+    if (!Number.isSafeInteger(boletoId) || boletoId <= 0) {
+        return res.status(400).json({ erro: 'Identificador do boleto inválido.' });
+    }
+
+    try {
+        const boletoRes = await pool.query(`
+            SELECT b.numero_documento, cl.nome, cl.email,
+                   g.email AS gerente_email, v.email AS vendedor_email
+            FROM boletos b
+            LEFT JOIN clientes cl ON cl.id = b.cliente_id
+            LEFT JOIN vendedores v ON v.id = COALESCE(b.vendedor_id, cl.vendedor_id)
+            LEFT JOIN gerentes g ON g.id = COALESCE(b.gerente_id, cl.gerente_id, v.gerente_id)
+            WHERE b.id = $1
+        `, [boletoId]);
+
+        if (boletoRes.rows.length === 0) {
+            return res.status(404).json({ erro: 'Boleto não encontrado.' });
+        }
+
+        const boleto = boletoRes.rows[0];
+        const emailAtual = boleto.email || 'Não informado';
+        const destinatarios = [...new Set([boleto.gerente_email, boleto.vendedor_email]
+            .filter(email => typeof email === 'string' && email.trim() !== '')
+            .map(email => email.trim()))];
+        if (destinatarios.length === 0) {
+            return res.status(400).json({ erro: 'O gerente e o vendedor não possuem e-mail cadastrado.' });
+        }
+
+        const assunto = `FALHA NA ENTREGA DE E-MAIL: Cliente ${boleto.nome || 'Cliente'} - Boleto Nº ${boleto.numero_documento}`;
+        const corpo = `Prezados Gerente e Vendedor,
+
+Informamos que o e-mail de cobrança enviado para o cliente ${boleto.nome || 'Cliente'} através do endereço (${emailAtual}) retornou ou não pôde ser entregue (endereço incorreto ou caixa postal cheia).
+
+Precisamos que por favor verifiquem e nos informem o e-mail correto do cliente para atualizarmos o cadastro, ou que entrem em contato diretamente com ele para alertá-lo sobre a cobrança em aberto do boleto Nº ${boleto.numero_documento}.
+
+Contamos com a vossa colaboração.
+
+Atenciosamente,
+Setor Financeiro - Omnia`;
+        const resumo = `Aviso de falha na entrega de e-mail preparado para gerente e vendedor (${destinatarios.join(', ')}). E-mail cadastrado do cliente: ${emailAtual}.
+
+${corpo}`;
+
+        await pool.query(`
+            INSERT INTO boletos_historico
+                (boleto_id, usuario_id, tipo_contato, canal, contato_nome, resumo, status, data_hora)
+            VALUES ($1, $2, 'Interno', 'E-mail', 'Gerente e Vendedor', $3, 'Registrado', CURRENT_TIMESTAMP)
+        `, [boletoId, req.session.usuario.id, resumo]);
+
+        res.json({ sucesso: 'Aviso de falha registado no histórico com sucesso.', para: destinatarios.join(','), assunto, corpo });
+    } catch (err) {
+        console.error('ERRO AO REGISTRAR FALHA DE E-MAIL:', err);
+        res.status(500).json({ erro: 'Erro ao registrar falha no histórico.' });
+    }
+});
+
 // EXCLUIR BOLETO
 app.post('/cobranca/excluir/:id', verificarAutenticacao, async (req, res) => {
     try {
