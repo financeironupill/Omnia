@@ -920,6 +920,10 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
         queryText += ' ORDER BY ' + colunasOrdenacao[ordenarAtual] + ' ' + ordemAtual;
 
         const result = await pool.query(queryText, queryParams);
+        const totalValorOriginal = result.rows.reduce((total, boleto) => total + (parseFloat(boleto.valor_original) || 0), 0);
+        const totalCustas = result.rows.reduce((total, boleto) => total + (parseFloat(boleto.valor_custas) || 0), 0);
+        const totalValorOriginalFmt = formatarMoedaSemSimbolo(totalValorOriginal);
+        const totalCustasFmt = formatarMoedaSemSimbolo(totalCustas);
         const gerentes = await pool.query('SELECT id, nome_resumido FROM gerentes WHERE ativo = 1 ORDER BY nome_resumido ASC');
         const vendedores = await pool.query('SELECT id, nome_resumido, gerente_id FROM vendedores WHERE ativo = 1 ORDER BY nome_resumido ASC');
         
@@ -943,6 +947,8 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
             vendedorAtual: vendedor_id || '',
             ordenarAtual,
             ordemAtual,
+            totalValorOriginalFmt,
+            totalCustasFmt,
             erro: req.query.erro || null, 
             sucesso: req.query.sucesso || null 
         });

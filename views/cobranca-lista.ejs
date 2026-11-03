@@ -75,7 +75,6 @@
 
             <!-- FILTROS DE PESQUISA DA RÉGUA -->
             <form action="/cobranca" method="GET" class="row g-2 mb-4 bg-light p-3 rounded border">
-                <!-- Mantém os filtros atuais ocultos se ordenar -->
                 <input type="hidden" name="ordenar" value="<%= locals.ordenarAtual || '' %>">
                 <input type="hidden" name="ordem" value="<%= locals.ordemAtual || '' %>">
 
@@ -130,7 +129,6 @@
             </form>
 
             <%
-                // Função auxiliar para gerar o link de ordenação mantendo os filtros ativos
                 function gerarLinkOrdenacao(coluna) {
                     let novaOrdem = 'ASC';
                     if (locals.ordenarAtual === coluna && locals.ordemAtual === 'ASC') {
@@ -214,12 +212,10 @@
                                     </td>
                                     <td class="text-center">
                                         <div class="d-inline-flex gap-1">
-                                            <!-- Botão de Editar Boleto -->
                                             <a href="/cobranca/editar/<%= b.id %>" class="btn btn-outline-primary btn-sm" title="Editar Boleto">
                                                 <i class="fa-solid fa-pen-to-square"></i>
                                             </a>
                                             
-                                            <!-- Botão de Estorno de Comissão Inteligente -->
                                             <% if (b.data_estorno) { %>
                                                 <button type="button" class="btn btn-warning btn-sm" title="Comissão Estornada em <%= new Date(b.data_estorno).toLocaleDateString('pt-BR') %>" 
                                                     data-bs-toggle="modal" data-bs-target="#modalEstorno<%= b.id %>">
@@ -232,11 +228,9 @@
                                                 </button>
                                             <% } %>
 
-                                            <!-- Botão de Duplicar -->
                                             <a href="/cobranca/duplicar/<%= b.id %>" class="btn btn-outline-secondary btn-sm" title="Duplicar Lançamento">
                                                 <i class="fa-solid fa-copy"></i>
                                             </a>
-                                            <!-- Botão de Excluir -->
                                             <form action="/cobranca/excluir/<%= b.id %>" method="POST" onsubmit="return confirm('Tem certeza de que deseja excluir este boleto permanentemente?');" class="d-inline">
                                                 <button type="submit" class="btn btn-outline-danger btn-sm" title="Excluir Boleto">
                                                     <i class="fa-solid fa-trash"></i>
@@ -246,7 +240,7 @@
                                     </td>
                                 </tr>
 
-                                <!-- MODAL (POP-UP) DE ESTORNO DE COMISSÃO -->
+                                <!-- MODAL (POP-UP) DE ESTORNO -->
                                 <div class="modal fade" id="modalEstorno<%= b.id %>" tabindex="-1" aria-hidden="true">
                                     <div class="modal-dialog">
                                         <div class="modal-content">
@@ -292,8 +286,6 @@
                                         </div>
                                     </div>
                                 </div>
-                                <!-- FIM DO MODAL -->
-
                             <% }) %>
                         <% } else { %>
                             <tr>
@@ -301,6 +293,17 @@
                             </tr>
                         <% } %>
                     </tbody>
+                    <!-- RODAPÉ COM TOTALIZADORES -->
+                    <% if (contas && contas.length > 0) { %>
+                        <tfoot class="table-light fw-bold border-top">
+                            <tr>
+                                <td colspan="5" class="text-end text-muted small text-uppercase">TOTAIS (<%= contas.length %> registros filtrados):</td>
+                                <td class="text-end text-dark"><%= locals.totalValorOriginalFmt || '0,00' %></td>
+                                <td class="text-end text-danger"><%= locals.totalCustasFmt || '0,00' %></td>
+                                <td colspan="3"></td>
+                            </tr>
+                        </tfoot>
+                    <% } %>
                 </table>
             </div>
 
