@@ -1342,16 +1342,25 @@ Agradecemos a sua atenção e colaboração.
 Atenciosamente,`;
     } else {
         assunto = `URGENTE: Notificação Final de Envio a Cartório - Boleto Nº ${boleto.numero_documento}`;
-        corpo = `Prezados,
+        corpo = `Prezado(a) cliente,
 
-Informamos que o seguinte título em aberto será encaminhado para Cartório no próximo dia útil:
+Esperamos que este e-mail o(a) encontre bem.
+
+Estamos enviando este último aviso referente ao título que continua em aberto em nosso sistema:
 
 ${identificacaoTitulo}
 
-Solicitamos o envio imediato do comprovante de pagamento caso já tenha sido liquidado.
+Apesar de nossos avisos anteriores o pagamento ainda não foi regularizado.
 
-Atenciosamente,
-Setor de Cobrança - Omnia`;
+Informamos que, na ausência de regularização, este título será encaminhado para protesto em cartório no próximo dia útil. O protesto pode acarretar custos adicionais e restrições de crédito para sua empresa/CPF.
+
+Caso o pagamento já tenha sido efetuado, por favor, nos envie o comprovante com urgência para que possamos evitar o protesto e atualizar nosso sistema.
+
+Estamos à disposição para qualquer esclarecimento final e para auxiliá-lo(a) na regularização imediata. Por favor, entre em contato respondendo a este e-mail.
+
+Agradecemos sua atenção e compreensão.
+
+Atenciosamente,`;
     }
 
     return { para, cc, assunto, corpo, clienteNome, etapaConfig };
