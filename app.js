@@ -1325,16 +1325,21 @@ Agradecemos a sua atenção e colaboração.
 Atenciosamente,`;
     } else if (etapa === 2) {
         assunto = `RE: Lembrete de Cobrança - Boleto Nº ${boleto.numero_documento}`;
-        corpo = `Prezados,
+        corpo = `Prezado(a) cliente,
 
-Reforçamos o contato referente ao título em aberto:
+Esperamos que este e-mail o(a) encontre bem.
+
+Estamos enviando este segundo aviso para reforçar nosso contato anterior, referente ao título que em nosso sistema ainda consta como em aberto:
 
 ${identificacaoTitulo}
 
-Ressaltamos que os títulos não quitados sujeitam-se ao envio para cartório/negativação após 3 dias úteis do vencimento. Caso o pagamento já tenha sido efetuado, por favor nos envie o comprovante.
+Se o pagamento já foi efetuado, pedimos a gentileza de nos enviar o comprovante para que possamos atualizar o status em nosso sistema e evitar futuros lembretes.
 
-Atenciosamente,
-Setor de Cobrança - Omnia`;
+Caso haja alguma dificuldade para regularizar essa pendência, ou se precisar de qualquer informação adicional, por favor, entre em contato conosco o mais breve possível. Estamos à disposição para ajudar.
+
+Agradecemos a sua atenção e colaboração.
+
+Atenciosamente,`;
     } else {
         assunto = `URGENTE: Notificação Final de Envio a Cartório - Boleto Nº ${boleto.numero_documento}`;
         corpo = `Prezados,
