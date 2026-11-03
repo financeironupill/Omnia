@@ -1,0 +1,2 @@
+ALTER TABLE boletos_historico
+ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'Registrado';

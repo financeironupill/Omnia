@@ -273,7 +273,7 @@
                     </div>
                     <div class="card-body">
                         <% if (historico && historico.length > 0) { %>
-                            <div class="list-group">
+                            <div class="list-group" id="listaHistoricoInteracoes">
                                 <% historico.forEach(h => { %>
                                     <div class="list-group-item list-group-item-action flex-column align-items-start">
                                         <div class="d-flex w-100 justify-content-between">
@@ -281,7 +281,21 @@
                                                 <i class="fa-solid <%= h.canal === 'WhatsApp' ? 'fa-square-whatsapp text-success' : (h.canal === 'E-mail' ? 'fa-envelope text-info' : 'fa-phone text-warning') %> me-2"></i>
                                                 <%= h.tipo_contato %> - <%= h.contato_nome || 'N/A' %>
                                             </h6>
-                                            <small class="text-muted"><%= new Date(h.data_hora).toLocaleString('pt-BR') %></small>
+                                            <div class="text-end">
+                                                <% if (h.status) { %><span class="badge <%= h.status === 'Confirmado' ? 'bg-success' : 'bg-secondary' %> me-2"><%= h.status %></span><% } %>
+                                                <small class="text-muted"><%= new Date(h.data_hora).toLocaleString('pt-BR') %></small>
+                                                <button type="button" class="btn btn-outline-secondary btn-sm ms-2"
+                                                    data-bs-toggle="modal" data-bs-target="#modalEditarInteracao"
+                                                    data-historico-id="<%= h.id %>"
+                                                    data-boleto-id="<%= conta.id %>"
+                                                    data-tipo-contato="<%= h.tipo_contato %>"
+                                                    data-canal="<%= h.canal %>"
+                                                    data-contato-nome="<%= h.contato_nome || '' %>"
+                                                    data-resumo="<%= h.resumo || '' %>"
+                                                    onclick="preencherEdicaoInteracao(this)" title="Editar interação">
+                                                    <i class="fa-solid fa-pen"></i>
+                                                </button>
+                                            </div>
                                         </div>
                                         <p class="mb-1 text-dark small"><%= h.resumo %></p>
                                         <small class="text-muted">Registrado por: <%= h.usuario_nome || 'Sistema' %></small>
@@ -289,7 +303,7 @@
                                 <% }) %>
                             </div>
                         <% } else { %>
-                            <p class="text-muted small mb-0 text-center py-2">Nenhuma interação registrada até o momento.</p>
+                            <p id="historicoVazio" class="text-muted small mb-0 text-center py-2">Nenhuma interação registrada até o momento.</p>
                         <% } %>
                     </div>
                 </div>
@@ -346,6 +360,52 @@
         </div>
     <% } %>
 
+    <% if (conta && conta.id) { %>
+        <div class="modal fade" id="modalEditarInteracao" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-secondary text-white">
+                        <h5 class="modal-title fw-bold"><i class="fa-solid fa-pen-to-square me-2"></i>Editar Interação</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                    </div>
+                    <form id="formEditarInteracao" method="POST">
+                        <div class="modal-body bg-light">
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Tipo de Contato</label>
+                                <select name="tipo_contato" id="editarTipoContato" class="form-select" required>
+                                    <option value="Cliente">Cliente</option>
+                                    <option value="Gerente">Gerente</option>
+                                    <option value="Vendedor">Vendedor</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Canal</label>
+                                <select name="canal" id="editarCanal" class="form-select" required>
+                                    <option value="Telefone">Telefone</option>
+                                    <option value="WhatsApp">WhatsApp</option>
+                                    <option value="E-mail">E-mail</option>
+                                    <option value="Interno">Interno</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Pessoa Contatada</label>
+                                <input type="text" name="contato_nome" id="editarContatoNome" class="form-control">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Resumo / Detalhes</label>
+                                <textarea name="resumo" id="editarResumo" class="form-control" rows="4" required></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="submit" class="btn btn-primary fw-semibold">Salvar Alterações</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    <% } %>
+
     <!-- MODAL DE COPIAR TEXTO DO E-MAIL -->
     <div class="modal fade" id="modalCopiarEmail" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg">
@@ -355,6 +415,7 @@
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body bg-light">
+                    <div id="emailConfirmFeedback" class="alert d-none" role="status" aria-live="polite"></div>
                     <div class="mb-3">
                         <label class="form-label small fw-bold">Para:</label>
                         <input type="text" id="emailParaModal" class="form-control bg-white" readonly>
@@ -376,6 +437,7 @@
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
                     <button type="button" class="btn btn-outline-primary" onclick="abrirEmailPreparado()"><i class="fa-solid fa-envelope me-1"></i> Abrir cliente de e-mail</button>
                     <button type="button" class="btn btn-primary fw-semibold" onclick="copiarTextoEmail()"><i class="fa-solid fa-clipboard me-1"></i> Copiar Texto</button>
+                    <button type="button" id="btnConfirmarEnvio" class="btn btn-success fw-semibold" hidden onclick="confirmarEnvioEmail()"><i class="fa-solid fa-check me-1"></i> Confirmar Envio</button>
                 </div>
             </div>
         </div>
@@ -462,6 +524,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         let emailAvisoPreparadoUrl = '';
+        let emailReguaEtapaPendente = null;
 
         const dadosBoleto = {
             id: "<%= conta ? conta.id : '' %>",
@@ -478,47 +541,7 @@
         };
 
         async function prepararEmailAviso1() {
-            const botao = document.getElementById('btnAviso1');
-            const feedback = document.getElementById('emailAvisoFeedback');
-            let janelaEmail = null;
-            botao.disabled = true;
-            feedback.className = 'alert d-none mt-3 mb-0';
-
-            try {
-                janelaEmail = window.open('about:blank', '_blank');
-                const resposta = await fetch(`/cobranca/aviso1/${encodeURIComponent(dadosBoleto.id)}`, {
-                    method: 'POST',
-                    headers: { Accept: 'application/json' }
-                });
-                const resultado = await resposta.json();
-                if (!resposta.ok) {
-                    throw new Error(resultado.erro || 'Não foi possível preparar o e-mail.');
-                }
-
-                document.getElementById('emailParaModal').value = resultado.para;
-                const cc = Array.isArray(resultado.cc) ? resultado.cc.filter(Boolean) : [];
-                document.getElementById('emailCcModal').value = cc.join(',');
-                document.getElementById('emailAssuntoModal').value = resultado.assunto;
-                document.getElementById('emailTextoModal').value = resultado.corpo;
-                emailAvisoPreparadoUrl = `mailto:${encodeURIComponent(resultado.para)}?cc=${encodeURIComponent(cc.join(','))}&subject=${encodeURIComponent(resultado.assunto)}&body=${encodeURIComponent(resultado.corpo)}`;
-
-                if (janelaEmail && !janelaEmail.closed) {
-                    janelaEmail.location.href = emailAvisoPreparadoUrl;
-                    feedback.textContent = 'O cliente de e-mail foi acionado e a interação foi registrada. Confirme o envio no seu cliente de e-mail.';
-                    feedback.className = 'alert alert-success mt-3 mb-0';
-                } else {
-                    feedback.textContent = 'A interação foi registrada, mas o navegador bloqueou a nova janela. Use “Abrir cliente de e-mail” no modal e confirme o envio.';
-                    feedback.className = 'alert alert-warning mt-3 mb-0';
-                }
-
-                new bootstrap.Modal(document.getElementById('modalCopiarEmail')).show();
-            } catch (err) {
-                if (janelaEmail && !janelaEmail.closed) janelaEmail.close();
-                feedback.textContent = err.message;
-                feedback.className = 'alert alert-danger mt-3 mb-0';
-            } finally {
-                botao.disabled = false;
-            }
+            return prepararEmailRégua(1);
         }
 
         function abrirEmailPreparado() {
@@ -530,6 +553,9 @@
         function dispararEmail(para, cc, assunto, corpo) {
             emailAvisoPreparadoUrl = `mailto:${encodeURIComponent(para)}?cc=${encodeURIComponent(cc)}&subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
             window.location.href = emailAvisoPreparadoUrl;
+            emailReguaEtapaPendente = null;
+            document.getElementById('btnConfirmarEnvio').hidden = true;
+            document.getElementById('emailConfirmFeedback').className = 'alert d-none';
 
             document.getElementById('emailParaModal').value = para;
             document.getElementById('emailCcModal').value = cc;
@@ -549,34 +575,128 @@
             alert('Texto copiado com sucesso para a área de transferência!');
         }
 
-        function obterIdentificacaoTitulo() {
-            const razaoSocial = (dadosBoleto.cliente_nome || '').trim();
-            const nomeFantasia = (dadosBoleto.cliente_nome_fantasia || '').trim();
-            const cliente = razaoSocial
-                ? (nomeFantasia ? `${razaoSocial} (${nomeFantasia})` : razaoSocial)
-                : (nomeFantasia || 'Cliente');
-            return `**Vencimento: ${dadosBoleto.data_vencimento || 'Não informado'} - ${cliente} - R$ ${dadosBoleto.valor_original}**`;
+        async function prepararEmailRégua(etapa) {
+            const feedback = document.getElementById('emailAvisoFeedback');
+            const botaoConfirmar = document.getElementById('btnConfirmarEnvio');
+            let janelaEmail = null;
+            feedback.className = 'alert d-none mt-3 mb-0';
+            try {
+                janelaEmail = window.open('about:blank', '_blank');
+                const resposta = await fetch(`/cobranca/email-regua/preparar/${encodeURIComponent(dadosBoleto.id)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                    body: JSON.stringify({ etapa })
+                });
+                const resultado = await resposta.json();
+                if (!resposta.ok) throw new Error(resultado.erro || 'Não foi possível preparar o e-mail.');
+
+                const cc = Array.isArray(resultado.cc) ? resultado.cc : [];
+                document.getElementById('emailParaModal').value = resultado.para;
+                document.getElementById('emailCcModal').value = cc.join(',');
+                document.getElementById('emailAssuntoModal').value = resultado.assunto;
+                document.getElementById('emailTextoModal').value = resultado.corpo;
+                emailAvisoPreparadoUrl = `mailto:${encodeURIComponent(resultado.para)}?cc=${encodeURIComponent(cc.join(','))}&subject=${encodeURIComponent(resultado.assunto)}&body=${encodeURIComponent(resultado.corpo)}`;
+                emailReguaEtapaPendente = etapa;
+                botaoConfirmar.hidden = false;
+                botaoConfirmar.disabled = false;
+
+                if (janelaEmail && !janelaEmail.closed) {
+                    janelaEmail.location.href = emailAvisoPreparadoUrl;
+                    feedback.textContent = 'E-mail preparado no cliente de e-mail. Após enviá-lo, clique em “Confirmar Envio” para registrar a interação e atualizar a fase.';
+                    feedback.className = 'alert alert-info mt-3 mb-0';
+                } else {
+                    feedback.textContent = 'E-mail preparado. O navegador bloqueou a nova janela; use “Abrir cliente de e-mail”. Após enviar, clique em “Confirmar Envio”.';
+                    feedback.className = 'alert alert-warning mt-3 mb-0';
+                }
+                const modalFeedback = document.getElementById('emailConfirmFeedback');
+                modalFeedback.textContent = 'A interação só será gravada e a fase atualizada após confirmar que o e-mail foi enviado.';
+                modalFeedback.className = 'alert alert-info';
+                new bootstrap.Modal(document.getElementById('modalCopiarEmail')).show();
+            } catch (err) {
+                if (janelaEmail && !janelaEmail.closed) janelaEmail.close();
+                feedback.textContent = err.message;
+                feedback.className = 'alert alert-danger mt-3 mb-0';
+            }
         }
 
-        function prepararEmailRégua(etapa) {
-            let assunto = "";
-            let corpo = "";
-            const cc = [...new Set([dadosBoleto.gerente_email, dadosBoleto.vendedor_email]
-                .filter(email => typeof email === 'string' && email.trim() !== '')
-                .map(email => email.trim()))].join(',');
+        async function confirmarEnvioEmail() {
+            const botao = document.getElementById('btnConfirmarEnvio');
+            const modalFeedback = document.getElementById('emailConfirmFeedback');
+            if (!emailReguaEtapaPendente) return;
 
-            if (etapa === 1) {
-                assunto = `Aviso de Cobrança - Boleto Nº ${dadosBoleto.numero_documento}`;
-                corpo = `Prezados,\n\nIdentificamos que consta em aberto o título:\n\n${obterIdentificacaoTitulo()}\n\nSolicitamos a gentileza de nos informar a previsão de pagamento ou nos enviar o comprovante de quitação.\n\nAtenciosamente,\nSetor de Cobrança - Omnia`;
-            } else if (etapa === 2) {
-                assunto = `RE: Lembrete de Cobrança - Boleto Nº ${dadosBoleto.numero_documento}`;
-                corpo = `Prezados,\n\nReforçamos o contato referente ao título em aberto:\n\n${obterIdentificacaoTitulo()}\n\nRessaltamos que os títulos não quitados sujeitam-se ao envio para cartório/negativação após 3 dias úteis do vencimento. Caso o pagamento já tenha sido efetuado, por favor nos envie o comprovante.\n\nAtenciosamente,\nSetor de Cobrança - Omnia`;
-            } else if (etapa === 3) {
-                assunto = `URGENTE: Notificação Final de Envio a Cartório - Boleto Nº ${dadosBoleto.numero_documento}`;
-                corpo = `Prezados,\n\nInformamos que o seguinte título em aberto será encaminhado para Cartório no próximo dia útil:\n\n${obterIdentificacaoTitulo()}\n\nSolicitamos o envio imediato do comprovante de pagamento caso já tenha sido liquidado.\n\nAtenciosamente,\nSetor de Cobrança - Omnia`;
+            botao.disabled = true;
+            try {
+                const resposta = await fetch(`/cobranca/email-regua/confirmar/${encodeURIComponent(dadosBoleto.id)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                    body: JSON.stringify({ etapa: emailReguaEtapaPendente })
+                });
+                const resultado = await resposta.json();
+                if (!resposta.ok) throw new Error(resultado.erro || 'Não foi possível confirmar o envio.');
+
+                const faseSelect = document.querySelector('#formBoleto select[name="status_cobranca"]');
+                if (faseSelect) faseSelect.value = resultado.fase;
+                document.getElementById('emailAvisoFeedback').textContent = resultado.sucesso;
+                document.getElementById('emailAvisoFeedback').className = 'alert alert-success mt-3 mb-0';
+                modalFeedback.textContent = resultado.sucesso;
+                modalFeedback.className = 'alert alert-success';
+                adicionarInteracaoConfirmada(resultado.interacao);
+                emailReguaEtapaPendente = null;
+                botao.hidden = true;
+            } catch (err) {
+                modalFeedback.textContent = err.message;
+                modalFeedback.className = 'alert alert-danger';
+                botao.disabled = false;
+            }
+        }
+
+        function preencherEdicaoInteracao(botao) {
+            const form = document.getElementById('formEditarInteracao');
+            form.action = `/cobranca/historico/editar/${encodeURIComponent(botao.dataset.boletoId)}/${encodeURIComponent(botao.dataset.historicoId)}`;
+            document.getElementById('editarTipoContato').value = botao.dataset.tipoContato;
+            document.getElementById('editarCanal').value = botao.dataset.canal;
+            document.getElementById('editarContatoNome').value = botao.dataset.contatoNome;
+            document.getElementById('editarResumo').value = botao.dataset.resumo;
+        }
+
+        function adicionarInteracaoConfirmada(interacao) {
+            const listaExistente = document.getElementById('listaHistoricoInteracoes');
+            const lista = listaExistente || document.createElement('div');
+            if (!listaExistente) {
+                lista.id = 'listaHistoricoInteracoes';
+                lista.className = 'list-group';
+                const avisoVazio = document.getElementById('historicoVazio');
+                if (avisoVazio) avisoVazio.replaceWith(lista);
             }
 
-            dispararEmail(dadosBoleto.cliente_email, cc, assunto, corpo);
+            const item = document.createElement('div');
+            item.className = 'list-group-item list-group-item-action flex-column align-items-start';
+            const cabecalho = document.createElement('div');
+            cabecalho.className = 'd-flex w-100 justify-content-between';
+            const titulo = document.createElement('h6');
+            titulo.className = 'mb-1 fw-bold text-primary';
+            const icone = document.createElement('i');
+            icone.className = 'fa-solid fa-envelope text-info me-2';
+            titulo.append(icone, document.createTextNode(`${interacao.tipo_contato} - ${interacao.contato_nome}`));
+            const statusData = document.createElement('div');
+            statusData.className = 'text-end';
+            const selo = document.createElement('span');
+            selo.className = 'badge bg-success me-2';
+            selo.textContent = interacao.status;
+            const data = document.createElement('small');
+            data.className = 'text-muted';
+            data.textContent = new Date(interacao.data_hora).toLocaleString('pt-BR');
+            statusData.append(selo, data);
+            cabecalho.append(titulo, statusData);
+
+            const resumo = document.createElement('p');
+            resumo.className = 'mb-1 text-dark small';
+            resumo.textContent = interacao.resumo;
+            const registrado = document.createElement('small');
+            registrado.className = 'text-muted';
+            registrado.textContent = `Registrado por: ${interacao.usuario_nome}`;
+            item.append(cabecalho, resumo, registrado);
+            lista.prepend(item);
         }
 
         function prepararEmailAvisoComercial() {

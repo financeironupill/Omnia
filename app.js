@@ -1262,55 +1262,59 @@ app.get('/cobranca/duplicar/:id', verificarAutenticacao, async (req, res) => {
     }
 });
 
-// PREPARAR O PRIMEIRO E-MAIL DE COBRANÇA E REGISTRAR A AÇÃO NO HISTÓRICO
-app.post('/cobranca/aviso1/:id', verificarAutenticacao, async (req, res) => {
-    const boletoId = Number(req.params.id);
-    if (!Number.isSafeInteger(boletoId) || boletoId <= 0) {
-        return res.status(400).json({ erro: 'Identificador de boleto inválido.' });
+const etapasEmailRegua = {
+    1: { fase: 'Aviso 1 (Notificação)', tipoAcao: 'E-mail 1 - Aviso de Vencimento' },
+    2: { fase: 'Aviso 2 (Alerta Cartório)', tipoAcao: 'E-mail 2 - Risco de Cartório' },
+    3: { fase: 'Aviso 3 (Aviso Final)', tipoAcao: 'E-mail 3 - Aviso Final (Próximo Dia Útil)' }
+};
+
+async function carregarEmailRegua(boletoId, etapa, executor = pool) {
+    const boletoRes = await executor.query(`
+        SELECT b.id, b.numero_documento, b.data_vencimento, b.valor_original,
+               cl.nome, cl.nome_fantasia, cl.email,
+               g.email AS gerente_email, v.email AS vendedor_email
+        FROM boletos b
+        LEFT JOIN clientes cl ON cl.id = b.cliente_id
+        LEFT JOIN vendedores v ON v.id = COALESCE(b.vendedor_id, cl.vendedor_id)
+        LEFT JOIN gerentes g ON g.id = COALESCE(b.gerente_id, cl.gerente_id, v.gerente_id)
+        WHERE b.id = $1
+    `, [boletoId]);
+
+    if (boletoRes.rows.length === 0) return null;
+
+    const boleto = boletoRes.rows[0];
+    const para = boleto.email ? boleto.email.trim() : '';
+    if (!para) {
+        const error = new Error('O cliente não possui e-mail cadastrado.');
+        error.status = 400;
+        throw error;
     }
 
-    try {
-        const boletoRes = await pool.query(`
-            SELECT b.id, b.numero_documento, b.data_vencimento, b.valor_original,
-                   cl.nome, cl.nome_fantasia, cl.email,
-                   g.email AS gerente_email, v.email AS vendedor_email
-            FROM boletos b
-            LEFT JOIN clientes cl ON cl.id = b.cliente_id
-            LEFT JOIN vendedores v ON v.id = COALESCE(b.vendedor_id, cl.vendedor_id)
-            LEFT JOIN gerentes g ON g.id = COALESCE(b.gerente_id, cl.gerente_id, v.gerente_id)
-            WHERE b.id = $1
-        `, [boletoId]);
+    const cc = [...new Set([boleto.gerente_email, boleto.vendedor_email]
+        .filter(value => typeof value === 'string' && value.trim() !== '')
+        .map(value => value.trim()))];
+    const razaoSocial = boleto.nome ? boleto.nome.trim() : '';
+    const nomeFantasia = boleto.nome_fantasia ? boleto.nome_fantasia.trim() : '';
+    const clienteNome = razaoSocial
+        ? (nomeFantasia ? `${razaoSocial} (${nomeFantasia})` : razaoSocial)
+        : (nomeFantasia || 'Cliente');
+    const vencimento = boleto.data_vencimento
+        ? new Date(boleto.data_vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' })
+        : 'Não informado';
+    const identificacaoTitulo = `**Vencimento: ${vencimento} - ${clienteNome} - R$ ${formatarMoedaSemSimbolo(boleto.valor_original)}**`;
+    const etapaConfig = etapasEmailRegua[etapa];
+    let assunto;
+    let corpo;
 
-        if (boletoRes.rows.length === 0) {
-            return res.status(404).json({ erro: 'Boleto não encontrado.' });
-        }
-
-        const boleto = boletoRes.rows[0];
-        const email = boleto.email ? boleto.email.trim() : '';
-        const cc = [...new Set([boleto.gerente_email, boleto.vendedor_email]
-            .filter(value => typeof value === 'string' && value.trim() !== '')
-            .map(value => value.trim()))];
-        if (!email) {
-            return res.status(400).json({ erro: 'O cliente não possui e-mail cadastrado.' });
-        }
-
-        const razaoSocial = boleto.nome ? boleto.nome.trim() : '';
-        const nomeFantasia = boleto.nome_fantasia ? boleto.nome_fantasia.trim() : '';
-        const clienteNome = razaoSocial
-            ? (nomeFantasia ? `${razaoSocial} (${nomeFantasia})` : razaoSocial)
-            : (nomeFantasia || 'Cliente');
-        const vencimento = boleto.data_vencimento
-            ? new Date(boleto.data_vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' })
-            : 'Não informado';
-        const valor = formatarMoedaSemSimbolo(boleto.valor_original);
-        const assunto = `1º E-mail (Aviso 1) - Boleto Nº ${boleto.numero_documento}`;
-        const corpo = `Prezado cliente,
+    if (etapa === 1) {
+        assunto = `1º E-mail (Aviso 1) - Boleto Nº ${boleto.numero_documento}`;
+        corpo = `Prezado cliente,
 
 Esperamos que este e-mail o(a) encontre bem.
 
 Estamos entrando em contato para informar que, em nosso sistema, consta como em aberto o título:
 
-**Vencimento: ${vencimento} - ${clienteNome} - R$ ${valor}**
+${identificacaoTitulo}
 
 Se o pagamento já foi efetuado, por favor, nos avise e nos envie o comprovante para que possamos dar baixa em nosso registro.
 
@@ -1319,24 +1323,118 @@ Caso precise de qualquer informação para regularizar a situação, ou se houve
 Agradecemos a sua atenção e colaboração.
 
 Atenciosamente,`;
+    } else if (etapa === 2) {
+        assunto = `RE: Lembrete de Cobrança - Boleto Nº ${boleto.numero_documento}`;
+        corpo = `Prezados,
 
-        await pool.query(`
-            INSERT INTO boletos_historico
-                (boleto_id, usuario_id, tipo_contato, canal, contato_nome, resumo, data_hora)
-            VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
-        `, [
-            boletoId,
-            req.session.usuario.id,
-            'E-mail 1 - Aviso de Vencimento',
-            'E-mail',
-            clienteNome,
-            `1º E-mail (Aviso 1) acionado para ${email}${cc.length ? `, com cópia para ${cc.join(', ')}` : ''} via cliente de e-mail. O envio precisa ser confirmado no cliente.`
-        ]);
+Reforçamos o contato referente ao título em aberto:
 
-        res.json({ para: email, cc, assunto, corpo });
+${identificacaoTitulo}
+
+Ressaltamos que os títulos não quitados sujeitam-se ao envio para cartório/negativação após 3 dias úteis do vencimento. Caso o pagamento já tenha sido efetuado, por favor nos envie o comprovante.
+
+Atenciosamente,
+Setor de Cobrança - Omnia`;
+    } else {
+        assunto = `URGENTE: Notificação Final de Envio a Cartório - Boleto Nº ${boleto.numero_documento}`;
+        corpo = `Prezados,
+
+Informamos que o seguinte título em aberto será encaminhado para Cartório no próximo dia útil:
+
+${identificacaoTitulo}
+
+Solicitamos o envio imediato do comprovante de pagamento caso já tenha sido liquidado.
+
+Atenciosamente,
+Setor de Cobrança - Omnia`;
+    }
+
+    return { para, cc, assunto, corpo, clienteNome, etapaConfig };
+}
+
+app.post('/cobranca/email-regua/preparar/:id', verificarAutenticacao, async (req, res) => {
+    const boletoId = Number(req.params.id);
+    const etapa = Number(req.body.etapa);
+    if (!Number.isSafeInteger(boletoId) || boletoId <= 0 || !etapasEmailRegua[etapa]) {
+        return res.status(400).json({ erro: 'Boleto ou etapa da régua inválida.' });
+    }
+
+    try {
+        const email = await carregarEmailRegua(boletoId, etapa);
+        if (!email) return res.status(404).json({ erro: 'Boleto não encontrado.' });
+        res.json({ ...email, etapa, fase: email.etapaConfig.fase });
     } catch (err) {
-        console.error('ERRO AO PREPARAR AVISO 1 DA COBRANÇA:', err);
-        res.status(500).json({ erro: 'Erro ao preparar o e-mail e registrar a interação.' });
+        if (err.status === 400) return res.status(400).json({ erro: err.message });
+        console.error('ERRO AO PREPARAR E-MAIL DA RÉGUA:', err);
+        res.status(500).json({ erro: 'Erro ao preparar o e-mail.' });
+    }
+});
+
+app.post('/cobranca/email-regua/confirmar/:id', verificarAutenticacao, async (req, res) => {
+    const boletoId = Number(req.params.id);
+    const etapa = Number(req.body.etapa);
+    if (!Number.isSafeInteger(boletoId) || boletoId <= 0 || !etapasEmailRegua[etapa]) {
+        return res.status(400).json({ erro: 'Boleto ou etapa da régua inválida.' });
+    }
+
+    let db;
+    let transactionStarted = false;
+    try {
+        db = await pool.connect();
+        const email = await carregarEmailRegua(boletoId, etapa, db);
+        if (!email) {
+            return res.status(404).json({ erro: 'Boleto não encontrado.' });
+        }
+
+        await db.query('BEGIN');
+        transactionStarted = true;
+        const updateRes = await db.query(
+            'UPDATE boletos SET status_cobranca = $1, atualizado_em = CURRENT_TIMESTAMP WHERE id = $2',
+            [email.etapaConfig.fase, boletoId]
+        );
+        if (updateRes.rowCount === 0) {
+            await db.query('ROLLBACK');
+            transactionStarted = false;
+            return res.status(404).json({ erro: 'Boleto não encontrado.' });
+        }
+
+        const resumo = `Status: Confirmado. Envio da etapa ${etapa} (${email.etapaConfig.fase}) confirmado pelo usuário. Para: ${email.para}. CC: ${email.cc.join(', ') || 'Nenhum'}. Assunto: ${email.assunto}\n\n${email.corpo}`;
+        const historicoRes = await db.query(`
+            INSERT INTO boletos_historico
+                (boleto_id, usuario_id, tipo_contato, canal, contato_nome, resumo, status, data_hora)
+            VALUES ($1, $2, 'Cliente', 'E-mail', $3, $4, 'Confirmado', CURRENT_TIMESTAMP)
+            RETURNING id, data_hora
+        `, [boletoId, req.session.usuario.id, email.clienteNome, resumo]);
+        await db.query('COMMIT');
+        transactionStarted = false;
+
+        res.json({
+            sucesso: 'Envio confirmado e registrado no histórico.',
+            fase: email.etapaConfig.fase,
+            interacao: {
+                id: historicoRes.rows[0].id,
+                data_hora: historicoRes.rows[0].data_hora,
+                tipo_contato: 'Cliente',
+                canal: 'E-mail',
+                contato_nome: email.clienteNome,
+                resumo,
+                status: 'Confirmado',
+                usuario_nome: req.session.usuario.nome || 'Usuário atual'
+            }
+        });
+    } catch (err) {
+        if (db && transactionStarted) {
+            try {
+                await db.query('ROLLBACK');
+            } catch (rollbackErr) {
+                console.error('ERRO AO DESFAZER CONFIRMAÇÃO DE E-MAIL:', rollbackErr);
+            }
+        }
+        if (err.status === 400) return res.status(400).json({ erro: err.message });
+        console.error('ERRO AO CONFIRMAR E-MAIL DA RÉGUA:', err);
+        res.status(500).json({ erro: 'Erro ao confirmar o envio e atualizar a fase da régua.' });
+    } finally {
+        if (db) db.release();
     }
 });
 
@@ -1346,8 +1444,8 @@ app.post('/cobranca/historico/novo/:id', verificarAutenticacao, async (req, res)
     const { tipo_contato, canal, contato_nome, resumo } = req.body;
 
     try {
-        const sql = `INSERT INTO boletos_historico (boleto_id, usuario_id, tipo_contato, canal, contato_nome, resumo, data_hora) 
-                     VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)`;
+        const sql = `INSERT INTO boletos_historico (boleto_id, usuario_id, tipo_contato, canal, contato_nome, resumo, status, data_hora)
+                     VALUES ($1, $2, $3, $4, $5, $6, 'Registrado', CURRENT_TIMESTAMP)`;
         
         await pool.query(sql, [
             parseInt(boletoId, 10),
@@ -1362,6 +1460,40 @@ app.post('/cobranca/historico/novo/:id', verificarAutenticacao, async (req, res)
     } catch (err) {
         console.error('ERRO AO GRAVAR HISTÓRICO:', err);
         res.redirect(`/cobranca/editar/${boletoId}?erro=Erro ao gravar histórico.`);
+    }
+});
+
+app.post('/cobranca/historico/editar/:boletoId/:historicoId', verificarAutenticacao, async (req, res) => {
+    const boletoId = Number(req.params.boletoId);
+    const historicoId = Number(req.params.historicoId);
+    const { tipo_contato, canal, contato_nome, resumo } = req.body;
+    if (!Number.isSafeInteger(boletoId) || boletoId <= 0 || !Number.isSafeInteger(historicoId) || historicoId <= 0) {
+        return res.redirect('/cobranca?erro=Identificador de histórico inválido.');
+    }
+    if (!tipo_contato || !canal || !resumo || !String(resumo).trim()) {
+        return res.redirect(`/cobranca/editar/${boletoId}?erro=Preencha os dados da interação.`);
+    }
+
+    try {
+        const result = await pool.query(`
+            UPDATE boletos_historico
+            SET tipo_contato = $1, canal = $2, contato_nome = $3, resumo = $4
+            WHERE id = $5 AND boleto_id = $6
+        `, [
+            tipo_contato,
+            canal,
+            formatarCapitalizacao(contato_nome),
+            String(resumo).trim(),
+            historicoId,
+            boletoId
+        ]);
+        if (result.rowCount === 0) {
+            return res.redirect(`/cobranca/editar/${boletoId}?erro=Interação não encontrada.`);
+        }
+        res.redirect(`/cobranca/editar/${boletoId}?sucesso=Interação atualizada com sucesso.`);
+    } catch (err) {
+        console.error('ERRO AO EDITAR HISTÓRICO DA COBRANÇA:', err);
+        res.redirect(`/cobranca/editar/${boletoId}?erro=Erro ao atualizar interação.`);
     }
 });
 
