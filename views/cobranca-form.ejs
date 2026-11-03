@@ -720,8 +720,13 @@
 
                 dispararEmail(resultado.para, '', resultado.assunto, resultado.corpo);
                 const feedback = document.getElementById('emailAvisoFeedback');
-                feedback.textContent = resultado.sucesso;
+                feedback.textContent = resultado.sucesso + ' Atualizando a página...';
                 feedback.className = 'alert alert-success mt-3 mb-0';
+
+                // Recarrega a página automaticamente após 1 segundo para exibir a nova interação na timeline
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
             } catch (err) {
                 const feedback = document.getElementById('emailAvisoFeedback');
                 feedback.textContent = err.message || 'Erro ao registrar a falha no histórico.';
