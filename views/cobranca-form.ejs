@@ -506,6 +506,16 @@
                                 <input type="text" id="modalNomeFantasia" class="form-control">
                             </div>
 
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">E-mail *</label>
+                                <input type="email" id="modalEmail" class="form-control" placeholder="cliente@email.com.br" required>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Telefone</label>
+                                <input type="text" id="modalTelefone" class="form-control" placeholder="(00) 00000-0000">
+                            </div>
+
                             <div class="col-md-8">
                                 <label class="form-label small fw-bold">Cidade</label>
                                 <input type="text" id="modalCidade" class="form-control">
@@ -821,14 +831,16 @@
                         cnpj_cpf: document.getElementById('modalCnpjCpf').value,
                         nome: document.getElementById('modalNome').value,
                         nome_fantasia: document.getElementById('modalNomeFantasia').value,
+                        email: document.getElementById('modalEmail').value,
+                        telefone: document.getElementById('modalTelefone').value,
                         cidade: document.getElementById('modalCidade').value,
                         uf: document.getElementById('modalUf').value,
                         gerente_id: document.getElementById('modalGerenteId').value,
                         vendedor_id: document.getElementById('modalVendedorId').value
                     };
 
-                    if (!payload.nome || !payload.gerente_id || !payload.vendedor_id) {
-                        alert('Por favor, preencha a Razão Social, Gerente e Vendedor.');
+                    if (!payload.nome || !payload.email || !payload.gerente_id || !payload.vendedor_id) {
+                        alert('Por favor, preencha a Razão Social, o E-mail, o Gerente e o Vendedor.');
                         return;
                     }
 
