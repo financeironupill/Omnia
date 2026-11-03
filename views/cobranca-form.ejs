@@ -472,8 +472,8 @@
             situacao_boleto: "<%= conta ? conta.situacao_boleto : '' %>",
             cliente_nome: "<%= conta ? conta.cliente_nome : '' %>",
             cliente_email: "<%= conta ? conta.cliente_email : '' %>",
-            gerente_email: "<%= conta ? conta.gerente_email : '' %>",
-            vendedor_email: "<%= conta ? conta.vendedor_email : '' %>"
+            gerente_email: "<%= conta && conta.gerente_email ? conta.gerente_email : '' %>",
+            vendedor_email: "<%= conta && conta.vendedor_email ? conta.vendedor_email : '' %>"
         };
 
         async function prepararEmailAviso1() {
@@ -495,10 +495,11 @@
                 }
 
                 document.getElementById('emailParaModal').value = resultado.para;
-                document.getElementById('emailCcModal').value = '';
+                const cc = Array.isArray(resultado.cc) ? resultado.cc.filter(Boolean) : [];
+                document.getElementById('emailCcModal').value = cc.join(',');
                 document.getElementById('emailAssuntoModal').value = resultado.assunto;
                 document.getElementById('emailTextoModal').value = resultado.corpo;
-                emailAvisoPreparadoUrl = `mailto:${encodeURIComponent(resultado.para)}?subject=${encodeURIComponent(resultado.assunto)}&body=${encodeURIComponent(resultado.corpo)}`;
+                emailAvisoPreparadoUrl = `mailto:${encodeURIComponent(resultado.para)}?cc=${encodeURIComponent(cc.join(','))}&subject=${encodeURIComponent(resultado.assunto)}&body=${encodeURIComponent(resultado.corpo)}`;
 
                 if (janelaEmail && !janelaEmail.closed) {
                     janelaEmail.location.href = emailAvisoPreparadoUrl;
@@ -550,7 +551,9 @@
         function prepararEmailRégua(etapa) {
             let assunto = "";
             let corpo = "";
-            const cc = [dadosBoleto.gerente_email, dadosBoleto.vendedor_email].filter(Boolean).join(',');
+            const cc = [...new Set([dadosBoleto.gerente_email, dadosBoleto.vendedor_email]
+                .filter(email => typeof email === 'string' && email.trim() !== '')
+                .map(email => email.trim()))].join(',');
 
             if (etapa === 1) {
                 assunto = `Aviso de Cobrança - Boleto Nº ${dadosBoleto.numero_documento}`;

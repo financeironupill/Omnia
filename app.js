@@ -1111,8 +1111,8 @@ app.get('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
                    v.nome_resumido AS vendedor_nome, v.email AS vendedor_email
             FROM boletos b 
             LEFT JOIN clientes cl ON b.cliente_id = cl.id 
-            LEFT JOIN gerentes g ON b.gerente_id = g.id 
-            LEFT JOIN vendedores v ON b.vendedor_id = v.id 
+            LEFT JOIN vendedores v ON v.id = COALESCE(b.vendedor_id, cl.vendedor_id)
+            LEFT JOIN gerentes g ON g.id = COALESCE(b.gerente_id, cl.gerente_id, v.gerente_id)
             WHERE b.id = $1
         `, [boletoId]);
         
@@ -1271,9 +1271,12 @@ app.post('/cobranca/aviso1/:id', verificarAutenticacao, async (req, res) => {
     try {
         const boletoRes = await pool.query(`
             SELECT b.id, b.numero_documento, b.data_vencimento, b.valor_original,
-                   cl.nome, cl.nome_fantasia, cl.email
+                   cl.nome, cl.nome_fantasia, cl.email,
+                   g.email AS gerente_email, v.email AS vendedor_email
             FROM boletos b
             LEFT JOIN clientes cl ON cl.id = b.cliente_id
+            LEFT JOIN vendedores v ON v.id = COALESCE(b.vendedor_id, cl.vendedor_id)
+            LEFT JOIN gerentes g ON g.id = COALESCE(b.gerente_id, cl.gerente_id, v.gerente_id)
             WHERE b.id = $1
         `, [boletoId]);
 
@@ -1283,6 +1286,9 @@ app.post('/cobranca/aviso1/:id', verificarAutenticacao, async (req, res) => {
 
         const boleto = boletoRes.rows[0];
         const email = boleto.email ? boleto.email.trim() : '';
+        const cc = [...new Set([boleto.gerente_email, boleto.vendedor_email]
+            .filter(value => typeof value === 'string' && value.trim() !== '')
+            .map(value => value.trim()))];
         if (!email) {
             return res.status(400).json({ erro: 'O cliente não possui e-mail cadastrado.' });
         }
@@ -1319,10 +1325,10 @@ Atenciosamente,`;
             'E-mail 1 - Aviso de Vencimento',
             'E-mail',
             clienteNome,
-            `1º E-mail (Aviso 1) acionado para ${email} via cliente de e-mail. O envio precisa ser confirmado no cliente.`
+            `1º E-mail (Aviso 1) acionado para ${email}${cc.length ? `, com cópia para ${cc.join(', ')}` : ''} via cliente de e-mail. O envio precisa ser confirmado no cliente.`
         ]);
 
-        res.json({ para: email, assunto, corpo });
+        res.json({ para: email, cc, assunto, corpo });
     } catch (err) {
         console.error('ERRO AO PREPARAR AVISO 1 DA COBRANÇA:', err);
         res.status(500).json({ erro: 'Erro ao preparar o e-mail e registrar a interação.' });
