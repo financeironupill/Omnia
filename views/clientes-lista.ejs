@@ -29,6 +29,9 @@
 
             <!-- BARRA DE BUSCA -->
             <form action="/clientes" method="GET" class="mb-4">
+                <input type="hidden" name="ord" value="<%= ordAtual %>">
+                <% if (paginaAtual) { %><input type="hidden" name="page" value="<%= paginaAtual %>"><% } %>
+                <% if (origemAtual) { %><input type="hidden" name="origem" value="<%= origemAtual %>"><% } %>
                 <div class="row g-2">
                     <div class="col-md-10">
                         <div class="input-group">
@@ -50,7 +53,17 @@
                             <th style="width: 70px;">ID</th>
                             <th>Tipo</th>
                             <th>CPF / CNPJ</th>
-                            <th>Nome / Fantasia</th>
+                            <th>
+                                <span>Nome / Fantasia</span>
+                                <a href="/clientes?ord=az<%= buscaAtual ? '&busca=' + encodeURIComponent(buscaAtual) : '' %><%= paginaAtual ? '&page=' + encodeURIComponent(paginaAtual) : '' %><%= origemAtual ? '&origem=' + encodeURIComponent(origemAtual) : '' %>"
+                                   class="text-white ms-1" title="Ordenar de A a Z" aria-label="Ordenar de A a Z">
+                                    <i class="fa-solid fa-arrow-down-a-z <%= ordAtual === 'az' ? 'text-warning' : '' %>"></i>
+                                </a>
+                                <a href="/clientes?ord=za<%= buscaAtual ? '&busca=' + encodeURIComponent(buscaAtual) : '' %><%= paginaAtual ? '&page=' + encodeURIComponent(paginaAtual) : '' %><%= origemAtual ? '&origem=' + encodeURIComponent(origemAtual) : '' %>"
+                                   class="text-white ms-1" title="Ordenar de Z a A" aria-label="Ordenar de Z a A">
+                                    <i class="fa-solid fa-arrow-down-z-a <%= ordAtual === 'za' ? 'text-warning' : '' %>"></i>
+                                </a>
+                            </th>
                             <th>Gerente / Vendedor</th>
                             <th>Cidade / UF</th>
                             <th class="text-end" style="width: 160px;">Ações</th>

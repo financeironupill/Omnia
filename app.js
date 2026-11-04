@@ -328,9 +328,14 @@ app.post('/transportadoras/excluir/:id', verificarAutenticacao, async (req, res)
 // CLIENTES
 app.get('/clientes', verificarAutenticacao, async (req, res) => {
     try {
-        const { busca, ordenar, ordem, origem } = req.query;
-        let col = ordenar === 'cnpj_cpf' ? 'cnpj_cpf' : (ordenar === 'nome' ? 'nome' : 'id');
-        let dir = ordem === 'ASC' ? 'ASC' : 'DESC';
+        const { busca, ordenar, ordem, origem, ord, page } = req.query;
+        const ordAtual = ord === 'az' || ord === 'za' ? ord : '';
+        let col = ord === 'az' || ord === 'za'
+            ? 'nome'
+            : (ordenar === 'cnpj_cpf' ? 'cnpj_cpf' : (ordenar === 'nome' ? 'nome' : 'id'));
+        let dir = ord === 'az'
+            ? 'ASC'
+            : (ord === 'za' ? 'DESC' : (ordem === 'ASC' ? 'ASC' : 'DESC'));
         let query = 'SELECT c.*, g.nome_resumido AS gerente_nome, v.nome_resumido AS vendedor_nome FROM clientes c LEFT JOIN gerentes g ON c.gerente_id = g.id LEFT JOIN vendedores v ON c.vendedor_id = v.id';
         let params = [];
         if (busca && busca.trim() !== '') {
@@ -349,6 +354,8 @@ app.get('/clientes', verificarAutenticacao, async (req, res) => {
             buscaAtual: busca || '', 
             ordenarAtual: col, 
             ordemAtual: dir, 
+            ordAtual,
+            paginaAtual: typeof page === 'string' ? page : '',
             origemAtual: origem || 'dashboard', 
             erro: null, 
             sucesso: null 
