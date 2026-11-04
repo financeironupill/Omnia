@@ -959,7 +959,9 @@ function criarQueryFiltrosCobranca(query) {
         vendedor_id: '',
         data_vencimento_de: '',
         data_vencimento_ate: '',
-        exibir_fundo_perdido: 'ativos'
+        exibir_fundo_perdido: 'ativos',
+        ordenar: '',
+        ordem: ''
     };
     const params = new URLSearchParams();
 
@@ -1276,6 +1278,7 @@ app.get('/cobranca/nova', verificarAutenticacao, async (req, res) => {
             clientes: clientes.rows, 
             gerentes: gerentes.rows, 
             vendedores: vendedores.rows, 
+            filtrosCobrancaQuery: criarQueryFiltrosCobranca(req.query),
             historico: [],
             erro: null, 
             sucesso: null 
@@ -1307,13 +1310,13 @@ app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
                 clientes: clientes.rows,
                 gerentes: gerentes.rows,
                 vendedores: vendedores.rows,
+                filtrosCobrancaQuery: criarQueryFiltrosCobranca(req.query),
                 historico: [],
                 erro: 'Este número de documento já foi lançado para este cliente.',
                 sucesso: null
             });
         }
 
-        const cliRes = await pool.query('SELECT nome FROM clientes WHERE id = $1', [cliente_id]);
         const gerenteId = gerente_id ? parseInt(gerente_id, 10) : null;
         const vendedorId = vendedor_id ? parseInt(vendedor_id, 10) : null;
 
@@ -1338,11 +1341,8 @@ app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
             formatarCapitalizacao(observacoes)
         ]);
 
-        const paramsRetorno = new URLSearchParams({
-            busca: numeroDocumento || (cliRes.rows.length > 0 ? cliRes.rows[0].nome : ''),
-            status_boleto: '',
-            sucesso: 'Boleto cadastrado com sucesso!'
-        });
+        const paramsRetorno = new URLSearchParams(criarQueryFiltrosCobranca(req.query));
+        paramsRetorno.set('sucesso', 'Boleto cadastrado com sucesso!');
         res.redirect(`/cobranca?${paramsRetorno.toString()}`);
     } catch (err) {
         console.error('ERRO AO CADASTRAR BOLETO:', err);
@@ -1355,6 +1355,7 @@ app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
             clientes: clientes.rows, 
             gerentes: gerentes.rows, 
             vendedores: vendedores.rows, 
+            filtrosCobrancaQuery: criarQueryFiltrosCobranca(req.query),
             historico: [],
             erro: 'Erro ao cadastrar boleto: ' + err.message, 
             sucesso: null 
@@ -1479,7 +1480,6 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
     } = req.body;
 
     try {
-        const cliRes = await pool.query('SELECT nome FROM clientes WHERE id = $1', [cliente_id]);
         const gerenteId = gerente_id ? parseInt(gerente_id, 10) : null;
         const vendedorId = vendedor_id ? parseInt(vendedor_id, 10) : null;
 
@@ -1513,10 +1513,7 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
             parseInt(boletoId, 10)
         ]);
 
-        const numeroDocumento = numero_documento ? numero_documento.trim().toUpperCase() : '';
         const paramsRetorno = new URLSearchParams(criarQueryFiltrosCobranca(req.query));
-        paramsRetorno.set('busca', numeroDocumento || (cliRes.rows.length > 0 ? cliRes.rows[0].nome : ''));
-        paramsRetorno.set('status_boleto', '');
         paramsRetorno.set('sucesso', 'Boleto atualizado com sucesso!');
         res.redirect(`/cobranca?${paramsRetorno.toString()}`);
     } catch (err) {
@@ -1561,6 +1558,7 @@ app.get('/cobranca/duplicar/:id', verificarAutenticacao, async (req, res) => {
             clientes: clientes.rows, 
             gerentes: gerentes.rows, 
             vendedores: vendedores.rows, 
+            filtrosCobrancaQuery: criarQueryFiltrosCobranca(req.query),
             historico: [],
             erro: null, 
             sucesso: 'Lançamento duplicado! Informe a nova data de vencimento.' 
