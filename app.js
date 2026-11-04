@@ -38,6 +38,38 @@ function formatarCnpjCpf(valor) {
     return valor;
 }
 
+function validarIdentificacaoVendedor({ tipo_pessoa, cpf, cnpj, razao_social }) {
+    const tipoPessoa = tipo_pessoa === undefined ? 'PF' : tipo_pessoa;
+    if (tipoPessoa !== 'PF' && tipoPessoa !== 'PJ') {
+        return { erro: 'Selecione PF ou PJ para o vendedor.' };
+    }
+
+    if ([cpf, cnpj, razao_social].some(valor => valor !== undefined && typeof valor !== 'string')) {
+        return { erro: 'Dados de identificação inválidos.' };
+    }
+
+    const cpfLimpo = (cpf || '').replace(/\D/g, '');
+    const cnpjLimpo = (cnpj || '').replace(/\D/g, '');
+    const razaoSocial = (razao_social || '').trim();
+
+    if (tipoPessoa === 'PF' && cpf.trim() && cpfLimpo.length !== 11) {
+        return { erro: 'CPF deve conter 11 dígitos.' };
+    }
+    if (tipoPessoa === 'PJ' && cnpjLimpo.length !== 14) {
+        return { erro: 'CNPJ deve conter 14 dígitos.' };
+    }
+    if (tipoPessoa === 'PJ' && !razaoSocial) {
+        return { erro: 'Razão Social é obrigatória para pessoa jurídica.' };
+    }
+
+    return {
+        tipoPessoa,
+        cpf: tipoPessoa === 'PF' ? cpfLimpo || null : null,
+        cnpj: tipoPessoa === 'PJ' ? cnpjLimpo : null,
+        razaoSocial: tipoPessoa === 'PJ' ? razaoSocial : null
+    };
+}
+
 function formatarMoedaSemSimbolo(valor) {
     const num = parseFloat(valor) || 0;
     return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -643,7 +675,7 @@ app.get('/vendedores', verificarAutenticacao, async (req, res) => {
         let idx = 1;
 
         if (busca && busca.trim() !== '') {
-            query += ' AND (v.nome_resumido ILIKE $' + idx + ' OR v.nome_completo ILIKE $' + idx + ' OR g.nome_resumido ILIKE $' + idx + ')';
+            query += ' AND (v.nome_resumido ILIKE $' + idx + ' OR v.nome_completo ILIKE $' + idx + ' OR v.razao_social ILIKE $' + idx + ' OR v.cpf ILIKE $' + idx + ' OR v.cnpj ILIKE $' + idx + ' OR g.nome_resumido ILIKE $' + idx + ')';
             params.push('%' + busca.trim() + '%');
             idx++;
         }
@@ -658,7 +690,7 @@ app.get('/vendedores', verificarAutenticacao, async (req, res) => {
 
         const result = await pool.query(query, params);
         result.rows.forEach(v => {
-            v.cpf_formatado = formatarCnpjCpf(v.cpf);
+            v.identificacao_formatada = formatarCnpjCpf(v.tipo_pessoa === 'PJ' ? v.cnpj : v.cpf);
         });
         res.render('vendedores-lista', { 
             vendedores: result.rows, 
@@ -685,20 +717,22 @@ app.get('/vendedores/novo', verificarAutenticacao, async (req, res) => {
 });
 
 app.post('/vendedores/novo', verificarAutenticacao, async (req, res) => {
-    const { gerente_id, nome_resumido, nome_completo, cpf, telefone, email, banco, agencia, conta, tipo_chave_pix, chave_pix, ativo } = req.body;
-    const cpfInformado = typeof cpf === 'string' && cpf.trim() !== '';
-    const cpfLimpo = cpfInformado ? cpf.replace(/\D/g, '') : '';
-    if ((cpf && typeof cpf !== 'string') || (cpfInformado && cpfLimpo.length !== 11)) {
-        return res.redirect('/vendedores?erro=CPF deve conter 11 dígitos.');
+    const { gerente_id, nome_resumido, nome_completo, telefone, email, banco, agencia, conta, tipo_chave_pix, chave_pix, ativo } = req.body;
+    const identificacao = validarIdentificacaoVendedor(req.body);
+    if (identificacao.erro) {
+        return res.redirect(`/vendedores?erro=${encodeURIComponent(identificacao.erro)}`);
     }
 
     try {
-        const sql = 'INSERT INTO vendedores (gerente_id, nome_resumido, nome_completo, cpf, telefone, email, banco, agencia, conta, tipo_chave_pix, chave_pix, ativo) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)';
+        const sql = 'INSERT INTO vendedores (gerente_id, tipo_pessoa, nome_resumido, nome_completo, cpf, cnpj, razao_social, telefone, email, banco, agencia, conta, tipo_chave_pix, chave_pix, ativo) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)';
         await pool.query(sql, [
             gerente_id ? parseInt(gerente_id, 10) : null,
+            identificacao.tipoPessoa,
             nome_resumido ? nome_resumido.trim().toUpperCase() : '',
             formatarCapitalizacao(nome_completo),
-            cpfLimpo || null,
+            identificacao.cpf,
+            identificacao.cnpj,
+            identificacao.razaoSocial,
             telefone,
             email ? email.trim().toLowerCase() : '',
             formatarCapitalizacao(banco),
@@ -727,20 +761,22 @@ app.get('/vendedores/editar/:id', verificarAutenticacao, async (req, res) => {
 });
 
 app.post('/vendedores/editar/:id', verificarAutenticacao, async (req, res) => {
-    const { gerente_id, nome_resumido, nome_completo, cpf, telefone, email, banco, agencia, conta, tipo_chave_pix, chave_pix, ativo } = req.body;
-    const cpfInformado = typeof cpf === 'string' && cpf.trim() !== '';
-    const cpfLimpo = cpfInformado ? cpf.replace(/\D/g, '') : '';
-    if ((cpf && typeof cpf !== 'string') || (cpfInformado && cpfLimpo.length !== 11)) {
-        return res.redirect('/vendedores?erro=CPF deve conter 11 dígitos.');
+    const { gerente_id, nome_resumido, nome_completo, telefone, email, banco, agencia, conta, tipo_chave_pix, chave_pix, ativo } = req.body;
+    const identificacao = validarIdentificacaoVendedor(req.body);
+    if (identificacao.erro) {
+        return res.redirect(`/vendedores?erro=${encodeURIComponent(identificacao.erro)}`);
     }
 
     try {
-        const sql = 'UPDATE vendedores SET gerente_id = $1, nome_resumido = $2, nome_completo = $3, cpf = $4, telefone = $5, email = $6, banco = $7, agencia = $8, conta = $9, tipo_chave_pix = $10, chave_pix = $11, ativo = $12 WHERE id = $13';
+        const sql = 'UPDATE vendedores SET gerente_id = $1, tipo_pessoa = $2, nome_resumido = $3, nome_completo = $4, cpf = $5, cnpj = $6, razao_social = $7, telefone = $8, email = $9, banco = $10, agencia = $11, conta = $12, tipo_chave_pix = $13, chave_pix = $14, ativo = $15 WHERE id = $16';
         await pool.query(sql, [
             gerente_id ? parseInt(gerente_id, 10) : null,
+            identificacao.tipoPessoa,
             nome_resumido ? nome_resumido.trim().toUpperCase() : '',
             formatarCapitalizacao(nome_completo),
-            cpfLimpo || null,
+            identificacao.cpf,
+            identificacao.cnpj,
+            identificacao.razaoSocial,
             telefone,
             email ? email.trim().toLowerCase() : '',
             banco,
