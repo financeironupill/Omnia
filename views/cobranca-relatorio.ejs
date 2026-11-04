@@ -64,9 +64,9 @@
             <tr>
                 <th>Nº Documento</th>
                 <th>Cliente</th>
-                <th>Banco</th>
                 <th>Gerente</th>
                 <th>Vendedor</th>
+                <th>Emissão</th>
                 <th>Vencimento</th>
                 <th>Situação</th>
                 <th>Fase da Régua</th>
@@ -80,9 +80,9 @@
                     <tr>
                         <td><%= b.numero_documento || '-' %></td>
                         <td><%= b.cliente_nome || '-' %></td>
-                        <td><%= b.banco || '-' %></td>
                         <td><%= b.gerente_nome || '-' %></td>
                         <td><%= b.vendedor_nome || '-' %></td>
+                        <td><%= b.data_emissao ? new Date(b.data_emissao).toLocaleDateString('pt-BR') : '-' %></td>
                         <td><%= b.data_vencimento ? new Date(b.data_vencimento).toLocaleDateString('pt-BR') : '-' %></td>
                         <td><%= b.situacao_boleto || '-' %></td>
                         <td><%= b.status_cobranca || 'Aguardando Régua' %></td>
