@@ -187,7 +187,10 @@
         });
 
         gerenteEnvio.addEventListener('change', function() {
-            vendedorEnvio.replaceChildren(new Option('Todos da Equipe', 'todos'));
+            vendedorEnvio.replaceChildren(
+                new Option('Apenas o Gerente (Nenhum Vendedor)', 'nenhum'),
+                new Option('Todos da Equipe', 'todos')
+            );
             vendedoresRelatorio
                 .filter(v => String(v.gerente_id) === gerenteEnvio.value)
                 .forEach(v => vendedorEnvio.add(new Option(v.nome_resumido, String(v.id))));

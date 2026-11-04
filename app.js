@@ -1224,10 +1224,12 @@ app.get('/cobranca/relatorio', verificarAutenticacao, async (req, res) => {
 app.post('/cobranca/relatorio/envio', verificarAutenticacao, async (req, res) => {
     const { gerente_id, vendedor_id, canal, cc, formato } = req.body;
     const gerenteId = Number(gerente_id);
-    const vendedorId = vendedor_id === 'todos' ? null : Number(vendedor_id);
+    const vendedorSomenteGerente = vendedor_id === 'nenhum' || vendedor_id === '';
+    const vendedorTodos = vendedor_id === 'todos';
+    const vendedorId = vendedorSomenteGerente || vendedorTodos ? null : Number(vendedor_id);
 
     if (!Number.isSafeInteger(gerenteId) || gerenteId <= 0 ||
-        (vendedorId !== null && (!Number.isSafeInteger(vendedorId) || vendedorId <= 0)) ||
+        (!vendedorSomenteGerente && !vendedorTodos && (!Number.isSafeInteger(vendedorId) || vendedorId <= 0)) ||
         !['email', 'whatsapp'].includes(canal) ||
         !['pdf', 'excel'].includes(formato)) {
         return res.status(400).json({ erro: 'Selecione gerente, vendedor, canal e formato válidos.' });
@@ -1250,16 +1252,18 @@ app.post('/cobranca/relatorio/envio', verificarAutenticacao, async (req, res) =>
             return res.status(400).json({ erro: 'O gerente selecionado não está ativo ou não foi encontrado.' });
         }
 
-        const vendedoresRes = vendedorId === null
+        const vendedoresRes = vendedorTodos
             ? await pool.query(
                 'SELECT id, nome_resumido, email, telefone FROM vendedores WHERE gerente_id = $1 AND ativo = 1 ORDER BY nome_resumido ASC',
                 [gerenteId]
             )
-            : await pool.query(
-                'SELECT id, nome_resumido, email, telefone FROM vendedores WHERE id = $1 AND gerente_id = $2 AND ativo = 1',
-                [vendedorId, gerenteId]
-            );
-        if (vendedorId !== null && !vendedoresRes.rows.length) {
+            : vendedorSomenteGerente
+                ? { rows: [] }
+                : await pool.query(
+                    'SELECT id, nome_resumido, email, telefone FROM vendedores WHERE id = $1 AND gerente_id = $2 AND ativo = 1',
+                    [vendedorId, gerenteId]
+                );
+        if (!vendedorSomenteGerente && !vendedorTodos && !vendedoresRes.rows.length) {
             return res.status(400).json({ erro: 'O vendedor selecionado não pertence ao gerente ou não está ativo.' });
         }
 
