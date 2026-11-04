@@ -65,9 +65,14 @@
                     </h3>
                     <p class="text-muted small mb-0">Consulte, filtre e gira o fluxo de liquidação dos boletos.</p>
                 </div>
-                <a href="/cobranca/nova" class="btn btn-primary fw-semibold px-3">
-                    <i class="fa-solid fa-plus me-1"></i> Cadastrar Boleto
-                </a>
+                <div class="d-flex gap-2">
+                    <a href="/cobranca/relatorio<%= queryCobrancaCompleta ? '?' + queryCobrancaCompleta : '' %>" target="_blank" rel="noopener" class="btn btn-outline-success fw-semibold px-3">
+                        <i class="fa-solid fa-print me-1"></i> Gerar Relatório
+                    </a>
+                    <a href="/cobranca/nova" class="btn btn-primary fw-semibold px-3">
+                        <i class="fa-solid fa-plus me-1"></i> Cadastrar Boleto
+                    </a>
+                </div>
             </div>
 
             <% if (locals.erro && erro) { %> <div class="alert alert-danger py-2"><%= erro %></div> <% } %>

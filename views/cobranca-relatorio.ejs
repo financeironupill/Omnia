@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatório de Cobrança - Omnia</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 24px; color: #212529; font: 12px Arial, sans-serif; }
+        header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #212529; padding-bottom: 12px; }
+        h1 { margin: 0 0 5px; font-size: 22px; }
+        p { margin: 3px 0; }
+        .actions { display: flex; gap: 8px; }
+        button, .back { border: 1px solid #6c757d; border-radius: 4px; background: #fff; color: #212529; padding: 7px 12px; text-decoration: none; font-size: 12px; cursor: pointer; }
+        .filters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 16px; margin: 16px 0; padding: 12px; background: #f3f4f5; }
+        .filters strong { display: block; margin-bottom: 2px; }
+        .search { grid-column: 1 / -1; overflow-wrap: anywhere; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #adb5bd; padding: 6px; text-align: left; }
+        th { background: #e9ecef; }
+        .numeric { text-align: right; white-space: nowrap; }
+        tfoot { font-weight: bold; background: #f3f4f5; }
+        .empty { padding: 20px; text-align: center; color: #6c757d; }
+        @media print {
+            body { margin: 10mm; font-size: 9px; }
+            .actions { display: none; }
+            .filters { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+            th, td { padding: 4px; }
+            thead { display: table-header-group; }
+            tr { break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div>
+            <h1>OMNIA — Gestão de Cobrança & Régua</h1>
+            <p>Relatório de boletos</p>
+            <p>Emitido em: <%= emitidoEm %></p>
+        </div>
+        <div class="actions">
+            <a href="/cobranca" class="back">Voltar</a>
+            <button type="button" onclick="window.print()">Imprimir / Salvar em PDF</button>
+        </div>
+    </header>
+
+    <section class="filters" aria-label="Filtros aplicados">
+        <div><strong>Situação</strong><%= filtros.situacao %></div>
+        <div><strong>Banco</strong><%= filtros.banco %></div>
+        <div><strong>Fase da régua</strong><%= filtros.fase %></div>
+        <div><strong>Gerente</strong><%= filtros.gerente %></div>
+        <div><strong>Vendedor</strong><%= filtros.vendedor %></div>
+        <div><strong>Ordenação</strong><%= filtros.ordenar %> — <%= filtros.ordem %></div>
+        <% if (filtros.busca) { %>
+            <div class="search"><strong>Pesquisa</strong><%= filtros.busca %></div>
+        <% } %>
+    </section>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Nº Documento</th>
+                <th>Cliente</th>
+                <th>Banco</th>
+                <th>Gerente</th>
+                <th>Vendedor</th>
+                <th>Vencimento</th>
+                <th>Situação</th>
+                <th>Fase da Régua</th>
+                <th class="numeric">Valor Original (R$)</th>
+                <th class="numeric">Custas (R$)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% if (boletos.length) { %>
+                <% boletos.forEach(b => { %>
+                    <tr>
+                        <td><%= b.numero_documento || '-' %></td>
+                        <td><%= b.cliente_nome || '-' %></td>
+                        <td><%= b.banco || '-' %></td>
+                        <td><%= b.gerente_nome || '-' %></td>
+                        <td><%= b.vendedor_nome || '-' %></td>
+                        <td><%= b.data_vencimento ? new Date(b.data_vencimento).toLocaleDateString('pt-BR') : '-' %></td>
+                        <td><%= b.situacao_boleto || '-' %></td>
+                        <td><%= b.status_cobranca || 'Aguardando Régua' %></td>
+                        <td class="numeric"><%= b.valor_original_fmt %></td>
+                        <td class="numeric"><%= b.valor_custas_fmt %></td>
+                    </tr>
+                <% }) %>
+            <% } else { %>
+                <tr><td class="empty" colspan="10">Nenhum boleto encontrado para os filtros aplicados.</td></tr>
+            <% } %>
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="8">Totais (<%= boletos.length %> boleto(s))</td>
+                <td class="numeric"><%= totalValorOriginalFmt %></td>
+                <td class="numeric"><%= totalCustasFmt %></td>
+            </tr>
+        </tfoot>
+    </table>
+</body>
+</html>

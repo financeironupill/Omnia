@@ -970,26 +970,25 @@ function criarQueryFiltrosCobranca(query) {
     return params.toString();
 }
 
-app.get('/cobranca', verificarAutenticacao, async (req, res) => {
-    try {
-        const { busca, banco, status_boleto, status_cobranca, gerente_id, vendedor_id, ordenar, ordem } = req.query;
-        const statusBoletoInformado = Object.prototype.hasOwnProperty.call(req.query, 'status_boleto');
-        const statusBoletoSelecionado = typeof status_boleto === 'string' ? status_boleto : '';
-        const statusBoletoPadrao = !statusBoletoInformado || statusBoletoSelecionado === 'pendentes';
-        const colunasOrdenacao = {
-            documento: 'b.numero_documento',
-            cliente: 'cl.nome',
-            vencimento: 'b.data_vencimento',
-            previsao: 'b.data_previsao_pagamento',
-            valor: 'b.valor_original',
-            situacao: 'b.situacao_boleto',
-            regua: 'b.status_cobranca'
-        };
-        const ordenarAtual = typeof ordenar === 'string' && Object.prototype.hasOwnProperty.call(colunasOrdenacao, ordenar)
-            ? ordenar
-            : 'vencimento';
-        const ordemAtual = ordem === 'DESC' ? 'DESC' : 'ASC';
-        let queryText = `
+function construirConsultaCobranca(query) {
+    const { busca, banco, status_boleto, status_cobranca, gerente_id, vendedor_id, ordenar, ordem } = query;
+    const statusBoletoInformado = Object.prototype.hasOwnProperty.call(query, 'status_boleto');
+    const statusBoletoSelecionado = typeof status_boleto === 'string' ? status_boleto : '';
+    const statusBoletoPadrao = !statusBoletoInformado || statusBoletoSelecionado === 'pendentes';
+    const colunasOrdenacao = {
+        documento: 'b.numero_documento',
+        cliente: 'cl.nome',
+        vencimento: 'b.data_vencimento',
+        previsao: 'b.data_previsao_pagamento',
+        valor: 'b.valor_original',
+        situacao: 'b.situacao_boleto',
+        regua: 'b.status_cobranca'
+    };
+    const ordenarAtual = typeof ordenar === 'string' && Object.prototype.hasOwnProperty.call(colunasOrdenacao, ordenar)
+        ? ordenar
+        : 'vencimento';
+    const ordemAtual = ordem === 'DESC' ? 'DESC' : 'ASC';
+    let queryText = `
             SELECT b.*, cl.nome AS cliente_nome, cl.cnpj_cpf AS cliente_cnpj, cl.email AS cliente_email, cl.telefone AS cliente_telefone,
                    g.nome_resumido AS gerente_nome, g.email AS gerente_email,
                    v.nome_resumido AS vendedor_nome, v.email AS vendedor_email,
@@ -1007,49 +1006,67 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
             LEFT JOIN comissoes_estornos ce ON ce.boleto_id = b.id
             WHERE 1=1
         `;
-        let queryParams = [];
-        let idx = 1;
+    const queryParams = [];
+    let idx = 1;
 
-        if (busca && busca.trim() !== '') {
-            queryText += ' AND (b.numero_documento ILIKE $' + idx + ' OR cl.nome ILIKE $' + idx + ' OR cl.nome_fantasia ILIKE $' + idx + ' OR cl.cnpj_cpf ILIKE $' + idx + ' OR b.banco ILIKE $' + idx + ')';
-            queryParams.push('%' + busca.trim() + '%');
-            idx++;
-        }
+    if (busca && busca.trim() !== '') {
+        queryText += ' AND (b.numero_documento ILIKE $' + idx + ' OR cl.nome ILIKE $' + idx + ' OR cl.nome_fantasia ILIKE $' + idx + ' OR cl.cnpj_cpf ILIKE $' + idx + ' OR b.banco ILIKE $' + idx + ')';
+        queryParams.push('%' + busca.trim() + '%');
+        idx++;
+    }
 
-        if (statusBoletoPadrao) {
-            queryText += " AND b.situacao_boleto IN ('Vencido', 'Pago com Pendência')";
-        } else if (statusBoletoSelecionado !== '') {
-            queryText += ' AND b.situacao_boleto = $' + idx;
-            queryParams.push(statusBoletoSelecionado);
-            idx++;
-        }
+    if (statusBoletoPadrao) {
+        queryText += " AND b.situacao_boleto IN ('Vencido', 'Pago com Pendência')";
+    } else if (statusBoletoSelecionado !== '') {
+        queryText += ' AND b.situacao_boleto = $' + idx;
+        queryParams.push(statusBoletoSelecionado);
+        idx++;
+    }
 
-        if (typeof banco === 'string' && banco !== '') {
-            queryText += ' AND b.banco = $' + idx;
-            queryParams.push(banco);
-            idx++;
-        }
+    if (typeof banco === 'string' && banco !== '') {
+        queryText += ' AND b.banco = $' + idx;
+        queryParams.push(banco);
+        idx++;
+    }
 
-        if (status_cobranca && status_cobranca !== '') {
-            queryText += ' AND b.status_cobranca = $' + idx;
-            queryParams.push(status_cobranca);
-            idx++;
-        }
+    if (status_cobranca && status_cobranca !== '') {
+        queryText += ' AND b.status_cobranca = $' + idx;
+        queryParams.push(status_cobranca);
+        idx++;
+    }
 
-        if (gerente_id && gerente_id !== '') {
-            queryText += ' AND b.gerente_id = $' + idx;
-            queryParams.push(parseInt(gerente_id, 10));
-            idx++;
-        }
+    if (gerente_id && gerente_id !== '') {
+        queryText += ' AND b.gerente_id = $' + idx;
+        queryParams.push(parseInt(gerente_id, 10));
+        idx++;
+    }
 
-        if (vendedor_id && vendedor_id !== '') {
-            queryText += ' AND b.vendedor_id = $' + idx;
-            queryParams.push(parseInt(vendedor_id, 10));
-            idx++;
-        }
+    if (vendedor_id && vendedor_id !== '') {
+        queryText += ' AND b.vendedor_id = $' + idx;
+        queryParams.push(parseInt(vendedor_id, 10));
+        idx++;
+    }
 
-        queryText += ' ORDER BY ' + colunasOrdenacao[ordenarAtual] + ' ' + ordemAtual;
+    queryText += ' ORDER BY ' + colunasOrdenacao[ordenarAtual] + ' ' + ordemAtual;
+    return { queryText, queryParams, ordenarAtual, ordemAtual, statusBoletoPadrao, statusBoletoSelecionado };
+}
 
+function formatarResultadosCobranca(rows) {
+    rows.forEach(b => {
+        b.cliente_cnpj = formatarCnpjCpf(b.cliente_cnpj);
+        b.valor_original_fmt = formatarMoedaSemSimbolo(b.valor_original);
+        b.valor_custas_fmt = formatarMoedaSemSimbolo(b.valor_custas);
+        b.valor_estornado_fmt = formatarMoedaSemSimbolo(b.valor_estornado);
+        b.reincidente_pendente = parseInt(b.total_pendentes_cliente, 10) > 1;
+        b.dias_atraso = parseInt(b.dias_atraso, 10) > 0 ? parseInt(b.dias_atraso, 10) : 0;
+    });
+    return rows;
+}
+
+app.get('/cobranca', verificarAutenticacao, async (req, res) => {
+    try {
+        const { busca, banco, status_cobranca, gerente_id, vendedor_id } = req.query;
+        const { queryText, queryParams, ordenarAtual, ordemAtual, statusBoletoPadrao, statusBoletoSelecionado } = construirConsultaCobranca(req.query);
         const result = await pool.query(queryText, queryParams);
         const totalValorOriginal = result.rows.reduce((total, boleto) => total + (parseFloat(boleto.valor_original) || 0), 0);
         const totalCustas = result.rows.reduce((total, boleto) => total + (parseFloat(boleto.valor_custas) || 0), 0);
@@ -1059,15 +1076,7 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
         const vendedores = await pool.query('SELECT id, nome_resumido, gerente_id FROM vendedores WHERE ativo = 1 ORDER BY nome_resumido ASC');
         const bancos = await pool.query("SELECT DISTINCT banco FROM boletos WHERE banco IS NOT NULL AND banco != '' ORDER BY banco ASC");
         const clientes = await pool.query('SELECT id, nome, nome_fantasia, cnpj_cpf FROM clientes ORDER BY nome ASC');
-        
-        result.rows.forEach(b => {
-            b.cliente_cnpj = formatarCnpjCpf(b.cliente_cnpj);
-            b.valor_original_fmt = formatarMoedaSemSimbolo(b.valor_original);
-            b.valor_custas_fmt = formatarMoedaSemSimbolo(b.valor_custas);
-            b.valor_estornado_fmt = formatarMoedaSemSimbolo(b.valor_estornado);
-            b.reincidente_pendente = parseInt(b.total_pendentes_cliente, 10) > 1;
-            b.dias_atraso = parseInt(b.dias_atraso, 10) > 0 ? parseInt(b.dias_atraso, 10) : 0;
-        });
+        formatarResultadosCobranca(result.rows);
 
         res.render('cobranca-lista', { 
             contas: result.rows, 
@@ -1076,6 +1085,7 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
             bancos: bancos.rows,
             clientesLista: clientes.rows,
             filtrosCobrancaQuery: criarQueryFiltrosCobranca(req.query),
+            queryCobrancaCompleta: new URLSearchParams(req.query).toString(),
             buscaAtual: busca || '', 
             bancoAtual: typeof banco === 'string' ? banco : '',
             statusBoletoAtual: statusBoletoPadrao ? 'pendentes' : statusBoletoSelecionado,
@@ -1092,6 +1102,76 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
     } catch (err) {
         console.error('ERRO EM GET /cobranca:', err);
         res.status(500).send('Erro interno');
+    }
+});
+
+app.get('/cobranca/relatorio', verificarAutenticacao, async (req, res) => {
+    try {
+        const consulta = construirConsultaCobranca(req.query);
+        const result = await pool.query(consulta.queryText, consulta.queryParams);
+        const totalValorOriginal = result.rows.reduce((total, boleto) => total + (parseFloat(boleto.valor_original) || 0), 0);
+        const totalCustas = result.rows.reduce((total, boleto) => total + (parseFloat(boleto.valor_custas) || 0), 0);
+        const [gerente, vendedor] = await Promise.all([
+            req.query.gerente_id
+                ? pool.query('SELECT nome_resumido FROM gerentes WHERE id = $1', [parseInt(req.query.gerente_id, 10)])
+                : Promise.resolve({ rows: [] }),
+            req.query.vendedor_id
+                ? pool.query('SELECT nome_resumido FROM vendedores WHERE id = $1', [parseInt(req.query.vendedor_id, 10)])
+                : Promise.resolve({ rows: [] })
+        ]);
+        formatarResultadosCobranca(result.rows);
+
+        const situacoes = {
+            pendentes: 'Vencido e Pago com Pendência',
+            Vencido: 'Vencido',
+            Pago: 'Pago',
+            'Pago com Pendência': 'Pago com Pendência'
+        };
+        const fases = {
+            'Aguardando Régua': 'Aguardando Régua',
+            'Aviso 1 (Notificação)': 'Aviso 1 (Notificação)',
+            'Aviso 2 (Alerta Cartório)': 'Aviso 2 (Alerta Cartório)',
+            'Aviso 3 (Aviso Final)': 'Aviso 3 (Aviso Final)',
+            'Em Cartório / Negativado': 'Em Cartório / Negativado',
+            'Custas Pendentes (Cartório)': 'Custas Pendentes (Cartório)',
+            Concluído: 'Concluído'
+        };
+        const nomesOrdenacao = {
+            documento: 'Número do documento',
+            cliente: 'Cliente',
+            vencimento: 'Vencimento',
+            previsao: 'Previsão de pagamento',
+            valor: 'Valor original',
+            situacao: 'Situação',
+            regua: 'Fase da régua'
+        };
+        const statusSelecionado = req.query.status_boleto;
+
+        res.render('cobranca-relatorio', {
+            boletos: result.rows,
+            emitidoEm: new Date().toLocaleString('pt-BR'),
+            filtros: {
+                busca: typeof req.query.busca === 'string' ? req.query.busca : '',
+                situacao: statusSelecionado === undefined
+                    ? situacoes.pendentes
+                    : statusSelecionado === ''
+                        ? 'Todas'
+                        : situacoes[statusSelecionado] || statusSelecionado,
+                banco: typeof req.query.banco === 'string' && req.query.banco ? req.query.banco : 'Todos',
+                fase: typeof req.query.status_cobranca === 'string' && req.query.status_cobranca
+                    ? fases[req.query.status_cobranca] || req.query.status_cobranca
+                    : 'Todas',
+                gerente: gerente.rows[0] ? gerente.rows[0].nome_resumido : (req.query.gerente_id ? `ID ${req.query.gerente_id}` : 'Todos'),
+                vendedor: vendedor.rows[0] ? vendedor.rows[0].nome_resumido : (req.query.vendedor_id ? `ID ${req.query.vendedor_id}` : 'Todos'),
+                ordenar: nomesOrdenacao[consulta.ordenarAtual],
+                ordem: consulta.ordemAtual === 'ASC' ? 'Crescente' : 'Decrescente'
+            },
+            totalValorOriginalFmt: formatarMoedaSemSimbolo(totalValorOriginal),
+            totalCustasFmt: formatarMoedaSemSimbolo(totalCustas)
+        });
+    } catch (err) {
+        console.error('ERRO EM GET /cobranca/relatorio:', err);
+        res.status(500).send('Erro interno ao gerar relatório');
     }
 });
 
