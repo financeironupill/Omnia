@@ -68,12 +68,12 @@
                                 <input type="text" name="cpf" id="cpf" class="form-control" maxlength="14" inputmode="numeric" placeholder="000.000.000-00" value="<%= vendedor ? vendedor.cpf : '' %>">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label fw-semibold">CNPJ (Pessoa Jurídica)</label>
-                                <input type="text" name="cnpj" id="cnpj" class="form-control" maxlength="18" inputmode="numeric" placeholder="00.000.000/0000-00" value="<%= vendedor ? vendedor.cnpj : '' %>">
-                            </div>
-                            <div class="col-md-6">
                                 <label class="form-label fw-semibold">Razão Social</label>
                                 <input type="text" name="razao_social" id="razaoSocial" class="form-control" placeholder="Razão social da empresa" value="<%= vendedor ? vendedor.razao_social : '' %>">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">CNPJ (Pessoa Jurídica)</label>
+                                <input type="text" name="cnpj" id="cnpj" class="form-control" maxlength="18" inputmode="numeric" placeholder="00.000.000/0000-00" value="<%= vendedor ? vendedor.cnpj : '' %>">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">E-mail</label>
