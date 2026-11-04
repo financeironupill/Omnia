@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Omnia - Módulo de Cobrança (Boletos)</title>
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .th-ordenavel {
+            color: #fff;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .th-ordenavel:hover {
+            color: #ffc107;
+        }
+    </style>
+</head>
+<body class="bg-light">
+
+    <!-- NAVBAR DA APLICAÇÃO -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow-sm">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand fw-bold" href="/dashboard">
+                <i class="fa-solid fa-layer-group text-primary me-2"></i>OMNIA
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/dashboard"><i class="fa-solid fa-chart-line me-1"></i> Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/cobranca"><i class="fa-solid fa-file-invoice-dollar me-1"></i> Cobrança</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/ocorrencias"><i class="fa-solid fa-triangle-exclamation me-1"></i> Ocorrências</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/clientes"><i class="fa-solid fa-users me-1"></i> Clientes</a>
+                    </li>
+                </ul>
+                <div class="d-flex align-items-center">
+                    <a href="/logout" class="btn btn-outline-light btn-sm"><i class="fa-solid fa-right-from-bracket me-1"></i> Sair</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- CONTEÚDO PRINCIPAL -->
+    <div class="container-fluid px-4 py-2">
+        <div class="card shadow-sm border-0 rounded-3 p-4 bg-white">
+            
+            <div class="d-flex align-items-center justify-content-between mb-3 border-bottom pb-3">
+                <div>
+                    <h3 class="fw-bold text-dark mb-1">
+                        <i class="fa-solid fa-file-invoice-dollar text-primary me-2"></i>Gestão de Cobrança & Régua
+                    </h3>
+                    <p class="text-muted small mb-0">Consulte, filtre e gira o fluxo de liquidação dos boletos.</p>
+                </div>
+                <a href="/cobranca/nova" class="btn btn-primary fw-semibold px-3">
+                    <i class="fa-solid fa-plus me-1"></i> Cadastrar Boleto
+                </a>
+            </div>
+
+            <% if (locals.erro && erro) { %> <div class="alert alert-danger py-2"><%= erro %></div> <% } %>
+            <% if (locals.sucesso && sucesso) { %> <div class="alert alert-success py-2"><%= sucesso %></div> <% } %>
+
+            <!-- FILTROS DE PESQUISA DA RÉGUA -->
+            <form action="/cobranca" method="GET" class="row g-2 mb-4 bg-light p-3 rounded border">
+                <input type="hidden" name="ordenar" value="<%= locals.ordenarAtual || '' %>">
+                <input type="hidden" name="ordem" value="<%= locals.ordemAtual || '' %>">
+
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold">Pesquisa Geral</label>
+                    <input type="text" name="busca" class="form-control form-control-sm" placeholder="Nº Documento, Cliente ou Banco..." value="<%= buscaAtual %>">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold">Situação do Boleto</label>
+                    <select name="status_boleto" class="form-select form-select-sm">
+                        <option value="">Todas</option>
+                        <option value="Vencido" <%= statusBoletoAtual === 'Vencido' ? 'selected' : '' %>>Vencido</option>
+                        <option value="Pago" <%= statusBoletoAtual === 'Pago' ? 'selected' : '' %>>Pago</option>
+                        <option value="Pago com Pendência" <%= statusBoletoAtual === 'Pago com Pendência' ? 'selected' : '' %>>Pago com Pendência</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold">Fase da Régua</label>
+                    <select name="status_cobranca" class="form-select form-select-sm">
+                        <option value="">Todas as Fases</option>
+                        <option value="Aguardando Régua" <%= statusCobrancaAtual === 'Aguardando Régua' ? 'selected' : '' %>>Aguardando Régua</option>
+                        <option value="Aviso 1 (Notificação)" <%= statusCobrancaAtual === 'Aviso 1 (Notificação)' ? 'selected' : '' %>>Aviso 1 (Notificação)</option>
+                        <option value="Aviso 2 (Alerta Cartório)" <%= statusCobrancaAtual === 'Aviso 2 (Alerta Cartório)' ? 'selected' : '' %>>Aviso 2 (Alerta Cartório)</option>
+                        <option value="Aviso 3 (Aviso Final)" <%= statusCobrancaAtual === 'Aviso 3 (Aviso Final)' ? 'selected' : '' %>>Aviso 3 (Aviso Final)</option>
+                        <option value="Em Cartório / Negativado" <%= statusCobrancaAtual === 'Em Cartório / Negativado' ? 'selected' : '' %>>Em Cartório / Negativado</option>
+                        <option value="Custas Pendentes (Cartório)" <%= statusCobrancaAtual === 'Custas Pendentes (Cartório)' ? 'selected' : '' %>>Custas Pendentes (Cartório)</option>
+                        <option value="Concluído" <%= statusCobrancaAtual === 'Concluído' ? 'selected' : '' %>>Concluído</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold">Gerente</label>
+                    <select name="gerente_id" id="filtroGerente" class="form-select form-select-sm">
+                        <option value="">Todos os Gerentes</option>
+                        <% gerentes.forEach(g => { %>
+                            <option value="<%= g.id %>" <%= gerenteAtual == g.id ? 'selected' : '' %>><%= g.nome_resumido %></option>
+                        <% }) %>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold">Vendedor</label>
+                    <select name="vendedor_id" id="filtroVendedor" class="form-select form-select-sm">
+                        <option value="">Todos os Vendedores</option>
+                        <% vendedores.forEach(v => { %>
+                            <option value="<%= v.id %>" data-gerente-id="<%= v.gerente_id %>" <%= vendedorAtual == v.id ? 'selected' : '' %>><%= v.nome_resumido %></option>
+                        <% }) %>
+                    </select>
+                </div>
+                <div class="col-md-1 d-flex align-items-end gap-1">
+                    <button type="submit" class="btn btn-secondary btn-sm w-100 fw-semibold" title="Filtrar"><i class="fa-solid fa-filter"></i></button>
+                    <a href="/cobranca" class="btn btn-outline-secondary btn-sm fw-semibold" title="Limpar"><i class="fa-solid fa-rotate-left"></i></a>
+                </div>
+            </form>
+
+            <%
+                function gerarLinkOrdenacao(coluna) {
+                    let novaOrdem = 'ASC';
+                    if (locals.ordenarAtual === coluna && locals.ordemAtual === 'ASC') {
+                        novaOrdem = 'DESC';
+                    }
+                    let url = `/cobranca?ordenar=${coluna}&ordem=${novaOrdem}`;
+                    if (locals.buscaAtual) url += `&busca=${encodeURIComponent(locals.buscaAtual)}`;
+                    if (locals.statusBoletoAtual) url += `&status_boleto=${encodeURIComponent(locals.statusBoletoAtual)}`;
+                    if (locals.statusCobrancaAtual) url += `&status_cobranca=${encodeURIComponent(locals.statusCobrancaAtual)}`;
+                    if (locals.gerenteAtual) url += `&gerente_id=${locals.gerenteAtual}`;
+                    if (locals.vendedorAtual) url += `&vendedor_id=${locals.vendedorAtual}`;
+                    return url;
+                }
+
+                function iconeSeta(coluna) {
+                    if (locals.ordenarAtual === coluna) {
+                        return locals.ordemAtual === 'ASC' ? '<i class="fa-solid fa-arrow-up-a-z text-warning small"></i>' : '<i class="fa-solid fa-arrow-down-z-a text-warning small"></i>';
+                    }
+                    return '<i class="fa-solid fa-sort text-muted small"></i>';
+                }
+
+                // Verifica se há algum filtro ativo na tela
+                const temFiltroAtivo = (locals.buscaAtual && locals.buscaAtual.trim() !== '') ||
+                                       (locals.statusBoletoAtual && locals.statusBoletoAtual !== '') ||
+                                       (locals.statusCobrancaAtual && locals.statusCobrancaAtual !== '') ||
+                                       (locals.gerenteAtual && locals.gerenteAtual !== '') ||
+                                       (locals.vendedorAtual && locals.vendedorAtual !== '');
+            %>
+
+            <!-- TABELA DE BOLETOS -->
+            <div class="table-responsive">
+                <table class="table table-hover align-middle border">
+                    <thead class="table-dark">
+                        <tr>
+                            <th><a href="<%= gerarLinkOrdenacao('documento') %>" class="th-ordenavel">Nº Doc <%- iconeSeta('documento') %></a></th>
+                            <th><a href="<%= gerarLinkOrdenacao('cliente') %>" class="th-ordenavel">Cliente <%- iconeSeta('cliente') %></a></th>
+                            <th><a href="<%= gerarLinkOrdenacao('vencimento') %>" class="th-ordenavel">Vencimento <%- iconeSeta('vencimento') %></a></th>
+                            <th class="text-center">Dias Aberto</th>
+                            <th><a href="<%= gerarLinkOrdenacao('previsao') %>" class="th-ordenavel">Previsão Pagto <%- iconeSeta('previsao') %></a></th>
+                            <th class="text-end"><a href="<%= gerarLinkOrdenacao('valor') %>" class="th-ordenavel justify-content-end">Valor Orig. <%- iconeSeta('valor') %></a></th>
+                            <th class="text-end">Custas</th>
+                            <th class="text-center"><a href="<%= gerarLinkOrdenacao('situacao') %>" class="th-ordenavel justify-content-center">Situação <%- iconeSeta('situacao') %></a></th>
+                            <th class="text-center"><a href="<%= gerarLinkOrdenacao('regua') %>" class="th-ordenavel justify-content-center">Fase Régua <%- iconeSeta('regua') %></a></th>
+                            <th class="text-center">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (contas && contas.length > 0) { %>
+                            <% contas.forEach(b => { %>
+                                <tr>
+                                    <td class="fw-bold"><%= b.numero_documento %></td>
+                                    <td>
+                                        <div class="fw-semibold"><%= b.cliente_nome || 'N/A' %></div>
+                                        <small class="<%= b.reincidente_pendente ? 'text-danger fw-normal' : 'text-muted' %>">
+                                            <%= b.cliente_cnpj || '' %>
+                                        </small>
+                                    </td>
+                                    <td><%= b.data_vencimento ? new Date(b.data_vencimento).toLocaleDateString('pt-BR') : '-' %></td>
+                                    <td class="text-center">
+                                        <% if (b.situacao_boleto === 'Vencido' && b.dias_atraso > 0) { %>
+                                            <span class="badge bg-danger"><%= b.dias_atraso %> dia(s)</span>
+                                        <% } else if (b.dias_atraso > 0) { %>
+                                            <span class="badge bg-secondary"><%= b.dias_atraso %> dia(s)</span>
+                                        <% } else { %>
+                                            <span class="text-muted">-</span>
+                                        <% } %>
+                                    </td>
+                                    <td class="fw-semibold text-primary">
+                                        <%= b.data_previsao_pagamento ? new Date(b.data_previsao_pagamento).toLocaleDateString('pt-BR') : '-' %>
+                                    </td>
+                                    <td class="text-end fw-bold"><%= b.valor_original_fmt %></td>
+                                    <td class="text-end text-danger fw-semibold"><%= b.valor_custas_fmt %></td>
+                                    <td class="text-center">
+                                        <% if (b.situacao_boleto === 'Pago') { %>
+                                            <span class="badge bg-success">Pago</span>
+                                        <% } else if (b.situacao_boleto === 'Pago com Pendência') { %>
+                                            <span class="badge bg-warning text-dark">Pago com Pendência</span>
+                                        <% } else { %>
+                                            <span class="badge bg-danger">Vencido</span>
+                                        <% } %>
+                                    </td>
+                                    <td class="text-center">
+                                        <% if (b.status_cobranca === 'Custas Pendentes (Cartório)') { %>
+                                            <span class="badge bg-warning text-dark"><i class="fa-solid fa-triangle-exclamation me-1"></i>Custas Pendentes</span>
+                                        <% } else { %>
+                                            <span class="badge bg-info text-dark"><%= b.status_cobranca || 'Aguardando Régua' %></span>
+                                        <% } %>
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="d-inline-flex gap-1">
+                                            <a href="/cobranca/editar/<%= b.id %>" class="btn btn-outline-primary btn-sm" title="Editar Boleto">
+                                                <i class="fa-solid fa-pen-to-square"></i>
+                                            </a>
+                                            
+                                            <% if (b.data_estorno) { %>
+                                                <button type="button" class="btn btn-warning btn-sm" title="Comissão Estornada em <%= new Date(b.data_estorno).toLocaleDateString('pt-BR') %>" 
+                                                    data-bs-toggle="modal" data-bs-target="#modalEstorno<%= b.id %>">
+                                                    <i class="fa-solid fa-hand-holding-dollar"></i>
+                                                </button>
+                                            <% } else { %>
+                                                <button type="button" class="btn btn-outline-success btn-sm" title="Controle de Estorno de Comissão" 
+                                                    data-bs-toggle="modal" data-bs-target="#modalEstorno<%= b.id %>">
+                                                    <i class="fa-solid fa-hand-holding-dollar"></i>
+                                                </button>
+                                            <% } %>
+
+                                            <a href="/cobranca/duplicar/<%= b.id %>" class="btn btn-outline-secondary btn-sm" title="Duplicar Lançamento">
+                                                <i class="fa-solid fa-copy"></i>
+                                            </a>
+                                            <form action="/cobranca/excluir/<%= b.id %>" method="POST" onsubmit="return confirm('Tem certeza de que deseja excluir este boleto permanentemente?');" class="d-inline">
+                                                <button type="submit" class="btn btn-outline-danger btn-sm" title="Excluir Boleto">
+                                                    <i class="fa-solid fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+
+                                <!-- MODAL (POP-UP) DE ESTORNO -->
+                                <div class="modal fade" id="modalEstorno<%= b.id %>" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <form action="/cobranca/estorno/<%= b.id %>" method="POST">
+                                                <div class="modal-header bg-dark text-white">
+                                                    <h5 class="modal-title fs-6">
+                                                        <i class="fa-solid fa-hand-holding-dollar text-success me-1"></i> Estorno de Comissão - Doc: <%= b.numero_documento %>
+                                                    </h5>
+                                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                                                </div>
+                                                <div class="modal-body text-start">
+                                                    <p class="small text-muted mb-3">Cliente: <strong><%= b.cliente_nome %></strong></p>
+                                                    
+                                                    <div class="mb-3">
+                                                        <label class="form-label small fw-bold">Data do Estorno</label>
+                                                        <input type="date" name="data_estorno" class="form-control form-control-sm" 
+                                                            value="<%= b.data_estorno ? new Date(b.data_estorno).toISOString().split('T')[0] : '' %>">
+                                                    </div>
+
+                                                    <div class="mb-3">
+                                                        <label class="form-label small fw-bold">Valor Estornado (R$)</label>
+                                                        <input type="text" name="valor_estornado" class="form-control form-control-sm" 
+                                                            value="<%= b.valor_estornado ? b.valor_estornado_fmt : '0,00' %>" placeholder="0,00">
+                                                    </div>
+
+                                                    <div class="mb-3">
+                                                        <label class="form-label small fw-bold">Data de Restituição (Devolução ao Representante)</label>
+                                                        <input type="date" name="data_restituicao" class="form-control form-control-sm" 
+                                                            value="<%= b.data_restituicao ? new Date(b.data_restituicao).toISOString().split('T')[0] : '' %>">
+                                                        <div class="form-text small">Preencher após o cliente quitar o débito em cartório.</div>
+                                                    </div>
+
+                                                    <div class="mb-3">
+                                                        <label class="form-label small fw-bold">Observações</label>
+                                                        <textarea name="observacoes" class="form-control form-control-sm" rows="2" placeholder="Detalhes adicionais..."><%= b.estorno_obs || '' %></textarea>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                                                    <button type="submit" class="btn btn-success btn-sm fw-semibold">Salvar Estorno</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            <% }) %>
+                        <% } else { %>
+                            <tr>
+                                <td colspan="10" class="text-center py-4 text-muted">Nenhum boleto encontrado.</td>
+                            </tr>
+                        <% } %>
+                    </tbody>
+                    <!-- RODAPÉ COM TOTALIZADORES CONDICIONAIS -->
+                    <% if (contas && contas.length > 0) { %>
+                        <tfoot class="table-light fw-bold border-top">
+                            <tr>
+                                <td colspan="5" class="text-end text-muted small text-uppercase">
+                                    <% if (temFiltroAtivo) { %>
+                                        TOTAIS (<%= contas.length %> registros filtrados):
+                                    <% } else { %>
+                                        TOTAIS (Geral / <%= contas.length %> registros):
+                                    <% } %>
+                                </td>
+                                <td class="text-end text-dark"><%= locals.totalValorOriginalFmt || '0,00' %></td>
+                                <td class="text-end text-danger"><%= locals.totalCustasFmt || '0,00' %></td>
+                                <td colspan="3"></td>
+                            </tr>
+                        </tfoot>
+                    <% } %>
+                </table>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const filtroGerente = document.getElementById('filtroGerente');
+            const filtroVendedor = document.getElementById('filtroVendedor');
+
+            function filtrarVendedores() {
+                const gerenteSel = filtroGerente.value;
+                Array.from(filtroVendedor.options).forEach(opt => {
+                    if (!opt.value) return;
+                    const gId = opt.getAttribute('data-gerente-id');
+                    if (!gerenteSel || gId === gerenteSel) {
+                        opt.style.display = '';
+                    } else {
+                        opt.style.display = 'none';
+                        if (opt.selected) filtroVendedor.value = '';
+                    }
+                });
+            }
+
+            filtroGerente.addEventListener('change', filtrarVendedores);
+            filtrarVendedores();
+        });
+    </script>
+</body>
+</html>

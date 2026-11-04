@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Omnia - Gestão de Transportadoras</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .table-hover tbody tr:hover { background-color: #f1f3f5; }
+        th a { text-decoration: none; color: inherit; display: flex; align-items: center; justify-content: space-between; }
+        th a:hover { color: #ffc107; }
+    </style>
+</head>
+<body>
+    <!-- BARRA SUPERIOR PADRÃO OMNIA -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-4 shadow-sm mb-4">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold" href="/dashboard"><i class="fa-solid fa-cube me-2 text-warning"></i>OMNIA <small class="text-muted fs-6">Enterprise</small></a>
+            <div class="d-flex gap-2">
+                <a href="/solucao" class="btn btn-outline-light btn-sm"><i class="fa-solid fa-arrow-left me-1"></i> Voltar ao Módulo Solução</a>
+                <a href="/dashboard" class="btn btn-outline-secondary btn-sm text-white"><i class="fa-solid fa-house me-1"></i> Dashboard</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid px-4">
+        <div class="card shadow-sm border-0 rounded-3 p-4 bg-white mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h3 class="fw-bold text-dark mb-0"><i class="fa-solid fa-truck-fast text-warning me-2"></i>Gestão de Transportadoras</h3>
+                    <p class="text-muted small mb-0">Registo e consulta de transportadoras parceiras, contactos e logística.</p>
+                </div>
+                <a href="/transportadoras/nova" class="btn btn-warning fw-semibold text-dark shadow-sm"><i class="fa-solid fa-plus me-1"></i> Cadastrar Nova Transportadora</a>
+            </div>
+
+            <hr class="text-muted">
+
+            <% if (locals.erro && erro) { %> <div class="alert alert-danger py-2"><%= erro %></div> <% } %>
+            <% if (locals.sucesso && sucesso) { %> <div class="alert alert-success py-2"><%= sucesso %></div> <% } %>
+
+            <!-- BARRA DE PESQUISA -->
+            <form action="/transportadoras" method="GET" class="mb-4">
+                <div class="row g-2">
+                    <div class="col-md-10">
+                        <div class="input-group">
+                            <span class="input-group-text bg-light"><i class="fa-solid fa-search text-muted"></i></span>
+                            <input type="text" name="busca" class="form-control" value="<%= buscaAtual %>" placeholder="Pesquisar por CNPJ, Razão Social ou Nome Fantasia...">
+                        </div>
+                    </div>
+                    <div class="col-md-2 d-flex gap-2">
+                        <button type="submit" class="btn btn-primary w-100 fw-semibold"><i class="fa-solid fa-magnifying-glass me-1"></i> Buscar</button>
+                        <% if (buscaAtual) { %>
+                            <a href="/transportadoras" class="btn btn-outline-secondary fw-semibold">Limpar</a>
+                        <% } %>
+                    </div>
+                </div>
+            </form>
+
+            <!-- TABELA DE TRANSPORTADORAS -->
+            <div class="table-responsive">
+                <table class="table table-hover table-striped align-middle bg-white mb-0 border">
+                    <thead class="table-dark">
+                        <tr>
+                            <th style="width: 80px;">ID</th>
+                            <th>
+                                <a href="/transportadoras?busca=<%= buscaAtual %>&ordenar=cnpj&ordem=<%= (ordenarAtual === 'cnpj' && ordemAtual === 'ASC') ? 'DESC' : 'ASC' %>">
+                                    CNPJ <%- ordenarAtual === 'cnpj' ? (ordemAtual === 'ASC' ? '<i class="fa-solid fa-sort-up"></i>' : '<i class="fa-solid fa-sort-down"></i>') : '<i class="fa-solid fa-sort opacity-50"></i>' %>
+                                </a>
+                            </th>
+                            <th>
+                                <a href="/transportadoras?busca=<%= buscaAtual %>&ordenar=nome&ordem=<%= (ordenarAtual === 'nome' && ordemAtual === 'ASC') ? 'DESC' : 'ASC' %>">
+                                    Razão Social / Fantasia <%- ordenarAtual === 'nome' ? (ordemAtual === 'ASC' ? '<i class="fa-solid fa-sort-up"></i>' : '<i class="fa-solid fa-sort-down"></i>') : '<i class="fa-solid fa-sort opacity-50"></i>' %>
+                                </a>
+                            </th>
+                            <th>Contacto / Telefone</th>
+                            <th>Cidade / UF</th>
+                            <th class="text-end" style="width: 160px;">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (transportadoras.length === 0) { %>
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-4"><i class="fa-solid fa-inbox fa-2x mb-2 d-block opacity-50"></i>Nenhuma transportadora encontrada.</td>
+                            </tr>
+                        <% } else { %>
+                            <% transportadoras.forEach(tr => { %>
+                                <tr>
+                                    <td><strong class="text-secondary">#<%= tr.id %></strong></td>
+                                    <td><span class="badge bg-light text-dark border"><%= tr.cnpj %></span></td>
+                                    <td>
+                                        <div class="fw-bold text-dark"><%= tr.nome %></div>
+                                        <small class="text-muted"><%= tr.nome_fantasia || '' %></small>
+                                    </td>
+                                    <td>
+                                        <div><i class="fa-regular fa-user text-muted me-1"></i><%= tr.contato || '- -' %></div>
+                                        <small class="text-muted"><i class="fa-solid fa-phone text-muted me-1"></i><%= tr.telefone || '- -' %></small>
+                                    </td>
+                                    <td>
+                                        <div><strong><%= tr.cidade %></strong> / <%= tr.uf %></div>
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="d-inline-flex gap-1">
+                                            <a href="/transportadoras/editar/<%= tr.id %>" class="btn btn-sm btn-outline-warning text-dark px-2" title="Editar"><i class="fa-solid fa-pen"></i> Editar</a>
+                                            <form action="/transportadoras/excluir/<%= tr.id %>" method="POST" class="d-inline" onsubmit="return confirm('Tem certeza que deseja excluir esta transportadora?');">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger px-2" title="Excluir"><i class="fa-solid fa-trash"></i></button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <% }); %>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

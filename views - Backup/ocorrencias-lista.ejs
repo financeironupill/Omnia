@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Omnia - Gestão de Ocorrências</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .table-hover tbody tr:hover { background-color: #f1f3f5; }
+        th a { text-decoration: none; color: inherit; display: flex; align-items: center; justify-content: space-between; }
+        th a:hover { color: #ffc107; }
+    </style>
+</head>
+<body>
+    <!-- BARRA SUPERIOR PADRÃO OMNIA -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-4 shadow-sm mb-4">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold" href="/dashboard"><i class="fa-solid fa-cube me-2 text-warning"></i>OMNIA <small class="text-muted fs-6">Enterprise</small></a>
+            <div class="d-flex gap-2">
+                <a href="/solucao" class="btn btn-outline-light btn-sm"><i class="fa-solid fa-arrow-left me-1"></i> Voltar ao Módulo Solução</a>
+                <a href="/dashboard" class="btn btn-outline-secondary btn-sm text-white"><i class="fa-solid fa-house me-1"></i> Dashboard</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid px-4">
+        <div class="card shadow-sm border-0 rounded-3 p-4 bg-white mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h3 class="fw-bold text-dark mb-0"><i class="fa-solid fa-triangle-exclamation text-primary me-2"></i>Gestão de Ocorrências</h3>
+                    <p class="text-muted small mb-0">Controlo de pós-venda, problemas de transporte, divergências e impactos financeiros.</p>
+                </div>
+                <a href="/ocorrencias/nova" class="btn btn-success fw-semibold shadow-sm"><i class="fa-solid fa-plus me-1"></i> Abrir Nova Ocorrência</a>
+            </div>
+
+            <hr class="text-muted">
+
+            <% if (locals.erro && erro) { %> <div class="alert alert-danger py-2"><%= erro %></div> <% } %>
+            <% if (locals.sucesso && sucesso) { %> <div class="alert alert-success py-2"><%= sucesso %></div> <% } %>
+
+            <!-- PAINEL DE FILTROS -->
+            <form action="/ocorrencias" method="GET" class="card bg-light border-0 p-3 mb-4">
+                <div class="row g-2">
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-secondary mb-1">Busca Geral (Nº, NF, NFD)</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-white"><i class="fa-solid fa-search text-muted"></i></span>
+                            <input type="text" name="busca" class="form-control" placeholder="Digite número, NF..." value="<%= buscaAtual %>">
+                        </div>
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold text-secondary mb-1">Tipo de Ocorrência</label>
+                        <select name="tipo_id" class="form-select">
+                            <option value="">Todos os tipos</option>
+                            <% tipos.forEach(t => { %>
+                                <option value="<%= t.id %>" <%= tipoAtual == t.id ? 'selected' : '' %>><%= t.descricao %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-secondary mb-1">Cliente</label>
+                        <% 
+                            let nomeClienteAtual = '';
+                            if (clienteAtual) {
+                                let cliFound = clientes.find(c => c.id == clienteAtual);
+                                if (cliFound) nomeClienteAtual = cliFound.nome;
+                            }
+                        %>
+                        <input type="text" name="cliente_nome_busca" class="form-control" list="lista_clientes" value="<%= nomeClienteAtual %>" placeholder="Digite para filtrar cliente...">
+                        <datalist id="lista_clientes">
+                            <% clientes.forEach(c => { %>
+                                <option value="<%= c.nome %>">
+                            <% }) %>
+                        </datalist>
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold text-secondary mb-1">Transportadora</label>
+                        <% 
+                            let nomeTranspAtual = '';
+                            if (transportadoraAtual) {
+                                let transpFound = transportadoras.find(tr => tr.id == transportadoraAtual);
+                                if (transpFound) nomeTranspAtual = transpFound.nome;
+                            }
+                        %>
+                        <input type="text" name="transportadora_nome_busca" class="form-control" list="lista_transportadoras" value="<%= nomeTranspAtual %>" placeholder="Digite transportadora...">
+                        <datalist id="lista_transportadoras">
+                            <% transportadoras.forEach(tr => { %>
+                                <option value="<%= tr.nome %>">
+                            <% }) %>
+                        </datalist>
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold text-secondary mb-1">Status</label>
+                        <select name="status" class="form-select">
+                            <option value="">Todos os status</option>
+                            <option value="Em Aberto" <%= statusAtual === 'Em Aberto' ? 'selected' : '' %>>Em Aberto</option>
+                            <option value="Resolvido" <%= statusAtual === 'Resolvido' ? 'selected' : '' %>>Resolvido</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 mt-3">
+                    <a href="/ocorrencias" class="btn btn-outline-secondary btn-sm fw-semibold">Limpar Filtros</a>
+                    <button type="submit" class="btn btn-primary btn-sm px-4 fw-semibold"><i class="fa-solid fa-filter me-1"></i> Filtrar</button>
+                </div>
+            </form>
+
+            <!-- TABELA DE OCORRÊNCIAS -->
+            <div class="table-responsive">
+                <table class="table table-hover table-striped align-middle bg-white mb-0 border">
+                    <thead class="table-dark">
+                        <tr>
+                            <th style="width: 110px;">
+                                <a href="/ocorrencias?busca=<%= encodeURIComponent(buscaAtual) %>&tipo_id=<%= tipoAtual %>&cliente_id=<%= clienteAtual %>&transportadora_id=<%= transportadoraAtual %>&status=<%= encodeURIComponent(statusAtual) %>&ordenar=id&ordem=<%= ordemAtual === 'ASC' ? 'DESC' : 'ASC' %>">
+                                    Nº <%- ordenarAtual === 'id' ? (ordemAtual === 'ASC' ? '<i class="fa-solid fa-sort-up"></i>' : '<i class="fa-solid fa-sort-down"></i>') : '<i class="fa-solid fa-sort opacity-50"></i>' %>
+                                </a>
+                            </th>
+                            <th>
+                                <a href="/ocorrencias?busca=<%= encodeURIComponent(buscaAtual) %>&tipo_id=<%= tipoAtual %>&cliente_id=<%= clienteAtual %>&transportadora_id=<%= transportadoraAtual %>&status=<%= encodeURIComponent(statusAtual) %>&ordenar=tipo&ordem=<%= ordemAtual === 'ASC' ? 'DESC' : 'ASC' %>">
+                                    Tipo <%- ordenarAtual === 'tipo' ? (ordemAtual === 'ASC' ? '<i class="fa-solid fa-sort-up"></i>' : '<i class="fa-solid fa-sort-down"></i>') : '<i class="fa-solid fa-sort opacity-50"></i>' %>
+                                </a>
+                            </th>
+                            <th>
+                                <a href="/ocorrencias?busca=<%= encodeURIComponent(buscaAtual) %>&tipo_id=<%= tipoAtual %>&cliente_id=<%= clienteAtual %>&transportadora_id=<%= transportadoraAtual %>&status=<%= encodeURIComponent(statusAtual) %>&ordenar=cliente&ordem=<%= ordemAtual === 'ASC' ? 'DESC' : 'ASC' %>">
+                                    Cliente / Transportadora <%- ordenarAtual === 'cliente' ? (ordemAtual === 'ASC' ? '<i class="fa-solid fa-sort-up"></i>' : '<i class="fa-solid fa-sort-down"></i>') : '<i class="fa-solid fa-sort opacity-50"></i>' %>
+                                </a>
+                            </th>
+                            <th>
+                                <a href="/ocorrencias?busca=<%= encodeURIComponent(buscaAtual) %>&tipo_id=<%= tipoAtual %>&cliente_id=<%= clienteAtual %>&transportadora_id=<%= transportadoraAtual %>&status=<%= encodeURIComponent(statusAtual) %>&ordenar=nf&ordem=<%= ordemAtual === 'ASC' ? 'DESC' : 'ASC' %>">
+                                    NF / NFD <%- ordenarAtual === 'nf' ? (ordemAtual === 'ASC' ? '<i class="fa-solid fa-sort-up"></i>' : '<i class="fa-solid fa-sort-down"></i>') : '<i class="fa-solid fa-sort opacity-50"></i>' %>
+                                </a>
+                            </th>
+                            <th>Financeiro</th>
+                            <th>
+                                <a href="/ocorrencias?busca=<%= encodeURIComponent(buscaAtual) %>&tipo_id=<%= tipoAtual %>&cliente_id=<%= clienteAtual %>&transportadora_id=<%= transportadoraAtual %>&status=<%= encodeURIComponent(statusAtual) %>&ordenar=status&ordem=<%= ordemAtual === 'ASC' ? 'DESC' : 'ASC' %>">
+                                    Status <%- ordenarAtual === 'status' ? (ordemAtual === 'ASC' ? '<i class="fa-solid fa-sort-up"></i>' : '<i class="fa-solid fa-sort-down"></i>') : '<i class="fa-solid fa-sort opacity-50"></i>' %>
+                                </a>
+                            </th>
+                            <th>Registo / Atualização</th>
+                            <th class="text-end" style="width: 220px;">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (ocorrencias.length === 0) { %>
+                            <tr>
+                                <td colspan="8" class="text-center text-muted py-4"><i class="fa-solid fa-inbox fa-2x mb-2 d-block opacity-50"></i>Nenhuma ocorrência encontrada.</td>
+                            </tr>
+                        <% } else { %>
+                            <% ocorrencias.forEach(o => { %>
+                                <tr>
+                                    <td><strong class="text-primary">#<%= o.numero %></strong></td>
+                                    <td><span class="badge bg-light text-dark border"><%= o.tipo_descricao || 'N/A' %></span></td>
+                                    <td>
+                                        <div class="fw-bold text-dark"><%= o.cliente_nome || 'N/A' %></div>
+                                        <small class="text-muted"><i class="fa-solid fa-truck me-1"></i><%= o.transportadora_nome || 'N/A' %></small>
+                                    </td>
+                                    <td>
+                                        <div><small class="fw-bold text-dark">NF: <%= o.nf_origem || '-' %></small></div>
+                                        <div><small class="text-muted">NFD: <%= o.nfd || '-' %></small></div>
+                                    </td>
+                                    <td>
+                                        <% if (o.tipo_financeiro) { %>
+                                            <span class="badge bg-danger mb-1"><%= o.tipo_financeiro %></span><br>
+                                            <small class="fw-bold text-success">R$ <%= o.valor_financeiro ? Number(o.valor_financeiro).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00' %></small>
+                                        <% } else { %>
+                                            <small class="text-muted">--</small>
+                                        <% } %>
+                                    </td>
+                                    <td>
+                                        <span class="badge <%= o.status === 'Resolvido' ? 'bg-success' : 'bg-info text-dark' %>">
+                                            <%= o.status %>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <small class="text-muted d-block"><i class="fa-regular fa-user me-1"></i><%= o.usuario_nome || 'Sistema' %></small>
+                                        <small class="text-muted d-block"><i class="fa-regular fa-clock me-1"></i><%= new Date(o.criado_em).toLocaleDateString('pt-BR') %></small>
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="d-inline-flex gap-1">
+                                            <a href="/ocorrencias/detalhes/<%= o.id %>" class="btn btn-sm btn-outline-primary px-2" title="Ver / Enviar E-mail"><i class="fa-solid fa-envelope me-1"></i> Ver</a>
+                                            <a href="/ocorrencias/editar/<%= o.id %>" class="btn btn-sm btn-outline-warning text-dark px-2" title="Editar"><i class="fa-solid fa-pen"></i></a>
+                                            <form action="/ocorrencias/excluir/<%= o.id %>" method="POST" class="d-inline" onsubmit="return confirm('Tem certeza que deseja excluir a ocorrência #<%= o.numero %>?');">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger px-2" title="Excluir"><i class="fa-solid fa-trash"></i></button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

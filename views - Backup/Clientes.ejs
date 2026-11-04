@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Omnia - Clientes</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; }
+        .container { max-width: 1000px; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin: 0 auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        h2, h3 { color: #333; margin: 0; }
+        .alert-error { background-color: #f8d7da; color: #721c24; padding: 12px; border-radius: 4px; margin-bottom: 15px; border: 1px solid #f5c6cb; }
+        .alert-success { background-color: #d4edda; color: #155724; padding: 12px; border-radius: 4px; margin-bottom: 15px; border: 1px solid #c3e6cb; }
+        
+        .form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 15px; margin-bottom: 25px; }
+        .form-group { display: flex; flex-direction: column; }
+        .form-group.span-2 { grid-column: span 2; }
+        .form-group.full { grid-column: span 3; }
+        
+        label { font-size: 13px; font-weight: bold; color: #555; margin-bottom: 5px; }
+        input[type="text"], input[type="email"], select { padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
+        input.titlecase { text-transform: capitalize; }
+        
+        .doc-container { display: flex; gap: 8px; }
+        .doc-container input { flex: 1; }
+        .btn-busca { background-color: #17a2b8; color: white; border: none; padding: 10px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; }
+        .btn-busca:hover { background-color: #138496; }
+
+        button.btn-save { background-color: #28a745; color: white; border: none; padding: 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 15px; }
+        button.btn-save:hover { background-color: #218838; }
+        
+        .section-divider { grid-column: span 3; border-bottom: 1px dashed #ccc; margin: 10px 0; padding-bottom: 5px; font-weight: bold; color: #007bff; font-size: 14px; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 14px; }
+        th { background-color: #f8f9fa; }
+        .back-link { display: inline-block; color: #007bff; text-decoration: none; font-weight: bold; }
+        .back-link:hover { text-decoration: underline; }
+        .btn-edit { background: #ffc107; color: #212529; padding: 6px 10px; border-radius: 4px; text-decoration: none; font-size: 12px; font-weight: bold; margin-right: 5px; }
+        .btn-delete { background: #dc3545; color: white; padding: 6px 10px; border-radius: 4px; border: none; font-size: 12px; font-weight: bold; cursor: pointer; }
+        .actions-cell { display: flex; align-items: center; }
+        .modal-edit { background: #f8f9fa; border: 1px solid #ccc; padding: 15px; border-radius: 6px; margin-top: 15px; margin-bottom: 20px; }
+        .loading-text { font-size: 12px; color: #17a2b8; margin-top: 4px; display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>Gestão de Clientes</h2>
+            <a href="/solucao" class="back-link">← Voltar ao Módulo Solução</a>
+        </div>
+
+        <% if (erro) { %>
+            <div class="alert-error"><%= erro %></div>
+        <% } %>
+        <% if (sucesso) { %>
+            <div class="alert-success"><%= sucesso %></div>
+        <% } %>
+
+        <% if (clienteEditando) { %>
+            <!-- FORMULÁRIO DE EDIÇÃO -->
+            <div class="modal-edit">
+                <h3>Editar Cliente: <%= clienteEditando.nome %></h3>
+                <form action="/clientes/editar/<%= clienteEditando.id %>" method="POST">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="tipo_pessoa">Tipo de Pessoa:</label>
+                            <select id="tipo_pessoa" name="tipo_pessoa" onchange="tratarTipoPessoa(this.value)">
+                                <option value="PJ" <%= clienteEditando.tipo_pessoa === 'PJ' ? 'selected' : '' %>>Pessoa Jurídica (CNPJ)</option>
+                                <option value="PF" <%= clienteEditando.tipo_pessoa === 'PF' ? 'selected' : '' %>>Pessoa Física (CPF)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group span-2">
+                            <label for="cnpj_cpf">CPF / CNPJ:</label>
+                            <input type="text" id="cnpj_cpf" name="cnpj_cpf" value="<%= clienteEditando.cnpj_cpf %>" required>
+                        </div>
+
+                        <div class="form-group span-2">
+                            <label for="nome">Razão Social / Nome Completo:</label>
+                            <input type="text" id="nome" name="nome" class="titlecase" value="<%= clienteEditando.nome %>" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="nome_fantasia">Nome Fantasia:</label>
+                            <input type="text" id="nome_fantasia" name="nome_fantasia" class="titlecase" value="<%= clienteEditando.nome_fantasia || '' %>">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="contato">Pessoa de Contacto:</label>
+                            <input type="text" id="contato" name="contato" class="titlecase" value="<%= clienteEditando.contato || '' %>">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="email">E-mail:</label>
+                            <input type="email" id="email" name="email" value="<%= clienteEditando.email || '' %>">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="telefone">Telefone:</label>
+                            <input type="text" id="telefone" name="telefone" value="<%= clienteEditando.telefone || '' %>">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="cidade">Cidade:</label>
+                            <input type="text" id="cidade" name="cidade" class="titlecase" value="<%= clienteEditando.cidade || '' %>">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="uf">UF:</label>
+                            <input type="text" id="uf" name="uf" style="text-transform: uppercase;" maxlength="2" value="<%= clienteEditando.uf || '' %>">
+                        </div>
+
+                        <div class="section-divider">Dados Bancários & PIX</div>
+
+                        <div class="form-group">
+                            <label for="banco">Banco:</label>
+                            <input type="text" id="banco" name="banco" class="titlecase" value="<%= clienteEditando.banco || '' %>">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="agencia">Agência:</label>
+                            <input type="text" id="agencia" name="agencia" value="<%= clienteEditando.agencia || '' %>">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="conta">Conta Corrente:</label>
+                            <input type="text" id="conta" name="conta" value="<%= clienteEditando.conta || '' %>">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="tipo_chave_pix">Tipo de Chave PIX:</label>
+                            <select id="tipo_chave_pix" name="tipo_chave_pix">
+                                <option value="">Selecione...</option>
+                                <option value="CPF/CNPJ" <%= clienteEditando.tipo_chave_pix === 'CPF/CNPJ' ? 'selected' : '' %>>CPF/CNPJ</option>
+                                <option value="E-mail" <%= clienteEditando.tipo_chave_pix === 'E-mail' ? 'selected' : '' %>>E-mail</option>
+                                <option value="Telefone" <%= clienteEditando.tipo_chave_pix === 'Telefone' ? 'selected' : '' %>>Telefone</option>
+                                <option value="Aleatória" <%= clienteEditando.tipo_chave_pix === 'Aleatória' ? 'selected' : '' %>>Chave Aleatória</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group span-2">
+                            <label for="chave_pix">Chave PIX:</label>
+                            <input type="text" id="chave_pix" name="chave_pix" value="<%= clienteEditando.chave_pix || '' %>">
+                        </div>
+
+                        <div class="form-group full" style="display: flex; gap: 10px;">
+                            <button type="submit" class="btn-save" style="background-color: #007bff; flex: 1;">Salvar Alterações</button>
+                            <a href="/clientes" style="padding: 12px; background: #6c757d; color: white; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 15px; text-align: center;">Cancelar</a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        <% } else { %>
+            <!-- FORMULÁRIO DE CADASTRO -->
+            <h3>Cadastrar Novo Cliente</h3>
+            <form action="/clientes/novo" method="POST">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="tipo_pessoa">Tipo de Pessoa:</label>
+                        <select id="tipo_pessoa" name="tipo_pessoa" onchange="tratarTipoPessoa(this.value)">
+                            <option value="PJ">Pessoa Jurídica (CNPJ)</option>
+                            <option value="PF">Pessoa Física (CPF)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group span-2">
+                        <label for="cnpj_cpf">CPF / CNPJ:</label>
+                        <div class="doc-container">
+                            <input type="text" id="cnpj_cpf" name="cnpj_cpf" placeholder="Apenas números" required>
+                            <button type="button" id="btn-buscar-doc" class="btn-busca" onclick="buscarCNPJ()">Buscar CNPJ</button>
+                        </div>
+                        <span id="loading-doc" class="loading-text">A procurar dados na Receita...</span>
+                    </div>
+
+                    <div class="form-group span-2">
+                        <label for="nome">Razão Social / Nome Completo:</label>
+                        <input type="text" id="nome" name="nome" class="titlecase" placeholder="Razão Social ou Nome Completo" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="nome_fantasia">Nome Fantasia:</label>
+                        <input type="text" id="nome_fantasia" name="nome_fantasia" class="titlecase" placeholder="Opcional para PJ">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="contato">Pessoa de Contacto:</label>
+                        <input type="text" id="contato" name="contato" class="titlecase" placeholder="Ex: João Silva">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="email">E-mail:</label>
+                        <input type="email" id="email" name="email" placeholder="cliente@empresa.com">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="telefone">Telefone:</label>
+                        <input type="text" id="telefone" name="telefone" placeholder="(00) 00000-0000">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="cidade">Cidade:</label>
+                        <input type="text" id="cidade" name="cidade" class="titlecase" placeholder="Cidade">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="uf">UF:</label>
+                        <input type="text" id="uf" name="uf" style="text-transform: uppercase;" maxlength="2" placeholder="UF">
+                    </div>
+
+                    <div class="section-divider">Dados Bancários & PIX</div>
+
+                    <div class="form-group">
+                        <label for="banco">Banco:</label>
+                        <input type="text" id="banco" name="banco" class="titlecase" placeholder="Ex: Banco Do Brasil">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="agencia">Agência:</label>
+                        <input type="text" id="agencia" name="agencia" placeholder="Ex: 1234-5">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="conta">Conta Corrente:</label>
+                        <input type="text" id="conta" name="conta" placeholder="Ex: 12345-6">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="tipo_chave_pix">Tipo de Chave PIX:</label>
+                        <select id="tipo_chave_pix" name="tipo_chave_pix">
+                            <option value="">Selecione...</option>
+                            <option value="CPF/CNPJ">CPF/CNPJ</option>
+                            <option value="E-mail">E-mail</option>
+                            <option value="Telefone">Telefone</option>
+                            <option value="Aleatória">Chave Aleatória</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group span-2">
+                        <label for="chave_pix">Chave PIX:</label>
+                        <input type="text" id="chave_pix" name="chave_pix" placeholder="Chave para pagamento">
+                    </div>
+
+                    <div class="form-group full">
+                        <button type="submit" class="btn-save">Cadastrar Cliente</button>
+                    </div>
+                </div>
+            </form>
+        <% } %>
+
+        <hr>
+
+        <h3>Clientes Cadastrados</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Tipo</th>
+                    <th>CPF / CNPJ</th>
+                    <th>Nome / Fantasia</th>
+                    <th>Cidade/UF</th>
+                    <th>PIX</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% clientes.forEach(c => { %>
+                    <tr>
+                        <td><%= c.id %></td>
+                        <td><strong><%= c.tipo_pessoa || 'PJ' %></strong></td>
+                        <td><%= c.cnpj_cpf %></td>
+                        <td>
+                            <strong><%= c.nome %></strong><br>
+                            <small style="color: #666;"><%= c.nome_fantasia || '-' %></small>
+                        </td>
+                        <td><%= c.cidade || '-' %> / <%= c.uf || '-' %></td>
+                        <td>
+                            <small>
+                                <strong><%= c.tipo_chave_pix || '-' %>:</strong> <%= c.chave_pix || '-' %>
+                            </small>
+                        </td>
+                        <td class="actions-cell">
+                            <a href="/clientes/editar/<%= c.id %>" class="btn-edit">Editar</a>
+                            <form action="/clientes/excluir/<%= c.id %>" method="POST" style="display: inline;" onsubmit="return confirm('Tem certeza que deseja excluir este cliente?');">
+                                <button type="submit" class="btn-delete">Excluir</button>
+                            </form>
+                        </td>
+                    </tr>
+                <% }); %>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        function tratarTipoPessoa(tipo) {
+            const btnBusca = document.getElementById('btn-buscar-doc');
+            if (tipo === 'PF') {
+                if (btnBusca) btnBusca.style.display = 'none';
+            } else {
+                if (btnBusca) btnBusca.style.display = 'block';
+            }
+        }
+
+        async function buscarCNPJ() {
+            const docInput = document.getElementById('cnpj_cpf');
+            const loadingText = document.getElementById('loading-doc');
+            const cnpj = docInput.value.replace(/\D/g, '');
+
+            if (cnpj.length !== 14) {
+                alert('Por favor, introduza um CNPJ válido com 14 dígitos para a busca.');
+                return;
+            }
+
+            loadingText.style.display = 'block';
+
+            try {
+                const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
+                
+                if (!response.ok) {
+                    throw new Error('CNPJ não encontrado na Receita Federal.');
+                }
+
+                const data = await response.json();
+
+                document.getElementById('nome').value = data.razao_social || '';
+                document.getElementById('nome_fantasia').value = data.nome_fantasia || data.razao_social || '';
+                document.getElementById('cidade').value = data.municipio || '';
+                document.getElementById('uf').value = data.uf || '';
+                if (data.ddd_telefone_1) {
+                    document.getElementById('telefone').value = data.ddd_telefone_1;
+                }
+                if (data.email) {
+                    document.getElementById('email').value = data.email.toLowerCase();
+                }
+
+            } catch (err) {
+                alert('Erro ao procurar CNPJ: ' + err.message);
+            } finally {
+                loadingText.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>

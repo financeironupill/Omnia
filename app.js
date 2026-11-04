@@ -902,6 +902,27 @@ app.post('/ocorrencias/excluir/:id', verificarAutenticacao, async (req, res) => 
 });
 
 // MÓDULO DE BOLETOS E RÉGUA DE COBRANÇA
+function criarQueryFiltrosCobranca(query) {
+    const filtrosPadrao = {
+        busca: '',
+        status_boleto: 'pendentes',
+        banco: '',
+        status_cobranca: '',
+        gerente_id: '',
+        vendedor_id: ''
+    };
+    const params = new URLSearchParams();
+
+    Object.entries(filtrosPadrao).forEach(([nome, valorPadrao]) => {
+        const valor = Object.prototype.hasOwnProperty.call(query, nome)
+            ? query[nome]
+            : valorPadrao;
+        params.set(nome, typeof valor === 'string' ? valor : '');
+    });
+
+    return params.toString();
+}
+
 app.get('/cobranca', verificarAutenticacao, async (req, res) => {
     try {
         const { busca, banco, status_boleto, status_cobranca, gerente_id, vendedor_id, ordenar, ordem } = req.query;
@@ -943,7 +964,7 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
         let idx = 1;
 
         if (busca && busca.trim() !== '') {
-            queryText += ' AND (b.numero_documento ILIKE $' + idx + ' OR cl.nome ILIKE $' + idx + ' OR b.banco ILIKE $' + idx + ')';
+            queryText += ' AND (b.numero_documento ILIKE $' + idx + ' OR cl.nome ILIKE $' + idx + ' OR cl.nome_fantasia ILIKE $' + idx + ' OR cl.cnpj_cpf ILIKE $' + idx + ' OR b.banco ILIKE $' + idx + ')';
             queryParams.push('%' + busca.trim() + '%');
             idx++;
         }
@@ -990,6 +1011,7 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
         const gerentes = await pool.query('SELECT id, nome_resumido FROM gerentes WHERE ativo = 1 ORDER BY nome_resumido ASC');
         const vendedores = await pool.query('SELECT id, nome_resumido, gerente_id FROM vendedores WHERE ativo = 1 ORDER BY nome_resumido ASC');
         const bancos = await pool.query("SELECT DISTINCT banco FROM boletos WHERE banco IS NOT NULL AND banco != '' ORDER BY banco ASC");
+        const clientes = await pool.query('SELECT id, nome, nome_fantasia, cnpj_cpf FROM clientes ORDER BY nome ASC');
         
         result.rows.forEach(b => {
             b.cliente_cnpj = formatarCnpjCpf(b.cliente_cnpj);
@@ -1005,6 +1027,8 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
             gerentes: gerentes.rows,
             vendedores: vendedores.rows,
             bancos: bancos.rows,
+            clientesLista: clientes.rows,
+            filtrosCobrancaQuery: criarQueryFiltrosCobranca(req.query),
             buscaAtual: busca || '', 
             bancoAtual: typeof banco === 'string' ? banco : '',
             statusBoletoAtual: statusBoletoPadrao ? 'pendentes' : statusBoletoSelecionado,
@@ -1188,7 +1212,8 @@ app.get('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
         `, [boletoId]);
         
         if (boletoRes.rows.length === 0) {
-            return res.redirect('/cobranca?erro=Boleto não encontrado.');
+            const filtrosQuery = criarQueryFiltrosCobranca(req.query);
+            return res.redirect(`/cobranca?${filtrosQuery}&erro=Boleto não encontrado.`);
         }
 
         const clientes = await pool.query(`
@@ -1223,13 +1248,15 @@ app.get('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
             clientes: clientes.rows, 
             gerentes: gerentes.rows, 
             vendedores: vendedores.rows, 
+            filtrosCobrancaQuery: criarQueryFiltrosCobranca(req.query),
             historico: historicoRes.rows,
             erro: null, 
             sucesso: req.query.sucesso || null 
         });
     } catch (err) {
         console.error(err);
-        res.redirect('/cobranca?erro=Erro ao carregar edição do boleto.');
+        const filtrosQuery = criarQueryFiltrosCobranca(req.query);
+        res.redirect(`/cobranca?${filtrosQuery}&erro=Erro ao carregar edição do boleto.`);
     }
 });
 
@@ -1280,10 +1307,12 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
             parseInt(boletoId, 10)
         ]);
 
-        res.redirect(`/cobranca/editar/${boletoId}?sucesso=Boleto atualizado com sucesso!`);
+        const filtrosQuery = criarQueryFiltrosCobranca(req.query);
+        res.redirect(`/cobranca/editar/${boletoId}?${filtrosQuery}&sucesso=Boleto atualizado com sucesso!`);
     } catch (err) {
         console.error('ERRO AO EDITAR BOLETO:', err);
-        res.redirect(`/cobranca/editar/${boletoId}?erro=Erro ao atualizar boleto.`);
+        const filtrosQuery = criarQueryFiltrosCobranca(req.query);
+        res.redirect(`/cobranca/editar/${boletoId}?${filtrosQuery}&erro=Erro ao atualizar boleto.`);
     }
 });
 

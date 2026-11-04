@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title><%= gerente ? 'Editar Gerente' : 'Novo Gerente' %> - Omnia</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>body { background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }</style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-4 shadow-sm mb-4">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold" href="/dashboard"><i class="fa-solid fa-cube me-2"></i>OMNIA <small class="text-muted fs-6">Enterprise</small></a>
+            <a href="/gerentes" class="btn btn-outline-light btn-sm"><i class="fa-solid fa-arrow-left me-1"></i> Voltar aos Gerentes</a>
+        </div>
+    </nav>
+
+    <div class="container-fluid px-4" style="max-width: 900px;">
+        <div class="card shadow-sm border-0 rounded-3 p-4 bg-white">
+            <h3 class="fw-bold mb-1" style="color: #6f42c1;"><i class="fa-solid fa-user-tie me-2"></i><%= gerente ? 'Editar Gerente' : 'Registar Novo Gerente' %></h3>
+            <p class="text-muted small mb-3">Preencha as informações cadastrais, contactos e dados bancários do gerente.</p>
+            <hr class="text-muted mb-4">
+
+            <form action="<%= gerente ? '/gerentes/editar/' + gerente.id : '/gerentes/novo' %>" method="POST">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Nome Resumido (Chave Única) <span class="text-danger">*</span></label>
+                        <input type="text" name="nome_resumido" class="form-control" placeholder="Ex: CARLOS.M" value="<%= gerente ? gerente.nome_resumido : '' %>" required style="text-transform: uppercase;">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Nome Completo <span class="text-danger">*</span></label>
+                        <input type="text" name="nome_completo" class="form-control" placeholder="Nome completo do gerente" value="<%= gerente ? gerente.nome_completo : '' %>" required>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-semibold">Status <span class="text-danger">*</span></label>
+                        <select name="ativo" class="form-select" required>
+                            <option value="1" <%= (!gerente || gerente.ativo === 1) ? 'selected' : '' %>>Ativo</option>
+                            <option value="0" <%= (gerente && gerente.ativo === 0) ? 'selected' : '' %>>Inativo</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Telefone</label>
+                        <input type="text" name="telefone" class="form-control" placeholder="(00) 00000-0000" value="<%= gerente ? gerente.telefone : '' %>">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">E-mail</label>
+                        <input type="email" name="email" class="form-control" placeholder="gerente@email.com" value="<%= gerente ? gerente.email : '' %>">
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Banco</label>
+                        <input type="text" name="banco" class="form-control" placeholder="Ex: Itaú, Bradesco..." value="<%= gerente ? gerente.banco : '' %>">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Agência</label>
+                        <input type="text" name="agencia" class="form-control" placeholder="Número da agência" value="<%= gerente ? gerente.agencia : '' %>">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Conta</label>
+                        <input type="text" name="conta" class="form-control" placeholder="Número da conta" value="<%= gerente ? gerente.conta : '' %>">
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Tipo de Chave PIX</label>
+                        <select name="tipo_chave_pix" class="form-select">
+                            <option value="">Selecione...</option>
+                            <option value="CPF" <%= (gerente && gerente.tipo_chave_pix === 'CPF') ? 'selected' : '' %>>CPF</option>
+                            <option value="CNPJ" <%= (gerente && gerente.tipo_chave_pix === 'CNPJ') ? 'selected' : '' %>>CNPJ</option>
+                            <option value="E-mail" <%= (gerente && gerente.tipo_chave_pix === 'E-mail') ? 'selected' : '' %>>E-mail</option>
+                            <option value="Telefone" <%= (gerente && gerente.tipo_chave_pix === 'Telefone') ? 'selected' : '' %>>Telefone</option>
+                            <option value="Aleatória" <%= (gerente && gerente.tipo_chave_pix === 'Aleatória') ? 'selected' : '' %>>Aleatória</option>
+                        </select>
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label fw-semibold">Chave PIX</label>
+                        <input type="text" name="chave_pix" class="form-control" placeholder="Insira a chave PIX" value="<%= gerente ? gerente.chave_pix : '' %>">
+                    </div>
+
+                    <div class="col-12 mt-4">
+                        <button type="submit" class="btn text-white fw-semibold px-4" style="background-color: #6f42c1;"><i class="fa-solid fa-check me-1"></i> Gravar Gerente</button>
+                        <a href="/gerentes" class="btn btn-secondary ms-2">Cancelar</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

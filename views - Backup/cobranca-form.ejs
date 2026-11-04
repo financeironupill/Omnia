@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Omnia - <%= conta && conta.id ? 'Editar' : 'Novo' %> Boleto</title>
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-light">
+
+    <!-- NAVBAR DA APLICAÇÃO -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow-sm">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand fw-bold" href="/dashboard">
+                <i class="fa-solid fa-layer-group text-primary me-2"></i>OMNIA
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/dashboard"><i class="fa-solid fa-chart-line me-1"></i> Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/cobranca"><i class="fa-solid fa-file-invoice-dollar me-1"></i> Cobrança</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/ocorrencias"><i class="fa-solid fa-triangle-exclamation me-1"></i> Ocorrências</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/clientes"><i class="fa-solid fa-users me-1"></i> Clientes</a>
+                    </li>
+                </ul>
+                <div class="d-flex align-items-center">
+                    <a href="/logout" class="btn btn-outline-light btn-sm"><i class="fa-solid fa-right-from-bracket me-1"></i> Sair</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- CONTEÚDO PRINCIPAL -->
+    <div class="container py-2">
+        <div class="card shadow-sm border-0 rounded-3 p-4 bg-white max-width-1000 mx-auto">
+            <div class="d-flex align-items-center justify-content-between mb-3 border-bottom pb-3">
+                <div>
+                    <h3 class="fw-bold text-dark mb-1">
+                        <i class="fa-solid fa-file-invoice-dollar text-primary me-2"></i><%= conta && conta.id ? 'Editar / Gerenciar' : 'Cadastrar Novo' %> Boleto
+                    </h3>
+                    <p class="text-muted small mb-0">Dados do documento e régua de acompanhamento de cobrança.</p>
+                </div>
+                <a href="/cobranca" class="btn btn-outline-secondary btn-sm"><i class="fa-solid fa-arrow-left me-1"></i> Voltar</a>
+            </div>
+
+            <% if (locals.erro && erro) { %> <div class="alert alert-danger py-2"><%= erro %></div> <% } %>
+            <% if (locals.sucesso && sucesso) { %> <div class="alert alert-success py-2"><%= sucesso %></div> <% } %>
+
+            <form action="/cobranca/<%= conta && conta.id ? 'editar/' + conta.id : 'novo' %>" method="POST" id="formBoleto">
+                
+                <!-- SEÇÃO 1: DADOS DO DEVEDOR -->
+                <div class="card mb-4 border-0 bg-light">
+                    <div class="card-header bg-secondary text-white fw-semibold">
+                        <i class="fa-solid fa-user me-2"></i>Dados do devedor
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-12">
+                                <label class="form-label small fw-bold">Cliente *</label>
+                                <div class="input-group">
+                                    <input type="text" id="buscaCliente" class="form-control" placeholder="Digite um trecho do nome para filtrar..." autocomplete="off">
+                                    <button type="button" class="btn btn-primary fw-semibold" data-bs-toggle="modal" data-bs-target="#modalNovoCliente">
+                                        <i class="fa-solid fa-user-plus me-1"></i> Cadastrar Cliente
+                                    </button>
+                                </div>
+                                <select name="cliente_id" id="selectCliente" class="form-select mt-2" size="4" required style="display: none;">
+                                    <% clientes.forEach(c => { %>
+                                        <option value="<%= c.id %>" 
+                                                data-gerente-id="<%= c.gerente_id %>" 
+                                                data-vendedor-id="<%= c.vendedor_id %>"
+                                                data-gerente-nome="<%= c.gerente_nome || '' %>" 
+                                                data-vendedor-nome="<%= c.vendedor_nome || '' %>"
+                                                <%= conta && conta.cliente_id == c.id ? 'selected' : '' %>>
+                                            <%= c.nome %>
+                                        </option>
+                                    <% }) %>
+                                </select>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Gerente Vinculado</label>
+                                <input type="text" id="inputGerenteNome" class="form-control bg-white" placeholder="Selecione um cliente..." readonly>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Vendedor Vinculado</label>
+                                <input type="text" id="inputVendedorNome" class="form-control bg-white" placeholder="Selecione um cliente..." readonly>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SEÇÃO 2: DADOS DO DOCUMENTO -->
+                <div class="card mb-4 border-0 bg-light">
+                    <div class="card-header bg-secondary text-white fw-semibold">
+                        <i class="fa-solid fa-file-lines me-2"></i>Dados do documento
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Número do Documento *</label>
+                                <input type="text" name="numero_documento" class="form-control text-uppercase" value="<%= conta ? conta.numero_documento : '' %>" placeholder="Ex: 123456" required>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Data de Emissão *</label>
+                                <input type="date" name="data_emissao" class="form-control" value="<%= conta && conta.data_emissao ? new Date(conta.data_emissao).toISOString().split('T')[0] : '' %>" required>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Data de Vencimento *</label>
+                                <input type="date" name="data_vencimento" id="dataVencimento" class="form-control" value="<%= conta && conta.data_vencimento ? new Date(conta.data_vencimento).toISOString().split('T')[0] : '' %>" required>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Banco *</label>
+                                <select name="banco" class="form-select" required>
+                                    <option value="">Selecione um Banco...</option>
+                                    <option value="Banco do Brasil" <%= conta && conta.banco === 'Banco do Brasil' ? 'selected' : '' %>>Banco do Brasil</option>
+                                    <option value="Bradesco" <%= conta && conta.banco === 'Bradesco' ? 'selected' : '' %>>Bradesco</option>
+                                    <option value="Caixa Econômica Federal" <%= conta && conta.banco === 'Caixa Econômica Federal' ? 'selected' : '' %>>Caixa Econômica Federal</option>
+                                    <option value="Itaú" <%= conta && conta.banco === 'Itaú' ? 'selected' : '' %>>Itaú</option>
+                                    <option value="Santander" <%= conta && conta.banco === 'Santander' ? 'selected' : '' %>>Santander</option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Carteira</label>
+                                <select name="carteira" class="form-select">
+                                    <option value="Simples" <%= !conta || conta.carteira === 'Simples' ? 'selected' : '' %>>Simples</option>
+                                    <option value="Descontada" <%= conta && conta.carteira === 'Descontada' ? 'selected' : '' %>>Descontada</option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Valor Original *</label>
+                                <input type="text" name="valor_original" id="valorOriginal" class="form-control text-end mascara-moeda" value="<%= conta ? conta.valor_original : '0,00' %>" placeholder="0,00" required>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SEÇÃO 3: GESTÃO DE COBRANÇA E CARTÓRIO -->
+                <div class="card mb-4 border-0 bg-light">
+                    <div class="card-header bg-dark text-white fw-semibold">
+                        <i class="fa-solid fa-bullhorn me-2"></i>Gestão de Cobrança e Cartório
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <% if (conta && conta.id) { %>
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-bold">Situação do Boleto *</label>
+                                    <select name="situacao_boleto" id="situacaoBoleto" class="form-select" required>
+                                        <option value="Vencido" <%= conta.situacao_boleto === 'Vencido' ? 'selected' : '' %>>Vencido</option>
+                                        <option value="Pago" <%= conta.situacao_boleto === 'Pago' ? 'selected' : '' %>>Pago</option>
+                                        <option value="Pago com Pendência" <%= conta.situacao_boleto === 'Pago com Pendência' ? 'selected' : '' %>>Pago com Pendência</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-bold">Fase da Régua de Cobrança</label>
+                                    <select name="status_cobranca" class="form-select">
+                                        <option value="Aguardando Régua" <%= conta.status_cobranca === 'Aguardando Régua' ? 'selected' : '' %>>Aguardando Régua</option>
+                                        <option value="Aviso 1 (Notificação)" <%= conta.status_cobranca === 'Aviso 1 (Notificação)' ? 'selected' : '' %>>Aviso 1 (Notificação)</option>
+                                        <option value="Aviso 2 (Alerta Cartório)" <%= conta.status_cobranca === 'Aviso 2 (Alerta Cartório)' ? 'selected' : '' %>>Aviso 2 (Alerta Cartório)</option>
+                                        <option value="Aviso 3 (Aviso Final)" <%= conta.status_cobranca === 'Aviso 3 (Aviso Final)' ? 'selected' : '' %>>Aviso 3 (Aviso Final)</option>
+                                        <option value="Em Cartório / Negativado" <%= conta.status_cobranca === 'Em Cartório / Negativado' ? 'selected' : '' %>>Em Cartório / Negativado</option>
+                                        <option value="Custas Pendentes (Cartório)" <%= conta.status_cobranca === 'Custas Pendentes (Cartório)' ? 'selected' : '' %>>Custas Pendentes (Cartório)</option>
+                                        <option value="Concluído" <%= conta.status_cobranca === 'Concluído' ? 'selected' : '' %>>Concluído</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-bold">Previsão de Pagamento</label>
+                                    <input type="date" name="data_previsao_pagamento" class="form-control" value="<%= conta.data_previsao_pagamento ? new Date(conta.data_previsao_pagamento).toISOString().split('T')[0] : '' %>">
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-bold">Data Envio Cartório/Negativação</label>
+                                    <input type="date" name="data_cartorio" id="dataCartorio" class="form-control" value="<%= conta.data_cartorio ? new Date(conta.data_cartorio).toISOString().split('T')[0] : '' %>">
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-bold">Valor Custas (Multa + Juros + 35,00)</label>
+                                    <div class="input-group">
+                                        <input type="text" name="valor_custas" id="valorCustas" class="form-control text-end mascara-moeda" value="<%= conta.valor_custas %>">
+                                        <button type="button" class="btn btn-outline-secondary" id="btnCalcularCustas" title="Calcular Custas Padrão"><i class="fa-solid fa-calculator"></i></button>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-bold">Data Pagamento Boleto</label>
+                                    <input type="date" name="data_pagamento" class="form-control" value="<%= conta.data_pagamento ? new Date(conta.data_pagamento).toISOString().split('T')[0] : '' %>">
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-bold">Data Pagamento Custas</label>
+                                    <input type="date" name="data_pagamento_custas" class="form-control" value="<%= conta.data_pagamento_custas ? new Date(conta.data_pagamento_custas).toISOString().split('T')[0] : '' %>">
+                                </div>
+
+                                <div class="col-md-8">
+                                    <label class="form-label small fw-bold">Observações Internas</label>
+                                    <input type="text" name="observacoes" class="form-control" value="<%= conta.observacoes || '' %>" placeholder="Notas sobre o acordo ou cliente...">
+                                </div>
+                            <% } else { %>
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-bold">Situação do Boleto *</label>
+                                    <input type="text" class="form-control bg-light" value="Vencido" readonly disabled>
+                                    <input type="hidden" name="situacao_boleto" value="Vencido">
+                                    <input type="hidden" name="status_cobranca" value="Aguardando Régua">
+                                </div>
+
+                                <div class="col-md-8">
+                                    <label class="form-label small fw-bold">Observações Internas</label>
+                                    <input type="text" name="observacoes" class="form-control" value="<%= conta ? conta.observacoes || '' : '' %>" placeholder="Notas iniciais sobre o boleto ou cliente...">
+                                </div>
+                            <% } %>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end align-items-center gap-2 mb-4">
+                    <a href="/cobranca" class="btn btn-secondary">Cancelar</a>
+                    <button type="submit" class="btn btn-primary fw-semibold px-4"><i class="fa-solid fa-save me-1"></i> <%= conta && conta.id ? 'Salvar Alterações' : 'Gravar Boleto' %></button>
+                </div>
+            </form>
+
+            <% if (conta && conta.id) { %>
+                <!-- SEÇÃO DE AÇÕES RÁPIDAS E E-MAILS -->
+                <div class="card mb-4 border-primary">
+                    <div class="card-header bg-primary text-white fw-semibold d-flex justify-content-between align-items-center">
+                        <span><i class="fa-solid fa-paper-plane me-2"></i>Ações e Disparo de E-mails da Régua</span>
+                        <small>Utiliza o leitor de e-mail local do usuário</small>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="button" id="btnAviso1" class="btn btn-outline-primary btn-sm" onclick="prepararEmailAviso1()">
+                                <i class="fa-solid fa-envelope me-1"></i> 1º E-mail (Aviso 1)
+                            </button>
+                            <button type="button" class="btn btn-outline-warning text-dark btn-sm" onclick="prepararEmailRégua(2)">
+                                <i class="fa-solid fa-triangle-exclamation me-1"></i> 2º E-mail (Alerta Cartório)
+                            </button>
+                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="prepararEmailRégua(3)">
+                                <i class="fa-solid fa-gavel me-1"></i> 3º E-mail (Notificação Final + Vendedor)
+                            </button>
+                            <button type="button" class="btn btn-success btn-sm" onclick="prepararEmailAvisoComercial()">
+                                <i class="fa-solid fa-user-check me-1"></i> Avisar Gerente/Vendedor (Liquidação/Custas)
+                            </button>
+                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="prepararEmailRetornado()">
+                                <i class="fa-solid fa-triangle-exclamation me-1"></i> Notificar E-mail Retornado (Gerente/Vendedor)
+                            </button>
+                        </div>
+                        <div id="emailAvisoFeedback" class="alert d-none mt-3 mb-0" role="status" aria-live="polite"></div>
+                    </div>
+                </div>
+
+                <!-- SEÇÃO DE HISTÓRICO DE INTERAÇÕES (TIMELINE) -->
+                <div class="card border-0 bg-light mb-3">
+                    <div class="card-header bg-secondary text-white fw-semibold d-flex justify-content-between align-items-center">
+                        <span><i class="fa-solid fa-comments me-2"></i>Registro de Interações (WhatsApp / Fone / E-mail)</span>
+                        <button type="button" class="btn btn-light btn-sm fw-semibold text-dark" data-bs-toggle="modal" data-bs-target="#modalNovaInteracao">
+                            <i class="fa-solid fa-plus me-1"></i> Nova Interação
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <% if (historico && historico.length > 0) { %>
+                            <div class="list-group" id="listaHistoricoInteracoes">
+                                <% historico.forEach(h => { %>
+                                    <div class="list-group-item list-group-item-action flex-column align-items-start">
+                                        <div class="d-flex w-100 justify-content-between">
+                                            <h6 class="mb-1 fw-bold text-primary">
+                                                <i class="fa-solid <%= h.canal === 'WhatsApp' ? 'fa-square-whatsapp text-success' : (h.canal === 'E-mail' ? 'fa-envelope text-info' : 'fa-phone text-warning') %> me-2"></i>
+                                                <%= h.tipo_contato %> - <%= h.contato_nome || 'N/A' %>
+                                            </h6>
+                                            <div class="text-end">
+                                                <% if (h.status) { %><span class="badge <%= h.status === 'Confirmado' ? 'bg-success' : 'bg-secondary' %> me-2"><%= h.status %></span><% } %>
+                                                <small class="text-muted"><%= new Date(h.data_hora).toLocaleString('pt-BR') %></small>
+                                                <button type="button" class="btn btn-outline-secondary btn-sm ms-2"
+                                                    data-bs-toggle="modal" data-bs-target="#modalEditarInteracao"
+                                                    data-historico-id="<%= h.id %>"
+                                                    data-boleto-id="<%= conta.id %>"
+                                                    data-tipo-contato="<%= h.tipo_contato %>"
+                                                    data-canal="<%= h.canal %>"
+                                                    data-contato-nome="<%= h.contato_nome || '' %>"
+                                                    data-resumo="<%= h.resumo || '' %>"
+                                                    onclick="preencherEdicaoInteracao(this)" title="Editar interação">
+                                                    <i class="fa-solid fa-pen"></i>
+                                                </button>
+                                                <form action="/cobranca/historico/excluir/<%= conta.id %>/<%= h.id %>" method="POST" class="d-inline"
+                                                    onsubmit="return confirm('Deseja realmente excluir esta interação?')">
+                                                    <button type="submit" class="btn btn-outline-danger btn-sm ms-1" title="Excluir interação">
+                                                        <i class="fa-solid fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                        <p class="mb-1 text-dark small"><%= h.resumo %></p>
+                                        <small class="text-muted">Registrado por: <%= h.usuario_nome || 'Sistema' %></small>
+                                    </div>
+                                <% }) %>
+                            </div>
+                        <% } else { %>
+                            <p id="historicoVazio" class="text-muted small mb-0 text-center py-2">Nenhuma interação registrada até o momento.</p>
+                        <% } %>
+                    </div>
+                </div>
+            <% } %>
+
+        </div>
+    </div>
+
+    <!-- MODAL PARA REGISTRAR NOVA INTERAÇÃO -->
+    <% if (conta && conta.id) { %>
+        <div class="modal fade" id="modalNovaInteracao" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-secondary text-white">
+                        <h5 class="modal-title fw-bold"><i class="fa-solid fa-comments me-2"></i>Registrar Interação</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <form action="/cobranca/historico/novo/<%= conta.id %>" method="POST">
+                        <div class="modal-body bg-light">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-bold">Tipo de Contato</label>
+                                    <select name="tipo_contato" class="form-select" required>
+                                        <option value="Cliente">Cliente</option>
+                                        <option value="Gerente">Gerente</option>
+                                        <option value="Vendedor">Vendedor</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-bold">Canal</label>
+                                    <select name="canal" class="form-select" required>
+                                        <option value="Telefone">Telefone</option>
+                                        <option value="WhatsApp">WhatsApp</option>
+                                        <option value="E-mail">E-mail</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-12">
+                                    <label class="form-label small fw-bold">Pessoa Contatada</label>
+                                    <input type="text" name="contato_nome" class="form-control" placeholder="Ex: Sr. João (Financeiro)" required>
+                                </div>
+                                <div class="col-md-12">
+                                    <label class="form-label small fw-bold">Resumo da Conversa</label>
+                                    <textarea name="resumo" class="form-control" rows="3" placeholder="Descreva o que foi tratado..." required></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="submit" class="btn btn-primary fw-semibold">Gravar Registro</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    <% } %>
+
+    <% if (conta && conta.id) { %>
+        <div class="modal fade" id="modalEditarInteracao" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-secondary text-white">
+                        <h5 class="modal-title fw-bold"><i class="fa-solid fa-pen-to-square me-2"></i>Editar Interação</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                    </div>
+                    <form id="formEditarInteracao" method="POST">
+                        <div class="modal-body bg-light">
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Tipo de Contato</label>
+                                <select name="tipo_contato" id="editarTipoContato" class="form-select" required>
+                                    <option value="Cliente">Cliente</option>
+                                    <option value="Gerente">Gerente</option>
+                                    <option value="Vendedor">Vendedor</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Canal</label>
+                                <select name="canal" id="editarCanal" class="form-select" required>
+                                    <option value="Telefone">Telefone</option>
+                                    <option value="WhatsApp">WhatsApp</option>
+                                    <option value="E-mail">E-mail</option>
+                                    <option value="Interno">Interno</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Pessoa Contatada</label>
+                                <input type="text" name="contato_nome" id="editarContatoNome" class="form-control">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Resumo / Detalhes</label>
+                                <textarea name="resumo" id="editarResumo" class="form-control" rows="4" required></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="submit" class="btn btn-primary fw-semibold">Salvar Alterações</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    <% } %>
+
+    <!-- MODAL DE COPIAR TEXTO DO E-MAIL -->
+    <div class="modal fade" id="modalCopiarEmail" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-copy me-2"></i>Conteúdo do E-mail para Envio</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body bg-light">
+                    <div id="emailConfirmFeedback" class="alert d-none" role="status" aria-live="polite"></div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Para:</label>
+                        <input type="text" id="emailParaModal" class="form-control bg-white" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Em Cópia (CC):</label>
+                        <input type="text" id="emailCcModal" class="form-control bg-white" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Assunto:</label>
+                        <input type="text" id="emailAssuntoModal" class="form-control bg-white" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Corpo da Mensagem:</label>
+                        <textarea id="emailTextoModal" class="form-control bg-white" rows="8" readonly></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                    <button type="button" class="btn btn-outline-primary" onclick="abrirEmailPreparado()"><i class="fa-solid fa-envelope me-1"></i> Abrir cliente de e-mail</button>
+                    <button type="button" class="btn btn-primary fw-semibold" onclick="copiarTextoEmail()"><i class="fa-solid fa-clipboard me-1"></i> Copiar Texto</button>
+                    <button type="button" id="btnConfirmarEnvio" class="btn btn-success fw-semibold" hidden onclick="confirmarEnvioEmail()"><i class="fa-solid fa-check me-1"></i> Confirmar Envio</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE CADASTRO RÁPIDO DE CLIENTE -->
+    <div class="modal fade" id="modalNovoCliente" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-user-plus me-2"></i>Cadastrar Novo Cliente Rápido</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body bg-light">
+                    <form id="formModalCliente">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Gerente *</label>
+                                <select id="modalGerenteId" class="form-select" required>
+                                    <option value="">Selecione o Gerente...</option>
+                                    <% if (locals.gerentes) { gerentes.forEach(g => { %>
+                                        <option value="<%= g.id %>"><%= g.nome_resumido %></option>
+                                    <% }) } %>
+                                </select>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Vendedor *</label>
+                                <select id="modalVendedorId" class="form-select" required>
+                                    <option value="">Selecione o Vendedor...</option>
+                                    <% if (locals.vendedores) { vendedores.forEach(v => { %>
+                                        <option value="<%= v.id %>" data-gerente-id="<%= v.gerente_id %>"><%= v.nome_resumido %></option>
+                                    <% }) } %>
+                                </select>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Tipo de Pessoa *</label>
+                                <select id="modalTipoPessoa" class="form-select" required>
+                                    <option value="PJ (CNPJ)">PJ (CNPJ)</option>
+                                    <option value="PF (CPF)">PF (CPF)</option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-8">
+                                <label class="form-label small fw-bold">CPF / CNPJ *</label>
+                                <div class="input-group">
+                                    <input type="text" id="modalCnpjCpf" class="form-control" placeholder="00.000.000/0000-00" required>
+                                    <button type="button" id="btnBuscarCnpjModal" class="btn btn-info text-white fw-semibold">Buscar</button>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Razão Social / Nome *</label>
+                                <input type="text" id="modalNome" class="form-control" required>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Nome Fantasia</label>
+                                <input type="text" id="modalNomeFantasia" class="form-control">
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">E-mail *</label>
+                                <input type="email" id="modalEmail" class="form-control" placeholder="cliente@email.com.br" required>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Telefone</label>
+                                <input type="text" id="modalTelefone" class="form-control" placeholder="(00) 00000-0000">
+                            </div>
+
+                            <div class="col-md-8">
+                                <label class="form-label small fw-bold">Cidade</label>
+                                <input type="text" id="modalCidade" class="form-control">
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">UF</label>
+                                <input type="text" id="modalUf" class="form-control text-uppercase" maxlength="2">
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" id="btnSalvarClienteModal" class="btn btn-success fw-semibold"><i class="fa-solid fa-check me-1"></i> Gravar e Selecionar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPTS DA APLICAÇÃO -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let emailAvisoPreparadoUrl = '';
+        let emailReguaEtapaPendente = null;
+
+        const dadosBoleto = {
+            id: "<%= conta ? conta.id : '' %>",
+            numero_documento: "<%= conta ? conta.numero_documento : '' %>",
+            valor_original: "<%= conta ? conta.valor_original : '0,00' %>",
+            valor_custas: "<%= conta ? conta.valor_custas : '0,00' %>",
+            data_vencimento: "<%= conta && conta.data_vencimento ? new Date(conta.data_vencimento).toLocaleDateString('pt-BR') : '' %>",
+            situacao_boleto: "<%= conta ? conta.situacao_boleto : '' %>",
+            cliente_nome: "<%= conta ? conta.cliente_nome : '' %>",
+            cliente_nome_fantasia: "<%= conta ? conta.cliente_nome_fantasia || '' : '' %>",
+            cliente_email: "<%= conta ? conta.cliente_email : '' %>",
+            gerente_email: "<%= conta && conta.gerente_email ? conta.gerente_email : '' %>",
+            vendedor_email: "<%= conta && conta.vendedor_email ? conta.vendedor_email : '' %>"
+        };
+
+        async function prepararEmailAviso1() {
+            return prepararEmailRégua(1);
+        }
+
+        function abrirEmailPreparado() {
+            if (emailAvisoPreparadoUrl) {
+                window.open(emailAvisoPreparadoUrl, '_blank');
+            }
+        }
+
+        function dispararEmail(para, cc, assunto, corpo) {
+            emailAvisoPreparadoUrl = `mailto:${encodeURIComponent(para)}?cc=${encodeURIComponent(cc)}&subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
+            window.location.href = emailAvisoPreparadoUrl;
+            emailReguaEtapaPendente = null;
+            document.getElementById('btnConfirmarEnvio').hidden = true;
+            document.getElementById('emailConfirmFeedback').className = 'alert d-none';
+
+            document.getElementById('emailParaModal').value = para;
+            document.getElementById('emailCcModal').value = cc;
+            document.getElementById('emailAssuntoModal').value = assunto;
+            document.getElementById('emailTextoModal').value = corpo;
+
+            setTimeout(() => {
+                const modalCopiar = new bootstrap.Modal(document.getElementById('modalCopiarEmail'));
+                modalCopiar.show();
+            }, 1000);
+        }
+
+        function copiarTextoEmail() {
+            const txt = document.getElementById('emailTextoModal');
+            txt.select();
+            document.execCommand('copy');
+            alert('Texto copiado com sucesso para a área de transferência!');
+        }
+
+        async function prepararEmailRégua(etapa) {
+            const feedback = document.getElementById('emailAvisoFeedback');
+            const botaoConfirmar = document.getElementById('btnConfirmarEnvio');
+            let janelaEmail = null;
+            feedback.className = 'alert d-none mt-3 mb-0';
+            try {
+                janelaEmail = window.open('about:blank', '_blank');
+                const resposta = await fetch(`/cobranca/email-regua/preparar/${encodeURIComponent(dadosBoleto.id)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                    body: JSON.stringify({ etapa })
+                });
+                const resultado = await resposta.json();
+                if (!resposta.ok) throw new Error(resultado.erro || 'Não foi possível preparar o e-mail.');
+
+                const cc = Array.isArray(resultado.cc) ? resultado.cc : [];
+                document.getElementById('emailParaModal').value = resultado.para;
+                document.getElementById('emailCcModal').value = cc.join(',');
+                document.getElementById('emailAssuntoModal').value = resultado.assunto;
+                document.getElementById('emailTextoModal').value = resultado.corpo;
+                emailAvisoPreparadoUrl = `mailto:${encodeURIComponent(resultado.para)}?cc=${encodeURIComponent(cc.join(','))}&subject=${encodeURIComponent(resultado.assunto)}&body=${encodeURIComponent(resultado.corpo)}`;
+                emailReguaEtapaPendente = etapa;
+                botaoConfirmar.hidden = false;
+                botaoConfirmar.disabled = false;
+
+                if (janelaEmail && !janelaEmail.closed) {
+                    janelaEmail.location.href = emailAvisoPreparadoUrl;
+                    feedback.textContent = 'E-mail preparado no cliente de e-mail. Após enviá-lo, clique em “Confirmar Envio” para registrar a interação e atualizar a fase.';
+                    feedback.className = 'alert alert-info mt-3 mb-0';
+                } else {
+                    feedback.textContent = 'E-mail preparado. O navegador bloqueou a nova janela; use “Abrir cliente de e-mail”. Após enviar, clique em “Confirmar Envio”.';
+                    feedback.className = 'alert alert-warning mt-3 mb-0';
+                }
+                const modalFeedback = document.getElementById('emailConfirmFeedback');
+                modalFeedback.textContent = 'A interação só será gravada e a fase atualizada após confirmar que o e-mail foi enviado.';
+                modalFeedback.className = 'alert alert-info';
+                new bootstrap.Modal(document.getElementById('modalCopiarEmail')).show();
+            } catch (err) {
+                if (janelaEmail && !janelaEmail.closed) janelaEmail.close();
+                feedback.textContent = err.message;
+                feedback.className = 'alert alert-danger mt-3 mb-0';
+            }
+        }
+
+        async function confirmarEnvioEmail() {
+            const botao = document.getElementById('btnConfirmarEnvio');
+            const modalFeedback = document.getElementById('emailConfirmFeedback');
+            if (!emailReguaEtapaPendente) return;
+
+            botao.disabled = true;
+            try {
+                const resposta = await fetch(`/cobranca/email-regua/confirmar/${encodeURIComponent(dadosBoleto.id)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                    body: JSON.stringify({ etapa: emailReguaEtapaPendente })
+                });
+                const resultado = await resposta.json();
+                if (!resposta.ok) throw new Error(resultado.erro || 'Não foi possível confirmar o envio.');
+
+                const faseSelect = document.querySelector('#formBoleto select[name="status_cobranca"]');
+                if (faseSelect) faseSelect.value = resultado.fase;
+                document.getElementById('emailAvisoFeedback').textContent = resultado.sucesso;
+                document.getElementById('emailAvisoFeedback').className = 'alert alert-success mt-3 mb-0';
+                modalFeedback.textContent = resultado.sucesso;
+                modalFeedback.className = 'alert alert-success';
+                emailReguaEtapaPendente = null;
+                botao.hidden = true;
+                window.setTimeout(() => window.location.reload(), 900);
+            } catch (err) {
+                modalFeedback.textContent = err.message;
+                modalFeedback.className = 'alert alert-danger';
+                botao.disabled = false;
+            }
+        }
+
+        function preencherEdicaoInteracao(botao) {
+            const form = document.getElementById('formEditarInteracao');
+            form.action = `/cobranca/historico/editar/${encodeURIComponent(botao.dataset.boletoId)}/${encodeURIComponent(botao.dataset.historicoId)}`;
+            const tipoContato = document.getElementById('editarTipoContato');
+            const tipoSalvo = botao.dataset.tipoContato;
+            if (![...tipoContato.options].some(option => option.value === tipoSalvo)) {
+                tipoContato.add(new Option(tipoSalvo, tipoSalvo));
+            }
+            tipoContato.value = tipoSalvo;
+            document.getElementById('editarCanal').value = botao.dataset.canal;
+            document.getElementById('editarContatoNome').value = botao.dataset.contatoNome;
+            document.getElementById('editarResumo').value = botao.dataset.resumo;
+        }
+
+        function prepararEmailAvisoComercial() {
+            const destinatarios = [dadosBoleto.gerente_email, dadosBoleto.vendedor_email].filter(Boolean).join(',');
+            let assunto = "";
+            let corpo = "";
+
+            if (dadosBoleto.situacao_boleto === 'Pago') {
+                assunto = `AVISO DE LIQUIDAÇÃO: Cliente ${dadosBoleto.cliente_nome} - Boleto Nº ${dadosBoleto.numero_documento}`;
+                corpo = `Prezados Gerente e Vendedor,\n\nO boleto Nº ${dadosBoleto.numero_documento} referente ao cliente ${dadosBoleto.cliente_nome} foi totalmente liquidado sem pendências.\n\nO cadastro do cliente está liberado para novos pedidos no sistema.\n\nAtenciosamente,\nSetor Financeiro - Omnia`;
+            } else {
+                assunto = `PENDÊNCIA DE CUSTAS: Cliente ${dadosBoleto.cliente_nome} - Boleto Nº ${dadosBoleto.numero_documento}`;
+                corpo = `Prezados Gerente e Vendedor,\n\nO boleto Nº ${dadosBoleto.numero_documento} referente ao cliente ${dadosBoleto.cliente_nome} foi pago, porém possui pendência de custas bancárias/cartório no valor de ${dadosBoleto.valor_custas}.\n\nInformamos que novos pedidos permanecerão bloqueados até a quitação integral destas custas.\n\nAtenciosamente,\nSetor Financeiro - Omnia`;
+            }
+
+            dispararEmail(destinatarios, '', assunto, corpo);
+        }
+
+        function prepararEmailRetornado() {
+            const destinatarios = [dadosBoleto.gerente_email, dadosBoleto.vendedor_email].filter(Boolean).join(',');
+            const emailAtual = dadosBoleto.cliente_email || 'Não informado';
+            
+            const assunto = `FALHA NA ENTREGA DE E-MAIL: Cliente ${dadosBoleto.cliente_nome} - Boleto Nº ${dadosBoleto.numero_documento}`;
+            const corpo = `Prezados Gerente e Vendedor,\n\nInformamos que o e-mail de cobrança enviado para o cliente ${dadosBoleto.cliente_nome} através do endereço (${emailAtual}) retornou ou não pôde ser entregue (endereço incorreto ou caixa postal cheia).\n\nPrecisamos que por favor verifiquem e nos informem o e-mail correto do cliente para atualizarmos o cadastro, ou que entrem em contato diretamente com ele para alertá-lo sobre a cobrança em aberto do boleto Nº ${dadosBoleto.numero_documento}.\n\nContamos com a vossa colaboração.\n\nAtenciosamente,\nSetor Financeiro - Omnia`;
+
+            dispararEmail(destinatarios, '', assunto, corpo);
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const modalGerenteId = document.getElementById('modalGerenteId');
+            const modalVendedorId = document.getElementById('modalVendedorId');
+
+            if (modalGerenteId && modalVendedorId) {
+                modalGerenteId.addEventListener('change', function() {
+                    const gerenteSel = this.value;
+                    Array.from(modalVendedorId.options).forEach(opt => {
+                        if (!opt.value) return;
+                        const gId = opt.getAttribute('data-gerente-id');
+                        if (!gerenteSel || gId === gerenteSel) {
+                            opt.style.display = '';
+                        } else {
+                            opt.style.display = 'none';
+                            if (opt.selected) modalVendedorId.value = '';
+                        }
+                    });
+                });
+            }
+
+            const buscaCliente = document.getElementById('buscaCliente');
+            const selectCliente = document.getElementById('selectCliente');
+            const inputGerenteNome = document.getElementById('inputGerenteNome');
+            const inputVendedorNome = document.getElementById('inputVendedorNome');
+            const valorOriginal = document.getElementById('valorOriginal');
+            const dataVencimento = document.getElementById('dataVencimento');
+            const valorCustas = document.getElementById('valorCustas');
+            const btnCalcularCustas = document.getElementById('btnCalcularCustas');
+
+            if (btnCalcularCustas) {
+                btnCalcularCustas.addEventListener('click', function() {
+                    const vOrig = parseFloat(valorOriginal.value.replace(/\./g, '').replace(',', '.')) || 0;
+                    if (vOrig === 0 || !dataVencimento.value) {
+                        alert('Informe o Valor Original e a Data de Vencimento para calcular as custas.');
+                        return;
+                    }
+
+                    const dtVenc = new Date(dataVencimento.value);
+                    const dtHoje = new Date();
+                    const diffTime = Math.max(0, dtHoje - dtVenc);
+                    const diffDias = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+                    const multa = vOrig * 0.02;
+                    const juros = vOrig * (0.02 * (diffDias / 30));
+                    const taxaBanco = 35.00;
+
+                    const totalCustas = multa + juros + taxaBanco;
+
+                    let v = totalCustas.toFixed(2);
+                    let partes = v.split('.');
+                    partes[0] = partes[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                    valorCustas.value = partes.join(',');
+                });
+            }
+
+            buscaCliente.addEventListener('input', function() {
+                const termo = this.value.toLowerCase().trim();
+                let visiveis = 0;
+
+                Array.from(selectCliente.options).forEach(opt => {
+                    if (!opt.value) return;
+                    const texto = opt.text.toLowerCase();
+                    if (texto.includes(termo)) {
+                        opt.style.display = '';
+                        visiveis++;
+                    } else {
+                        opt.style.display = 'none';
+                    }
+                });
+
+                selectCliente.style.display = visiveis > 0 && termo.length > 0 ? 'block' : 'none';
+            });
+
+            function atualizarVinculos() {
+                const opt = selectCliente.options[selectCliente.selectedIndex];
+                if (opt && opt.value) {
+                    inputGerenteNome.value = opt.getAttribute('data-gerente-nome') || 'Não Vinculado';
+                    inputVendedorNome.value = opt.getAttribute('data-vendedor-nome') || 'Não Vinculado';
+                    buscaCliente.value = opt.text.trim();
+                    selectCliente.style.display = 'none';
+                } else {
+                    inputGerenteNome.value = '';
+                    inputVendedorNome.value = '';
+                }
+            }
+
+            selectCliente.addEventListener('change', atualizarVinculos);
+
+            if (selectCliente.value) {
+                atualizarVinculos();
+            }
+
+            document.querySelectorAll('.mascara-moeda').forEach(input => {
+                input.addEventListener('input', function(e) {
+                    let v = e.target.value.replace(/\D/g, '');
+                    if (v === '') {
+                        e.target.value = '0,00';
+                        return;
+                    }
+                    v = (parseInt(v, 10) / 100).toFixed(2);
+                    let partes = v.split('.');
+                    partes[0] = partes[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                    e.target.value = partes.join(',');
+                });
+            });
+
+            const modalCnpjCpf = document.getElementById('modalCnpjCpf');
+            if (modalCnpjCpf) {
+                modalCnpjCpf.addEventListener('input', function(e) {
+                    let v = e.target.value.replace(/\D/g, '');
+                    if (v.length > 11) {
+                        e.target.value = v.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5').slice(0, 18);
+                    } else {
+                        e.target.value = v.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4').slice(0, 14);
+                    }
+                });
+            }
+
+            const btnBuscarCnpjModal = document.getElementById('btnBuscarCnpjModal');
+            if (btnBuscarCnpjModal) {
+                btnBuscarCnpjModal.addEventListener('click', async function() {
+                    const cnpj = modalCnpjCpf.value.replace(/\D/g, '');
+                    if (cnpj.length !== 14) {
+                        alert('Informe um CNPJ válido com 14 dígitos.');
+                        return;
+                    }
+                    btnBuscarCnpjModal.disabled = true;
+                    btnBuscarCnpjModal.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+
+                    try {
+                        const res = await fetch(`/api/consultar-cnpj/${cnpj}`);
+                        if (!res.ok) throw new Error();
+                        const data = await res.json();
+                        if (data.razao_social) document.getElementById('modalNome').value = data.razao_social;
+                        if (data.nome_fantasia) document.getElementById('modalNomeFantasia').value = data.nome_fantasia;
+                        if (data.municipio) document.getElementById('modalCidade').value = data.municipio;
+                        if (data.uf) document.getElementById('modalUf').value = data.uf;
+                    } catch (e) {
+                        alert('CNPJ não encontrado ou erro na consulta.');
+                    } finally {
+                        btnBuscarCnpjModal.disabled = false;
+                        btnBuscarCnpjModal.innerHTML = 'Buscar';
+                    }
+                });
+            }
+
+            const btnSalvarClienteModal = document.getElementById('btnSalvarClienteModal');
+            if (btnSalvarClienteModal) {
+                btnSalvarClienteModal.addEventListener('click', async function() {
+                    const payload = {
+                        tipo_pessoa: document.getElementById('modalTipoPessoa').value,
+                        cnpj_cpf: document.getElementById('modalCnpjCpf').value,
+                        nome: document.getElementById('modalNome').value,
+                        nome_fantasia: document.getElementById('modalNomeFantasia').value,
+                        email: document.getElementById('modalEmail').value,
+                        telefone: document.getElementById('modalTelefone').value,
+                        cidade: document.getElementById('modalCidade').value,
+                        uf: document.getElementById('modalUf').value,
+                        gerente_id: document.getElementById('modalGerenteId').value,
+                        vendedor_id: document.getElementById('modalVendedorId').value
+                    };
+
+                    if (!payload.nome || !payload.email || !payload.gerente_id || !payload.vendedor_id) {
+                        alert('Por favor, preencha a Razão Social, o E-mail, o Gerente e o Vendedor.');
+                        return;
+                    }
+
+                    btnSalvarClienteModal.disabled = true;
+
+                    try {
+                        const res = await fetch('/api/clientes/novo', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        const data = await res.json();
+
+                        if (data.sucesso) {
+                            const newOption = document.createElement('option');
+                            newOption.value = data.cliente.id;
+                            newOption.text = data.cliente.nome;
+                            newOption.setAttribute('data-gerente-id', data.cliente.gerente_id);
+                            newOption.setAttribute('data-vendedor-id', data.cliente.vendedor_id);
+                            newOption.setAttribute('data-gerente-nome', data.cliente.gerente_nome);
+                            newOption.setAttribute('data-vendedor-nome', data.cliente.vendedor_nome);
+                            newOption.selected = true;
+
+                            selectCliente.appendChild(newOption);
+                            atualizarVinculos();
+
+                            const modalEl = document.getElementById('modalNovoCliente');
+                            const modalInstance = bootstrap.Modal.getInstance(modalEl);
+                            modalInstance.hide();
+
+                            document.getElementById('formModalCliente').reset();
+                        } else {
+                            alert(data.erro || 'Erro ao cadastrar cliente.');
+                        }
+                    } catch (e) {
+                        alert('Erro de conexão ao salvar cliente.');
+                    } finally {
+                        btnSalvarClienteModal.disabled = false;
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>
