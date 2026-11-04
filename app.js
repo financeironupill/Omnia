@@ -328,21 +328,29 @@ app.post('/transportadoras/excluir/:id', verificarAutenticacao, async (req, res)
 // CLIENTES
 app.get('/clientes', verificarAutenticacao, async (req, res) => {
     try {
-        const { busca, ordenar, ordem, origem, ord, page } = req.query;
-        const ordAtual = ord === 'az' || ord === 'za' ? ord : '';
-        let col = ord === 'az' || ord === 'za'
-            ? 'nome'
-            : (ordenar === 'cnpj_cpf' ? 'cnpj_cpf' : (ordenar === 'nome' ? 'nome' : 'id'));
-        let dir = ord === 'az'
+        const { busca, ordenar, ordem, origem, campo, ord, page } = req.query;
+        const colunasOrdenacao = {
+            id: 'c.id',
+            tipo: 'c.tipo_pessoa',
+            cpf_cnpj: 'c.cnpj_cpf',
+            nome: 'c.nome, c.nome_fantasia',
+            gerente: 'g.nome_resumido, v.nome_resumido',
+            cidade_uf: 'c.cidade, c.uf'
+        };
+        const colunaAtual = Object.prototype.hasOwnProperty.call(colunasOrdenacao, campo)
+            ? campo
+            : (ord === 'az' || ord === 'za' ? 'nome' : (ordenar === 'cnpj_cpf' ? 'cpf_cnpj' : (ordenar === 'nome' ? 'nome' : 'id')));
+        const ordemAtual = ord === 'asc' || ord === 'az'
             ? 'ASC'
-            : (ord === 'za' ? 'DESC' : (ordem === 'ASC' ? 'ASC' : 'DESC'));
+            : (ord === 'desc' || ord === 'za' ? 'DESC' : (ordem === 'ASC' ? 'ASC' : 'DESC'));
+        const ordAtual = ordemAtual.toLowerCase();
         let query = 'SELECT c.*, g.nome_resumido AS gerente_nome, v.nome_resumido AS vendedor_nome FROM clientes c LEFT JOIN gerentes g ON c.gerente_id = g.id LEFT JOIN vendedores v ON c.vendedor_id = v.id';
         let params = [];
         if (busca && busca.trim() !== '') {
             query += ' WHERE c.nome ILIKE $1 OR c.nome_fantasia ILIKE $1 OR c.cnpj_cpf ILIKE $1';
             params.push('%' + busca.trim() + '%');
         }
-        query += ' ORDER BY c.' + col + ' ' + dir;
+        query += ' ORDER BY ' + colunasOrdenacao[colunaAtual].split(', ').map(coluna => `${coluna} ${ordemAtual}`).join(', ');
         const result = await pool.query(query, params);
 
         result.rows.forEach(cli => {
@@ -352,8 +360,9 @@ app.get('/clientes', verificarAutenticacao, async (req, res) => {
         res.render('clientes-lista', { 
             clientes: result.rows, 
             buscaAtual: busca || '', 
-            ordenarAtual: col, 
-            ordemAtual: dir, 
+            campoAtual: colunaAtual,
+            ordenarAtual: colunaAtual,
+            ordemAtual,
             ordAtual,
             paginaAtual: typeof page === 'string' ? page : '',
             origemAtual: origem || 'dashboard', 
