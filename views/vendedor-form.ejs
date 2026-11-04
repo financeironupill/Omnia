@@ -42,10 +42,6 @@
                                 <label class="form-label fw-semibold">Nome Resumido (Chave Única) <span class="text-danger">*</span></label>
                                 <input type="text" name="nome_resumido" class="form-control" placeholder="Ex: JOAO.S" value="<%= vendedor ? vendedor.nome_resumido : '' %>" required style="text-transform: uppercase;">
                             </div>
-                            <div class="col-md-8">
-                                <label class="form-label fw-semibold">Nome Completo / Nome Fantasia <span class="text-danger">*</span></label>
-                                <input type="text" name="nome_completo" class="form-control" placeholder="Nome completo ou nome fantasia" value="<%= vendedor ? vendedor.nome_completo : '' %>" required>
-                            </div>
                             <div class="col-md-4">
                                 <label class="form-label fw-semibold">Status <span class="text-danger">*</span></label>
                                 <select name="ativo" class="form-select" required>
@@ -63,29 +59,21 @@
                     </div>
                     <div class="card-body">
                         <div class="row g-3">
-                            <div class="col-md-4">
-                                <label class="form-label fw-semibold">Tipo de Pessoa <span class="text-danger">*</span></label>
-                                <select name="tipo_pessoa" id="tipoPessoa" class="form-select" required>
-                                    <% const tipoPessoaAtual = vendedor ? (vendedor.tipo_pessoa || (vendedor.cnpj ? 'PJ' : 'PF')) : 'PF'; %>
-                                    <option value="PF" <%= tipoPessoaAtual === 'PF' ? 'selected' : '' %>>Pessoa Física (PF)</option>
-                                    <option value="PJ" <%= tipoPessoaAtual === 'PJ' ? 'selected' : '' %>>Pessoa Jurídica (PJ)</option>
-                                </select>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Nome Completo <span class="text-danger">*</span></label>
+                                <input type="text" name="nome_completo" class="form-control" placeholder="Nome completo do vendedor" value="<%= vendedor ? vendedor.nome_completo : '' %>" required>
                             </div>
-                            <div id="camposPessoaFisica" class="col-md-8">
-                                <label class="form-label fw-semibold">CPF</label>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">CPF (Pessoa Física)</label>
                                 <input type="text" name="cpf" id="cpf" class="form-control" maxlength="14" inputmode="numeric" placeholder="000.000.000-00" value="<%= vendedor ? vendedor.cpf : '' %>">
                             </div>
-                            <div id="camposPessoaJuridica" class="col-12 <%= tipoPessoaAtual === 'PJ' ? '' : 'd-none' %>">
-                                <div class="row g-3">
-                                    <div class="col-md-6">
-                                        <label class="form-label fw-semibold">CNPJ <span class="text-danger">*</span></label>
-                                        <input type="text" name="cnpj" id="cnpj" class="form-control" maxlength="18" inputmode="numeric" placeholder="00.000.000/0000-00" value="<%= vendedor ? vendedor.cnpj : '' %>">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label fw-semibold">Razão Social <span class="text-danger">*</span></label>
-                                        <input type="text" name="razao_social" id="razaoSocial" class="form-control" placeholder="Razão social da empresa" value="<%= vendedor ? vendedor.razao_social : '' %>">
-                                    </div>
-                                </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">CNPJ (Pessoa Jurídica)</label>
+                                <input type="text" name="cnpj" id="cnpj" class="form-control" maxlength="18" inputmode="numeric" placeholder="00.000.000/0000-00" value="<%= vendedor ? vendedor.cnpj : '' %>">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Razão Social</label>
+                                <input type="text" name="razao_social" id="razaoSocial" class="form-control" placeholder="Razão social da empresa" value="<%= vendedor ? vendedor.razao_social : '' %>">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">E-mail</label>
@@ -146,10 +134,6 @@
     <script>
         const campoCpf = document.getElementById('cpf');
         const campoCnpj = document.getElementById('cnpj');
-        const tipoPessoa = document.getElementById('tipoPessoa');
-        const camposPessoaFisica = document.getElementById('camposPessoaFisica');
-        const camposPessoaJuridica = document.getElementById('camposPessoaJuridica');
-        const campoRazaoSocial = document.getElementById('razaoSocial');
 
         function aplicarMascaraCpf(valor) {
             const digitos = valor.replace(/\D/g, '').slice(0, 11);
@@ -168,20 +152,10 @@
             return `${digitos.slice(0, 2)}.${digitos.slice(2, 5)}.${digitos.slice(5, 8)}/${digitos.slice(8, 12)}-${digitos.slice(12)}`;
         }
 
-        function atualizarCamposPessoa() {
-            const pessoaJuridica = tipoPessoa.value === 'PJ';
-            camposPessoaFisica.classList.toggle('d-none', pessoaJuridica);
-            camposPessoaJuridica.classList.toggle('d-none', !pessoaJuridica);
-            campoCnpj.required = pessoaJuridica;
-            campoRazaoSocial.required = pessoaJuridica;
-        }
-
         campoCpf.addEventListener('input', () => campoCpf.value = aplicarMascaraCpf(campoCpf.value));
         campoCnpj.addEventListener('input', () => campoCnpj.value = aplicarMascaraCnpj(campoCnpj.value));
-        tipoPessoa.addEventListener('change', atualizarCamposPessoa);
         campoCpf.value = aplicarMascaraCpf(campoCpf.value);
         campoCnpj.value = aplicarMascaraCnpj(campoCnpj.value);
-        atualizarCamposPessoa();
     </script>
 </body>
 </html>

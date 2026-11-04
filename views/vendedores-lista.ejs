@@ -115,10 +115,13 @@
                                 <tr>
                                     <td class="fw-bold text-secondary">#<%= v.id %></td>
                                     <td><span class="badge text-white px-2 py-1" style="background-color: #20c997; font-size: 0.9rem;"><%= v.nome_resumido %></span></td>
-                                    <td><%= v.identificacao_formatada || '--' %></td>
+                                    <td>
+                                        <div>CPF: <%= v.cpf_formatado || '--' %></div>
+                                        <div>CNPJ: <%= v.cnpj_formatado || '--' %></div>
+                                    </td>
                                     <td class="fw-bold text-dark">
                                         <%= v.nome_completo %>
-                                        <% if (v.tipo_pessoa === 'PJ' && v.razao_social) { %><br><small class="text-muted"><%= v.razao_social %></small><% } %>
+                                        <% if (v.razao_social) { %><br><small class="text-muted"><%= v.razao_social %></small><% } %>
                                     </td>
                                     <td><span class="badge bg-secondary"><%= v.gerente_nome || '--' %></span></td>
                                     <td>
