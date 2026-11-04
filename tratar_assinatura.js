@@ -19,14 +19,14 @@ async function processarAssinatura() {
             const green = this.bitmap.data[idx + 1];
             const blue = this.bitmap.data[idx + 2];
 
-            // Se o pixel for claro (fundo do papel), torna-o totalmente transparente
-            if (red > 190 && green > 190 && blue > 190) {
-                this.bitmap.data[idx + 3] = 0; // Alpha 0 (transparente)
+            // Tolerância maior (140): se o tom for claro ou acinzentado, torna transparente
+            if (red > 140 && green > 140 && blue > 140) {
+                this.bitmap.data[idx + 3] = 0; // Transparente
             }
         });
 
         await imagem.write(arquivoSaida);
-        console.log('Sucesso! Assinatura transparente salva em:', arquivoSaida);
+        console.log('Sucesso! Assinatura limpa e transparente salva em:', arquivoSaida);
     } catch (erro) {
         console.error('Erro ao processar assinatura:', erro);
     }
