@@ -78,7 +78,7 @@
                 <input type="hidden" name="ordenar" value="<%= locals.ordenarAtual || '' %>">
                 <input type="hidden" name="ordem" value="<%= locals.ordemAtual || '' %>">
 
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label small fw-bold">Pesquisa Geral</label>
                     <input type="text" name="busca" class="form-control form-control-sm" placeholder="Nº Documento, Cliente ou Banco..." value="<%= buscaAtual %>">
                 </div>
@@ -86,9 +86,21 @@
                     <label class="form-label small fw-bold">Situação do Boleto</label>
                     <select name="status_boleto" class="form-select form-select-sm">
                         <option value="">Todas</option>
+                        <option value="pendentes" <%= statusBoletoAtual === 'pendentes' ? 'selected' : '' %>>Vencido e Pago com Pendência</option>
                         <option value="Vencido" <%= statusBoletoAtual === 'Vencido' ? 'selected' : '' %>>Vencido</option>
                         <option value="Pago" <%= statusBoletoAtual === 'Pago' ? 'selected' : '' %>>Pago</option>
                         <option value="Pago com Pendência" <%= statusBoletoAtual === 'Pago com Pendência' ? 'selected' : '' %>>Pago com Pendência</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold">Banco</label>
+                    <select name="banco" class="form-select form-select-sm">
+                        <option value="">Todos os Bancos</option>
+                        <% if (locals.bancos && bancos.length > 0) { %>
+                            <% bancos.forEach(b => { %>
+                                <option value="<%= b.banco %>" <%= bancoAtual === b.banco ? 'selected' : '' %>><%= b.banco %></option>
+                            <% }) %>
+                        <% } %>
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -122,8 +134,8 @@
                         <% }) %>
                     </select>
                 </div>
-                <div class="col-md-1 d-flex align-items-end gap-1">
-                    <button type="submit" class="btn btn-secondary btn-sm w-100 fw-semibold" title="Filtrar"><i class="fa-solid fa-filter"></i></button>
+                <div class="col-12 d-flex justify-content-end gap-1 mt-2">
+                    <button type="submit" class="btn btn-secondary btn-sm fw-semibold" title="Filtrar"><i class="fa-solid fa-filter"></i></button>
                     <a href="/cobranca" class="btn btn-outline-secondary btn-sm fw-semibold" title="Limpar"><i class="fa-solid fa-rotate-left"></i></a>
                 </div>
             </form>
@@ -138,6 +150,7 @@
                     if (locals.buscaAtual) url += `&busca=${encodeURIComponent(locals.buscaAtual)}`;
                     if (locals.statusBoletoAtual) url += `&status_boleto=${encodeURIComponent(locals.statusBoletoAtual)}`;
                     if (locals.statusCobrancaAtual) url += `&status_cobranca=${encodeURIComponent(locals.statusCobrancaAtual)}`;
+                    if (locals.bancoAtual) url += `&banco=${encodeURIComponent(locals.bancoAtual)}`;
                     if (locals.gerenteAtual) url += `&gerente_id=${locals.gerenteAtual}`;
                     if (locals.vendedorAtual) url += `&vendedor_id=${locals.vendedorAtual}`;
                     return url;
@@ -150,9 +163,9 @@
                     return '<i class="fa-solid fa-sort text-muted small"></i>';
                 }
 
-                // Verifica se há algum filtro ativo na tela
                 const temFiltroAtivo = (locals.buscaAtual && locals.buscaAtual.trim() !== '') ||
                                        (locals.statusBoletoAtual && locals.statusBoletoAtual !== '') ||
+                                       (locals.bancoAtual && locals.bancoAtual !== '') ||
                                        (locals.statusCobrancaAtual && locals.statusCobrancaAtual !== '') ||
                                        (locals.gerenteAtual && locals.gerenteAtual !== '') ||
                                        (locals.vendedorAtual && locals.vendedorAtual !== '');

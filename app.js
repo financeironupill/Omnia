@@ -904,7 +904,10 @@ app.post('/ocorrencias/excluir/:id', verificarAutenticacao, async (req, res) => 
 // MÓDULO DE BOLETOS E RÉGUA DE COBRANÇA
 app.get('/cobranca', verificarAutenticacao, async (req, res) => {
     try {
-        const { busca, status_boleto, status_cobranca, gerente_id, vendedor_id, ordenar, ordem } = req.query;
+        const { busca, banco, status_boleto, status_cobranca, gerente_id, vendedor_id, ordenar, ordem } = req.query;
+        const statusBoletoInformado = Object.prototype.hasOwnProperty.call(req.query, 'status_boleto');
+        const statusBoletoSelecionado = typeof status_boleto === 'string' ? status_boleto : '';
+        const statusBoletoPadrao = !statusBoletoInformado || statusBoletoSelecionado === 'pendentes';
         const colunasOrdenacao = {
             documento: 'b.numero_documento',
             cliente: 'cl.nome',
@@ -945,9 +948,17 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
             idx++;
         }
 
-        if (status_boleto && status_boleto !== '') {
+        if (statusBoletoPadrao) {
+            queryText += " AND b.situacao_boleto IN ('Vencido', 'Pago com Pendência')";
+        } else if (statusBoletoSelecionado !== '') {
             queryText += ' AND b.situacao_boleto = $' + idx;
-            queryParams.push(status_boleto);
+            queryParams.push(statusBoletoSelecionado);
+            idx++;
+        }
+
+        if (typeof banco === 'string' && banco !== '') {
+            queryText += ' AND b.banco = $' + idx;
+            queryParams.push(banco);
             idx++;
         }
 
@@ -978,6 +989,7 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
         const totalCustasFmt = formatarMoedaSemSimbolo(totalCustas);
         const gerentes = await pool.query('SELECT id, nome_resumido FROM gerentes WHERE ativo = 1 ORDER BY nome_resumido ASC');
         const vendedores = await pool.query('SELECT id, nome_resumido, gerente_id FROM vendedores WHERE ativo = 1 ORDER BY nome_resumido ASC');
+        const bancos = await pool.query("SELECT DISTINCT banco FROM boletos WHERE banco IS NOT NULL AND banco != '' ORDER BY banco ASC");
         
         result.rows.forEach(b => {
             b.cliente_cnpj = formatarCnpjCpf(b.cliente_cnpj);
@@ -992,8 +1004,10 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
             contas: result.rows, 
             gerentes: gerentes.rows,
             vendedores: vendedores.rows,
+            bancos: bancos.rows,
             buscaAtual: busca || '', 
-            statusBoletoAtual: status_boleto || '', 
+            bancoAtual: typeof banco === 'string' ? banco : '',
+            statusBoletoAtual: statusBoletoPadrao ? 'pendentes' : statusBoletoSelecionado,
             statusCobrancaAtual: status_cobranca || '',
             gerenteAtual: gerente_id || '',
             vendedorAtual: vendedor_id || '',
