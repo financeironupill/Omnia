@@ -958,7 +958,8 @@ function criarQueryFiltrosCobranca(query) {
         gerente_id: '',
         vendedor_id: '',
         data_vencimento_de: '',
-        data_vencimento_ate: ''
+        data_vencimento_ate: '',
+        exibir_fundo_perdido: 'ativos'
     };
     const params = new URLSearchParams();
 
@@ -973,10 +974,14 @@ function criarQueryFiltrosCobranca(query) {
 }
 
 function construirConsultaCobranca(query) {
-    const { busca, banco, status_boleto, status_cobranca, gerente_id, vendedor_id, data_vencimento_de, data_vencimento_ate, ordenar, ordem } = query;
+    const { busca, banco, status_boleto, status_cobranca, gerente_id, vendedor_id, data_vencimento_de, data_vencimento_ate, exibir_fundo_perdido, ordenar, ordem } = query;
     const statusBoletoInformado = Object.prototype.hasOwnProperty.call(query, 'status_boleto');
     const statusBoletoSelecionado = typeof status_boleto === 'string' ? status_boleto : '';
     const statusBoletoPadrao = !statusBoletoInformado || statusBoletoSelecionado === 'pendentes';
+    const filtrosFundoPerdidoValidos = ['ativos', 'perdidos', 'todos'];
+    const fundoPerdidoFiltro = typeof exibir_fundo_perdido === 'string' && filtrosFundoPerdidoValidos.includes(exibir_fundo_perdido)
+        ? exibir_fundo_perdido
+        : 'ativos';
     const colunasOrdenacao = {
         documento: 'b.numero_documento',
         cliente: 'cl.nome',
@@ -1061,8 +1066,14 @@ function construirConsultaCobranca(query) {
         idx++;
     }
 
+    if (fundoPerdidoFiltro === 'ativos') {
+        queryText += ' AND b.fundo_perdido IS NOT TRUE';
+    } else if (fundoPerdidoFiltro === 'perdidos') {
+        queryText += ' AND b.fundo_perdido IS TRUE';
+    }
+
     queryText += ' ORDER BY ' + colunasOrdenacao[ordenarAtual] + ' ' + ordemAtual;
-    return { queryText, queryParams, ordenarAtual, ordemAtual, statusBoletoPadrao, statusBoletoSelecionado };
+    return { queryText, queryParams, ordenarAtual, ordemAtual, statusBoletoPadrao, statusBoletoSelecionado, fundoPerdidoFiltro };
 }
 
 function formatarResultadosCobranca(rows) {
@@ -1080,7 +1091,7 @@ function formatarResultadosCobranca(rows) {
 app.get('/cobranca', verificarAutenticacao, async (req, res) => {
     try {
         const { busca, banco, status_cobranca, gerente_id, vendedor_id, data_vencimento_de, data_vencimento_ate } = req.query;
-        const { queryText, queryParams, ordenarAtual, ordemAtual, statusBoletoPadrao, statusBoletoSelecionado } = construirConsultaCobranca(req.query);
+        const { queryText, queryParams, ordenarAtual, ordemAtual, statusBoletoPadrao, statusBoletoSelecionado, fundoPerdidoFiltro } = construirConsultaCobranca(req.query);
         const result = await pool.query(queryText, queryParams);
         const totalValorOriginal = result.rows.reduce((total, boleto) => total + (parseFloat(boleto.valor_original) || 0), 0);
         const totalCustas = result.rows.reduce((total, boleto) => total + (parseFloat(boleto.valor_custas) || 0), 0);
@@ -1108,6 +1119,7 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
             vendedorAtual: vendedor_id || '',
             dataVencimentoDeAtual: typeof data_vencimento_de === 'string' ? data_vencimento_de : '',
             dataVencimentoAteAtual: typeof data_vencimento_ate === 'string' ? data_vencimento_ate : '',
+            fundoPerdidoFiltroAtual: fundoPerdidoFiltro,
             ordenarAtual,
             ordemAtual,
             totalValorOriginalFmt,
@@ -1179,6 +1191,11 @@ app.get('/cobranca/relatorio', verificarAutenticacao, async (req, res) => {
                     : 'Todas',
                 gerente: gerente.rows[0] ? gerente.rows[0].nome_resumido : (req.query.gerente_id ? `ID ${req.query.gerente_id}` : 'Todos'),
                 vendedor: vendedor.rows[0] ? vendedor.rows[0].nome_resumido : (req.query.vendedor_id ? `ID ${req.query.vendedor_id}` : 'Todos'),
+                fundoPerdido: {
+                    ativos: 'Apenas Ativos (padrão)',
+                    perdidos: 'Apenas Fundo Perdido',
+                    todos: 'Todos'
+                }[consulta.fundoPerdidoFiltro],
                 vencimentoDe: typeof req.query.data_vencimento_de === 'string' && req.query.data_vencimento_de
                     ? new Date(`${req.query.data_vencimento_de}T00:00:00`).toLocaleDateString('pt-BR')
                     : 'Não definido',
@@ -1458,7 +1475,7 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
     const { 
         cliente_id, gerente_id, vendedor_id, numero_documento, banco, carteira, valor_original, data_emissao, data_vencimento,
         situacao_boleto, status_cobranca, data_previsao_pagamento, data_cartorio, valor_custas, 
-        data_pagamento, data_pagamento_custas, observacoes 
+        data_pagamento, data_pagamento_custas, observacoes, fundo_perdido
     } = req.body;
 
     try {
@@ -1471,8 +1488,8 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
             carteira = $6, valor_original = $7, data_emissao = $8, data_vencimento = $9, 
             situacao_boleto = $10, status_cobranca = $11, data_previsao_pagamento = $12, 
             data_cartorio = $13, valor_custas = $14, data_pagamento = $15, data_pagamento_custas = $16,
-            observacoes = $17, atualizado_em = CURRENT_TIMESTAMP 
-            WHERE id = $18`;
+            observacoes = $17, fundo_perdido = $18, atualizado_em = CURRENT_TIMESTAMP
+            WHERE id = $19`;
 
         await pool.query(sql, [
             parseInt(cliente_id, 10),
@@ -1492,6 +1509,7 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
             tratarData(data_pagamento),
             tratarData(data_pagamento_custas),
             formatarCapitalizacao(observacoes),
+            fundo_perdido === 'true',
             parseInt(boletoId, 10)
         ]);
 

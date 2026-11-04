@@ -178,6 +178,14 @@
                         <div class="row g-3">
                             <% if (conta && conta.id) { %>
                                 <div class="col-md-4">
+                                    <label class="form-label small fw-bold">Fundo Perdido</label>
+                                    <select name="fundo_perdido" class="form-select">
+                                        <option value="false" <%= String(conta.fundo_perdido) === 'true' ? '' : 'selected' %>>Não</option>
+                                        <option value="true" <%= String(conta.fundo_perdido) === 'true' ? 'selected' : '' %>>Sim</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-4">
                                     <label class="form-label small fw-bold">Situação do Boleto *</label>
                                     <select name="situacao_boleto" id="situacaoBoleto" class="form-select" required>
                                         <option value="Vencido" <%= conta.situacao_boleto === 'Vencido' ? 'selected' : '' %>>Vencido</option>
