@@ -1147,7 +1147,7 @@ app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
             });
         }
 
-        const cliRes = await pool.query('SELECT gerente_id, vendedor_id FROM clientes WHERE id = $1', [cliente_id]);
+        const cliRes = await pool.query('SELECT nome, gerente_id, vendedor_id FROM clientes WHERE id = $1', [cliente_id]);
         let gerenteId = null;
         let vendedorId = null;
         if (cliRes.rows.length > 0) {
@@ -1176,7 +1176,12 @@ app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
             formatarCapitalizacao(observacoes)
         ]);
 
-        res.redirect('/cobranca?sucesso=Boleto cadastrado com sucesso!');
+        const paramsRetorno = new URLSearchParams({
+            busca: numeroDocumento || (cliRes.rows.length > 0 ? cliRes.rows[0].nome : ''),
+            status_boleto: '',
+            sucesso: 'Boleto cadastrado com sucesso!'
+        });
+        res.redirect(`/cobranca?${paramsRetorno.toString()}`);
     } catch (err) {
         console.error('ERRO AO CADASTRAR BOLETO:', err);
         const clientes = await pool.query('SELECT c.id, c.nome, c.gerente_id, c.vendedor_id, g.nome_resumido AS gerente_nome, v.nome_resumido AS vendedor_nome FROM clientes c LEFT JOIN gerentes g ON c.gerente_id = g.id LEFT JOIN vendedores v ON c.vendedor_id = v.id WHERE c.ativo = 1 ORDER BY c.nome ASC');
@@ -1270,7 +1275,7 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
     } = req.body;
 
     try {
-        const cliRes = await pool.query('SELECT gerente_id, vendedor_id FROM clientes WHERE id = $1', [cliente_id]);
+        const cliRes = await pool.query('SELECT nome, gerente_id, vendedor_id FROM clientes WHERE id = $1', [cliente_id]);
         let gerenteId = null;
         let vendedorId = null;
         if (cliRes.rows.length > 0) {
@@ -1307,8 +1312,13 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
             parseInt(boletoId, 10)
         ]);
 
-        const filtrosQuery = criarQueryFiltrosCobranca(req.query);
-        res.redirect(`/cobranca/editar/${boletoId}?${filtrosQuery}&sucesso=Boleto atualizado com sucesso!`);
+        const numeroDocumento = numero_documento ? numero_documento.trim().toUpperCase() : '';
+        const paramsRetorno = new URLSearchParams({
+            busca: numeroDocumento || (cliRes.rows.length > 0 ? cliRes.rows[0].nome : ''),
+            status_boleto: '',
+            sucesso: 'Boleto atualizado com sucesso!'
+        });
+        res.redirect(`/cobranca?${paramsRetorno.toString()}`);
     } catch (err) {
         console.error('ERRO AO EDITAR BOLETO:', err);
         const filtrosQuery = criarQueryFiltrosCobranca(req.query);

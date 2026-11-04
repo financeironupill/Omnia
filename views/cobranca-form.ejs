@@ -68,22 +68,29 @@
                     <div class="card-body">
                         <div class="row g-3">
                             <div class="col-md-12">
-                                <label class="form-label small fw-bold">Cliente *</label>
+                                <label class="form-label small fw-bold">Cliente (Razão Social, Nome Fantasia ou CNPJ) *</label>
                                 <div class="input-group">
-                                    <input type="text" id="buscaCliente" class="form-control" placeholder="Digite um trecho do nome para filtrar..." autocomplete="off">
+                                    <input type="text" id="buscaCliente" class="form-control" placeholder="Digite qualquer trecho da Razão Social, Fantasia ou CNPJ..." autocomplete="off">
                                     <button type="button" class="btn btn-primary fw-semibold" data-bs-toggle="modal" data-bs-target="#modalNovoCliente">
                                         <i class="fa-solid fa-user-plus me-1"></i> Cadastrar Cliente
                                     </button>
                                 </div>
-                                <select name="cliente_id" id="selectCliente" class="form-select mt-2" size="4" required style="display: none;">
+                                <!-- Select ajustado para conter Razão Social, Fantasia e CNPJ para o filtro por trecho -->
+                                <select name="cliente_id" id="selectCliente" class="form-select mt-2 font-monospace" size="4" required style="display: none;">
                                     <% clientes.forEach(c => { %>
+                                        <% 
+                                            let textoExibicao = c.nome;
+                                            if (c.nome_fantasia) textoExibicao += ' - ' + c.nome_fantasia;
+                                            if (c.cnpj_cpf) textoExibicao += ' (' + c.cnpj_cpf + ')';
+                                        %>
                                         <option value="<%= c.id %>" 
+                                                data-texto-busca="<%= textoExibicao.toLowerCase() %>"
                                                 data-gerente-id="<%= c.gerente_id %>" 
                                                 data-vendedor-id="<%= c.vendedor_id %>"
                                                 data-gerente-nome="<%= c.gerente_nome || '' %>" 
                                                 data-vendedor-nome="<%= c.vendedor_nome || '' %>"
                                                 <%= conta && conta.cliente_id == c.id ? 'selected' : '' %>>
-                                            <%= c.nome %>
+                                            <%= textoExibicao %>
                                         </option>
                                     <% }) %>
                                 </select>
@@ -723,7 +730,6 @@
                 feedback.textContent = resultado.sucesso + ' Atualizando a página...';
                 feedback.className = 'alert alert-success mt-3 mb-0';
 
-                // Recarrega a página automaticamente após 1 segundo para exibir a nova interação na timeline
                 setTimeout(() => {
                     window.location.reload();
                 }, 1000);
@@ -789,14 +795,15 @@
                 });
             }
 
+            // BUSCA INTELIGENTE POR TRECHO (RAZÃO SOCIAL, NOME FANTASIA E CNPJ)
             buscaCliente.addEventListener('input', function() {
                 const termo = this.value.toLowerCase().trim();
                 let visiveis = 0;
 
                 Array.from(selectCliente.options).forEach(opt => {
                     if (!opt.value) return;
-                    const texto = opt.text.toLowerCase();
-                    if (texto.includes(termo)) {
+                    const textoBusca = opt.getAttribute('data-texto-busca') || opt.text.toLowerCase();
+                    if (textoBusca.includes(termo)) {
                         opt.style.display = '';
                         visiveis++;
                     } else {
@@ -812,6 +819,7 @@
                 if (opt && opt.value) {
                     inputGerenteNome.value = opt.getAttribute('data-gerente-nome') || 'Não Vinculado';
                     inputVendedorNome.value = opt.getAttribute('data-vendedor-nome') || 'Não Vinculado';
+                    // Extrai apenas o nome principal para o input de busca visual ou mantém limpo
                     buscaCliente.value = opt.text.trim();
                     selectCliente.style.display = 'none';
                 } else {
@@ -885,7 +893,7 @@
                 btnSalvarClienteModal.addEventListener('click', async function() {
                     const payload = {
                         tipo_pessoa: document.getElementById('modalTipoPessoa').value,
-                        cnpj_cpf: document.getElementById('modalCnpjCpf5' in window ? '' : 'modalCnpjCpf').value, // corrigido
+                        cnpj_cpf: document.getElementById('modalCnpjCpf').value,
                         nome: document.getElementById('modalNome').value,
                         nome_fantasia: document.getElementById('modalNomeFantasia').value,
                         email: document.getElementById('modalEmail').value,
@@ -895,9 +903,6 @@
                         gerente_id: document.getElementById('modalGerenteId').value,
                         vendedor_id: document.getElementById('modalVendedorId').value
                     };
-
-                    // Ajuste seguro para pegar o CNPJ/CPF
-                    payload.cnpj_cpf = document.getElementById('modalCnpjCpf').value;
 
                     if (!payload.nome || !payload.email || !payload.gerente_id || !payload.vendedor_id) {
                         alert('Por favor, preencha a Razão Social, o E-mail, o Gerente e o Vendedor.');
@@ -917,7 +922,13 @@
                         if (data.sucesso) {
                             const newOption = document.createElement('option');
                             newOption.value = data.cliente.id;
-                            newOption.text = data.cliente.name || data.cliente.nome;
+                            
+                            let textoNovo = data.cliente.nome;
+                            if (data.cliente.nome_fantasia) textoNovo += ' - ' + data.cliente.nome_fantasia;
+                            if (data.cliente.cnpj_cpf) textoNovo += ' (' + data.cliente.cnpj_cpf + ')';
+
+                            newOption.text = textoNovo;
+                            newOption.setAttribute('data-texto-busca', textoNovo.toLowerCase());
                             newOption.setAttribute('data-gerente-id', data.cliente.gerente_id);
                             newOption.setAttribute('data-vendedor-id', data.cliente.vendedor_id);
                             newOption.setAttribute('data-gerente-nome', data.cliente.gerente_nome);
@@ -936,7 +947,7 @@
                             alert(data.erro || 'Erro ao cadastrar cliente.');
                         }
                     } catch (e) {
-                        alert('Excelência de conexão ao salvar cliente.');
+                        alert('Erro de conexão ao salvar cliente.');
                     } finally {
                         btnSalvarClienteModal.disabled = false;
                     }
