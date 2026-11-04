@@ -98,12 +98,22 @@
 
                             <div class="col-md-6">
                                 <label class="form-label small fw-bold">Gerente Vinculado</label>
-                                <input type="text" id="inputGerenteNome" class="form-control bg-white" placeholder="Selecione um cliente..." readonly>
+                                <select name="gerente_id" id="selectGerenteVinculado" class="form-select">
+                                    <option value="">Não vinculado</option>
+                                    <% if (locals.gerentes) { gerentes.forEach(g => { %>
+                                        <option value="<%= g.id %>" <%= conta && (conta.gerente_vinculado_id != null ? conta.gerente_vinculado_id : conta.gerente_id) == g.id ? 'selected' : '' %>><%= g.nome_resumido %></option>
+                                    <% }) } %>
+                                </select>
                             </div>
 
                             <div class="col-md-6">
                                 <label class="form-label small fw-bold">Vendedor Vinculado</label>
-                                <input type="text" id="inputVendedorNome" class="form-control bg-white" placeholder="Selecione um cliente..." readonly>
+                                <select name="vendedor_id" id="selectVendedorVinculado" class="form-select">
+                                    <option value="">Não vinculado</option>
+                                    <% if (locals.vendedores) { vendedores.forEach(v => { %>
+                                        <option value="<%= v.id %>" data-gerente-id="<%= v.gerente_id %>" <%= conta && (conta.vendedor_vinculado_id != null ? conta.vendedor_vinculado_id : conta.vendedor_id) == v.id ? 'selected' : '' %>><%= v.nome_resumido %></option>
+                                    <% }) } %>
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -766,8 +776,8 @@
 
             const buscaCliente = document.getElementById('buscaCliente');
             const selectCliente = document.getElementById('selectCliente');
-            const inputGerenteNome = document.getElementById('inputGerenteNome');
-            const inputVendedorNome = document.getElementById('inputVendedorNome');
+            const selectGerenteVinculado = document.getElementById('selectGerenteVinculado');
+            const selectVendedorVinculado = document.getElementById('selectVendedorVinculado');
             const valorOriginal = document.getElementById('valorOriginal');
             const dataVencimento = document.getElementById('dataVencimento');
             const valorCustas = document.getElementById('valorCustas');
@@ -818,24 +828,25 @@
                 selectCliente.style.display = visiveis > 0 && termo.length > 0 ? 'block' : 'none';
             });
 
-            function atualizarVinculos() {
+            function atualizarVinculos(atualizarResponsaveis) {
                 const opt = selectCliente.options[selectCliente.selectedIndex];
                 if (opt && opt.value) {
-                    inputGerenteNome.value = opt.getAttribute('data-gerente-nome') || 'Não Vinculado';
-                    inputVendedorNome.value = opt.getAttribute('data-vendedor-nome') || 'Não Vinculado';
+                    if (atualizarResponsaveis) {
+                        selectGerenteVinculado.value = opt.getAttribute('data-gerente-id') || '';
+                        selectVendedorVinculado.value = opt.getAttribute('data-vendedor-id') || '';
+                    }
                     // Extrai apenas o nome principal para o input de busca visual ou mantém limpo
                     buscaCliente.value = opt.text.trim();
                     selectCliente.style.display = 'none';
-                } else {
-                    inputGerenteNome.value = '';
-                    inputVendedorNome.value = '';
                 }
             }
 
-            selectCliente.addEventListener('change', atualizarVinculos);
+            selectCliente.addEventListener('change', function() {
+                atualizarVinculos(true);
+            });
 
             if (selectCliente.value) {
-                atualizarVinculos();
+                atualizarVinculos(false);
             }
 
             document.querySelectorAll('.mascara-moeda').forEach(input => {
@@ -940,7 +951,7 @@
                             newOption.selected = true;
 
                             selectCliente.appendChild(newOption);
-                            atualizarVinculos();
+                            atualizarVinculos(true);
 
                             const modalEl = document.getElementById('modalNovoCliente');
                             const modalInstance = bootstrap.Modal.getInstance(modalEl);

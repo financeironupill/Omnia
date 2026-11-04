@@ -956,7 +956,9 @@ function criarQueryFiltrosCobranca(query) {
         banco: '',
         status_cobranca: '',
         gerente_id: '',
-        vendedor_id: ''
+        vendedor_id: '',
+        data_vencimento_de: '',
+        data_vencimento_ate: ''
     };
     const params = new URLSearchParams();
 
@@ -971,7 +973,7 @@ function criarQueryFiltrosCobranca(query) {
 }
 
 function construirConsultaCobranca(query) {
-    const { busca, banco, status_boleto, status_cobranca, gerente_id, vendedor_id, ordenar, ordem } = query;
+    const { busca, banco, status_boleto, status_cobranca, gerente_id, vendedor_id, data_vencimento_de, data_vencimento_ate, ordenar, ordem } = query;
     const statusBoletoInformado = Object.prototype.hasOwnProperty.call(query, 'status_boleto');
     const statusBoletoSelecionado = typeof status_boleto === 'string' ? status_boleto : '';
     const statusBoletoPadrao = !statusBoletoInformado || statusBoletoSelecionado === 'pendentes';
@@ -1047,6 +1049,18 @@ function construirConsultaCobranca(query) {
         idx++;
     }
 
+    if (typeof data_vencimento_de === 'string' && data_vencimento_de !== '') {
+        queryText += ' AND b.data_vencimento >= $' + idx;
+        queryParams.push(data_vencimento_de);
+        idx++;
+    }
+
+    if (typeof data_vencimento_ate === 'string' && data_vencimento_ate !== '') {
+        queryText += ' AND b.data_vencimento <= $' + idx;
+        queryParams.push(data_vencimento_ate);
+        idx++;
+    }
+
     queryText += ' ORDER BY ' + colunasOrdenacao[ordenarAtual] + ' ' + ordemAtual;
     return { queryText, queryParams, ordenarAtual, ordemAtual, statusBoletoPadrao, statusBoletoSelecionado };
 }
@@ -1065,7 +1079,7 @@ function formatarResultadosCobranca(rows) {
 
 app.get('/cobranca', verificarAutenticacao, async (req, res) => {
     try {
-        const { busca, banco, status_cobranca, gerente_id, vendedor_id } = req.query;
+        const { busca, banco, status_cobranca, gerente_id, vendedor_id, data_vencimento_de, data_vencimento_ate } = req.query;
         const { queryText, queryParams, ordenarAtual, ordemAtual, statusBoletoPadrao, statusBoletoSelecionado } = construirConsultaCobranca(req.query);
         const result = await pool.query(queryText, queryParams);
         const totalValorOriginal = result.rows.reduce((total, boleto) => total + (parseFloat(boleto.valor_original) || 0), 0);
@@ -1092,6 +1106,8 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
             statusCobrancaAtual: status_cobranca || '',
             gerenteAtual: gerente_id || '',
             vendedorAtual: vendedor_id || '',
+            dataVencimentoDeAtual: typeof data_vencimento_de === 'string' ? data_vencimento_de : '',
+            dataVencimentoAteAtual: typeof data_vencimento_ate === 'string' ? data_vencimento_ate : '',
             ordenarAtual,
             ordemAtual,
             totalValorOriginalFmt,
@@ -1163,6 +1179,12 @@ app.get('/cobranca/relatorio', verificarAutenticacao, async (req, res) => {
                     : 'Todas',
                 gerente: gerente.rows[0] ? gerente.rows[0].nome_resumido : (req.query.gerente_id ? `ID ${req.query.gerente_id}` : 'Todos'),
                 vendedor: vendedor.rows[0] ? vendedor.rows[0].nome_resumido : (req.query.vendedor_id ? `ID ${req.query.vendedor_id}` : 'Todos'),
+                vencimentoDe: typeof req.query.data_vencimento_de === 'string' && req.query.data_vencimento_de
+                    ? new Date(`${req.query.data_vencimento_de}T00:00:00`).toLocaleDateString('pt-BR')
+                    : 'Não definido',
+                vencimentoAte: typeof req.query.data_vencimento_ate === 'string' && req.query.data_vencimento_ate
+                    ? new Date(`${req.query.data_vencimento_ate}T00:00:00`).toLocaleDateString('pt-BR')
+                    : 'Não definido',
                 ordenar: nomesOrdenacao[consulta.ordenarAtual],
                 ordem: consulta.ordemAtual === 'ASC' ? 'Crescente' : 'Decrescente'
             },
@@ -1248,7 +1270,7 @@ app.get('/cobranca/nova', verificarAutenticacao, async (req, res) => {
 });
 
 app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
-    const { cliente_id, numero_documento, banco, carteira, valor_original, data_emissao, data_vencimento, situacao_boleto, status_cobranca, data_previsao_pagamento, observacoes } = req.body;
+    const { cliente_id, gerente_id, vendedor_id, numero_documento, banco, carteira, valor_original, data_emissao, data_vencimento, situacao_boleto, status_cobranca, data_previsao_pagamento, observacoes } = req.body;
 
     try {
         const clienteId = parseInt(cliente_id, 10);
@@ -1274,13 +1296,9 @@ app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
             });
         }
 
-        const cliRes = await pool.query('SELECT nome, gerente_id, vendedor_id FROM clientes WHERE id = $1', [cliente_id]);
-        let gerenteId = null;
-        let vendedorId = null;
-        if (cliRes.rows.length > 0) {
-            gerenteId = cliRes.rows[0].gerente_id;
-            vendedorId = cliRes.rows[0].vendedor_id;
-        }
+        const cliRes = await pool.query('SELECT nome FROM clientes WHERE id = $1', [cliente_id]);
+        const gerenteId = gerente_id ? parseInt(gerente_id, 10) : null;
+        const vendedorId = vendedor_id ? parseInt(vendedor_id, 10) : null;
 
         const sql = `INSERT INTO boletos (
             cliente_id, gerente_id, vendedor_id, numero_documento, banco, carteira, valor_original, 
@@ -1376,8 +1394,8 @@ app.get('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
         const boletoRes = await pool.query(`
             SELECT b.*, cl.nome AS cliente_nome, cl.nome_fantasia AS cliente_nome_fantasia,
                    cl.email AS cliente_email, cl.telefone AS cliente_telefone,
-                   g.nome_resumido AS gerente_nome, g.email AS gerente_email,
-                   v.nome_resumido AS vendedor_nome, v.email AS vendedor_email
+                   g.id AS gerente_vinculado_id, g.nome_resumido AS gerente_nome, g.email AS gerente_email,
+                   v.id AS vendedor_vinculado_id, v.nome_resumido AS vendedor_nome, v.email AS vendedor_email
             FROM boletos b 
             LEFT JOIN clientes cl ON b.cliente_id = cl.id 
             LEFT JOIN vendedores v ON v.id = COALESCE(b.vendedor_id, cl.vendedor_id)
@@ -1438,19 +1456,15 @@ app.get('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
 app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
     const boletoId = req.params.id;
     const { 
-        cliente_id, numero_documento, banco, carteira, valor_original, data_emissao, data_vencimento, 
+        cliente_id, gerente_id, vendedor_id, numero_documento, banco, carteira, valor_original, data_emissao, data_vencimento,
         situacao_boleto, status_cobranca, data_previsao_pagamento, data_cartorio, valor_custas, 
         data_pagamento, data_pagamento_custas, observacoes 
     } = req.body;
 
     try {
-        const cliRes = await pool.query('SELECT nome, gerente_id, vendedor_id FROM clientes WHERE id = $1', [cliente_id]);
-        let gerenteId = null;
-        let vendedorId = null;
-        if (cliRes.rows.length > 0) {
-            gerenteId = cliRes.rows[0].gerente_id;
-            vendedorId = cliRes.rows[0].vendedor_id;
-        }
+        const cliRes = await pool.query('SELECT nome FROM clientes WHERE id = $1', [cliente_id]);
+        const gerenteId = gerente_id ? parseInt(gerente_id, 10) : null;
+        const vendedorId = vendedor_id ? parseInt(vendedor_id, 10) : null;
 
         const sql = `UPDATE boletos SET 
             cliente_id = $1, gerente_id = $2, vendedor_id = $3, numero_documento = $4, banco = $5, 
@@ -1482,11 +1496,10 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
         ]);
 
         const numeroDocumento = numero_documento ? numero_documento.trim().toUpperCase() : '';
-        const paramsRetorno = new URLSearchParams({
-            busca: numeroDocumento || (cliRes.rows.length > 0 ? cliRes.rows[0].nome : ''),
-            status_boleto: '',
-            sucesso: 'Boleto atualizado com sucesso!'
-        });
+        const paramsRetorno = new URLSearchParams(criarQueryFiltrosCobranca(req.query));
+        paramsRetorno.set('busca', numeroDocumento || (cliRes.rows.length > 0 ? cliRes.rows[0].nome : ''));
+        paramsRetorno.set('status_boleto', '');
+        paramsRetorno.set('sucesso', 'Boleto atualizado com sucesso!');
         res.redirect(`/cobranca?${paramsRetorno.toString()}`);
     } catch (err) {
         console.error('ERRO AO EDITAR BOLETO:', err);
