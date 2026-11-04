@@ -1215,6 +1215,19 @@ app.get('/cobranca/nota-debito/:id', verificarAutenticacao, async (req, res) => 
             return res.status(404).send('Boleto não encontrado.');
         }
 
+        if (req.query.registrar === 'true') {
+            await pool.query(`
+                INSERT INTO boletos_historico
+                    (boleto_id, usuario_id, tipo_contato, canal, contato_nome, resumo, status, data_hora)
+                VALUES ($1, $2, 'Cliente', 'E-mail', $3, $4, 'Registrado', CURRENT_TIMESTAMP)
+            `, [
+                result.rows[0].id,
+                req.session.usuario.id,
+                result.rows[0].cliente_nome || 'Cliente',
+                'Nota de Débito gerada para envio ao cliente'
+            ]);
+        }
+
         const conta = {
             ...result.rows[0],
             cliente_cnpj: formatarCnpjCpf(result.rows[0].cliente_cnpj),
