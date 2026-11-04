@@ -1141,13 +1141,15 @@ app.get('/cobranca/relatorio', verificarAutenticacao, async (req, res) => {
         const result = await pool.query(consulta.queryText, consulta.queryParams);
         const totalValorOriginal = result.rows.reduce((total, boleto) => total + (parseFloat(boleto.valor_original) || 0), 0);
         const totalCustas = result.rows.reduce((total, boleto) => total + (parseFloat(boleto.valor_custas) || 0), 0);
-        const [gerente, vendedor] = await Promise.all([
+        const [gerente, vendedor, gerentes, vendedores] = await Promise.all([
             req.query.gerente_id
                 ? pool.query('SELECT nome_resumido FROM gerentes WHERE id = $1', [parseInt(req.query.gerente_id, 10)])
                 : Promise.resolve({ rows: [] }),
             req.query.vendedor_id
                 ? pool.query('SELECT nome_resumido FROM vendedores WHERE id = $1', [parseInt(req.query.vendedor_id, 10)])
-                : Promise.resolve({ rows: [] })
+                : Promise.resolve({ rows: [] }),
+            pool.query('SELECT id, nome_resumido FROM gerentes WHERE ativo = 1 ORDER BY nome_resumido ASC'),
+            pool.query('SELECT id, nome_resumido, gerente_id FROM vendedores WHERE ativo = 1 ORDER BY nome_resumido ASC')
         ]);
         formatarResultadosCobranca(result.rows);
 
@@ -1209,11 +1211,117 @@ app.get('/cobranca/relatorio', verificarAutenticacao, async (req, res) => {
             },
             totalValorOriginalFmt: formatarMoedaSemSimbolo(totalValorOriginal),
             totalCustasFmt: formatarMoedaSemSimbolo(totalCustas),
-            queryString: req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : ''
+            queryString: req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : '',
+            gerentes: gerentes.rows,
+            vendedores: vendedores.rows
         });
     } catch (err) {
         console.error('ERRO EM GET /cobranca/relatorio:', err);
         res.status(500).send('Erro interno ao gerar relatório');
+    }
+});
+
+app.post('/cobranca/relatorio/envio', verificarAutenticacao, async (req, res) => {
+    const { gerente_id, vendedor_id, canal, cc, formato } = req.body;
+    const gerenteId = Number(gerente_id);
+    const vendedorId = vendedor_id === 'todos' ? null : Number(vendedor_id);
+
+    if (!Number.isSafeInteger(gerenteId) || gerenteId <= 0 ||
+        (vendedorId !== null && (!Number.isSafeInteger(vendedorId) || vendedorId <= 0)) ||
+        !['email', 'whatsapp'].includes(canal) ||
+        !['pdf', 'excel'].includes(formato)) {
+        return res.status(400).json({ erro: 'Selecione gerente, vendedor, canal e formato válidos.' });
+    }
+
+    const emailsCc = canal === 'email' && typeof cc === 'string'
+        ? cc.split(',').map(email => email.trim()).filter(Boolean)
+        : [];
+    const formatoEmailValido = /^[^\s,;@]+@[^\s,;@]+\.[^\s,;@]+$/;
+    if (emailsCc.some(email => !formatoEmailValido.test(email))) {
+        return res.status(400).json({ erro: 'Confira os endereços informados no campo Com Cópia (CC).' });
+    }
+
+    try {
+        const gerenteRes = await pool.query(
+            'SELECT id, nome_resumido, email, telefone FROM gerentes WHERE id = $1 AND ativo = 1',
+            [gerenteId]
+        );
+        if (!gerenteRes.rows.length) {
+            return res.status(400).json({ erro: 'O gerente selecionado não está ativo ou não foi encontrado.' });
+        }
+
+        const vendedoresRes = vendedorId === null
+            ? await pool.query(
+                'SELECT id, nome_resumido, email, telefone FROM vendedores WHERE gerente_id = $1 AND ativo = 1 ORDER BY nome_resumido ASC',
+                [gerenteId]
+            )
+            : await pool.query(
+                'SELECT id, nome_resumido, email, telefone FROM vendedores WHERE id = $1 AND gerente_id = $2 AND ativo = 1',
+                [vendedorId, gerenteId]
+            );
+        if (vendedorId !== null && !vendedoresRes.rows.length) {
+            return res.status(400).json({ erro: 'O vendedor selecionado não pertence ao gerente ou não está ativo.' });
+        }
+
+        const gerente = gerenteRes.rows[0];
+        const vendedoresDestino = vendedoresRes.rows;
+        const filtrosQuery = criarQueryFiltrosCobranca(req.query);
+        const caminhoArquivo = formato === 'excel' ? '/cobranca/relatorio/csv' : '/cobranca/relatorio';
+        const arquivoUrl = `${caminhoArquivo}?${filtrosQuery}`;
+        const nomesDestino = [gerente.nome_resumido, ...vendedoresDestino.map(v => v.nome_resumido)].filter(Boolean);
+        const corpo = [
+            'Olá,',
+            '',
+            'Segue o relatório de cobrança da equipe.',
+            '',
+            `Destinatários: ${nomesDestino.join(', ')}`,
+            'O envio é preparado manualmente pelo sistema. Baixe o relatório na tela aberta e anexe-o antes de enviar.',
+            '',
+            'Atenciosamente,',
+            'Setor Financeiro - Omnia'
+        ].join('\n');
+        const titulo = formato === 'excel' ? 'Baixar relatório CSV' : 'Abrir relatório para salvar em PDF';
+
+        if (canal === 'email') {
+            const destinatarios = [gerente, ...vendedoresDestino]
+                .map(pessoa => pessoa.email)
+                .filter(Boolean);
+            if (!destinatarios.length) {
+                return res.status(400).json({ erro: 'O gerente e os vendedores selecionados não possuem e-mail cadastrado.' });
+            }
+
+            const assunto = 'Relatório de Contas em Aberto - Cobrança';
+            const mailtoUrl = `mailto:${encodeURIComponent(destinatarios.join(','))}?cc=${encodeURIComponent(emailsCc.join(','))}&subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
+            return res.json({
+                canal,
+                arquivoUrl,
+                tituloArquivo: titulo,
+                mailtoUrl,
+                observacao: 'Baixe ou abra o relatório e anexe-o ao rascunho. O e-mail ainda precisa ser enviado pelo seu cliente de e-mail.'
+            });
+        }
+
+        const destinosWhatsapp = [gerente, ...vendedoresDestino]
+            .filter(pessoa => pessoa.telefone)
+            .map(pessoa => ({
+                nome: pessoa.nome_resumido,
+                url: `https://wa.me/${String(pessoa.telefone).replace(/\D/g, '')}?text=${encodeURIComponent(corpo)}`
+            }))
+            .filter(destino => /wa\.me\/\d+/.test(destino.url));
+        if (!destinosWhatsapp.length) {
+            return res.status(400).json({ erro: 'O gerente e os vendedores selecionados não possuem telefone válido cadastrado.' });
+        }
+
+        return res.json({
+            canal,
+            arquivoUrl,
+            tituloArquivo: titulo,
+            destinosWhatsapp,
+            observacao: 'Baixe ou abra o relatório e anexe-o na conversa do WhatsApp. A mensagem deve ser enviada manualmente.'
+        });
+    } catch (err) {
+        console.error('ERRO AO PREPARAR ENVIO DO RELATÓRIO DE COBRANÇA:', err);
+        res.status(500).json({ erro: 'Erro ao preparar o envio do relatório.' });
     }
 });
 

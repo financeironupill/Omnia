@@ -13,6 +13,16 @@
         .actions { display: flex; gap: 8px; }
         button, .back { border: 1px solid #6c757d; border-radius: 4px; background: #fff; color: #212529; padding: 7px 12px; text-decoration: none; font-size: 12px; cursor: pointer; }
         .export { border-color: #198754; color: #198754; }
+        #modalEnvioRelatorio { width: min(620px, calc(100% - 32px)); border: 0; border-radius: 8px; padding: 0; box-shadow: 0 12px 40px #0004; }
+        #modalEnvioRelatorio::backdrop { background: #0008; }
+        .modal-header, .modal-body, .modal-footer { padding: 16px 20px; }
+        .modal-header, .modal-footer { border-bottom: 1px solid #dee2e6; }
+        .modal-footer { border-top: 1px solid #dee2e6; border-bottom: 0; display: flex; justify-content: flex-end; gap: 8px; }
+        .modal-body label { display: block; margin: 12px 0 4px; font-weight: bold; }
+        .modal-body select, .modal-body input { width: 100%; padding: 8px; border: 1px solid #adb5bd; border-radius: 4px; }
+        .envio-result { display: none; margin-top: 14px; padding: 12px; background: #e9f5ee; border-radius: 4px; }
+        .envio-result a { display: block; margin-top: 8px; overflow-wrap: anywhere; }
+        .envio-error { background: #f8d7da; }
         .filters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 16px; margin: 16px 0; padding: 12px; background: #f3f4f5; }
         .filters strong { display: block; margin-bottom: 2px; }
         .search { grid-column: 1 / -1; overflow-wrap: anywhere; }
@@ -42,6 +52,7 @@
         <div class="actions">
             <a href="/cobranca" class="back">Voltar</a>
             <a href="/cobranca/relatorio/csv<%= queryString %>" class="back export">Exportar para Excel (CSV)</a>
+            <button type="button" class="back" id="abrirModalEnvio">Envio</button>
             <button type="button" onclick="imprimirRelatorio()">Imprimir / Salvar em PDF</button>
         </div>
     </header>
@@ -104,8 +115,150 @@
             </tr>
         </tfoot>
     </table>
+    <dialog id="modalEnvioRelatorio" aria-labelledby="tituloModalEnvio">
+        <form id="formEnvioRelatorio">
+            <div class="modal-header">
+                <strong id="tituloModalEnvio">Preparar envio do relatório</strong>
+            </div>
+            <div class="modal-body">
+                <p>O sistema prepara o arquivo e a mensagem. O envio e a inclusão do anexo são feitos manualmente.</p>
+                <label for="envioGerente">Destinatário (Gerente)</label>
+                <select id="envioGerente" name="gerente_id" required>
+                    <option value="">Selecione um gerente...</option>
+                    <% gerentes.forEach(g => { %>
+                        <option value="<%= g.id %>"><%= g.nome_resumido %></option>
+                    <% }) %>
+                </select>
+
+                <label for="envioVendedor">Vendedor Vinculado</label>
+                <select id="envioVendedor" name="vendedor_id" required disabled>
+                    <option value="">Selecione primeiro um gerente...</option>
+                </select>
+
+                <label for="envioCanal">Canal de Envio</label>
+                <select id="envioCanal" name="canal" required>
+                    <option value="email">E-mail</option>
+                    <option value="whatsapp">WhatsApp</option>
+                </select>
+
+                <div id="grupoEnvioCc">
+                    <label for="envioCc">Com Cópia (CC)</label>
+                    <input type="text" id="envioCc" name="cc" placeholder="email1@exemplo.com, email2@exemplo.com">
+                </div>
+
+                <label for="envioFormato">Formato do Arquivo</label>
+                <select id="envioFormato" name="formato" required>
+                    <option value="pdf">PDF</option>
+                    <option value="excel">Excel (CSV)</option>
+                </select>
+                <div id="resultadoEnvioRelatorio" class="envio-result" role="status" aria-live="polite"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="fecharModalEnvio">Fechar</button>
+                <button type="submit" id="confirmarEnvioRelatorio">Gerar e Enviar</button>
+            </div>
+        </form>
+    </dialog>
     <script>
         const tituloOriginal = document.title;
+
+        const modalEnvioRelatorio = document.getElementById('modalEnvioRelatorio');
+        const formEnvioRelatorio = document.getElementById('formEnvioRelatorio');
+        const gerenteEnvio = document.getElementById('envioGerente');
+        const vendedorEnvio = document.getElementById('envioVendedor');
+        const canalEnvio = document.getElementById('envioCanal');
+        const grupoEnvioCc = document.getElementById('grupoEnvioCc');
+        const resultadoEnvio = document.getElementById('resultadoEnvioRelatorio');
+
+        const vendedoresRelatorio = <%- JSON.stringify(vendedores.map(v => ({
+            id: v.id,
+            gerente_id: v.gerente_id,
+            nome_resumido: v.nome_resumido
+        }))).replace(/</g, '\\u003c') %>;
+
+        document.getElementById('abrirModalEnvio').addEventListener('click', function() {
+            resultadoEnvio.style.display = 'none';
+            resultadoEnvio.replaceChildren();
+            modalEnvioRelatorio.showModal();
+        });
+
+        document.getElementById('fecharModalEnvio').addEventListener('click', function() {
+            modalEnvioRelatorio.close();
+        });
+
+        gerenteEnvio.addEventListener('change', function() {
+            vendedorEnvio.replaceChildren(new Option('Todos da Equipe', 'todos'));
+            vendedoresRelatorio
+                .filter(v => String(v.gerente_id) === gerenteEnvio.value)
+                .forEach(v => vendedorEnvio.add(new Option(v.nome_resumido, String(v.id))));
+            vendedorEnvio.disabled = !gerenteEnvio.value;
+            if (!gerenteEnvio.value) vendedorEnvio.replaceChildren(new Option('Selecione primeiro um gerente...', ''));
+        });
+
+        canalEnvio.addEventListener('change', function() {
+            const usarEmail = canalEnvio.value === 'email';
+            grupoEnvioCc.hidden = !usarEmail;
+            document.getElementById('envioCc').disabled = !usarEmail;
+        });
+
+        function exibirResultadoEnvio(resultado) {
+            resultadoEnvio.replaceChildren();
+            resultadoEnvio.className = 'envio-result';
+            resultadoEnvio.style.display = 'block';
+            const mensagem = document.createElement('p');
+            mensagem.textContent = resultado.observacao;
+            resultadoEnvio.appendChild(mensagem);
+
+            const linkArquivo = document.createElement('a');
+            linkArquivo.href = resultado.arquivoUrl;
+            linkArquivo.target = '_blank';
+            linkArquivo.rel = 'noopener';
+            linkArquivo.textContent = resultado.tituloArquivo;
+            resultadoEnvio.appendChild(linkArquivo);
+
+            if (resultado.mailtoUrl) {
+                const linkEmail = document.createElement('a');
+                linkEmail.href = resultado.mailtoUrl;
+                linkEmail.textContent = 'Abrir rascunho de e-mail';
+                resultadoEnvio.appendChild(linkEmail);
+            }
+
+            (resultado.destinosWhatsapp || []).forEach(destino => {
+                const linkWhatsapp = document.createElement('a');
+                linkWhatsapp.href = destino.url;
+                linkWhatsapp.target = '_blank';
+                linkWhatsapp.rel = 'noopener';
+                linkWhatsapp.textContent = `Abrir WhatsApp — ${destino.nome}`;
+                resultadoEnvio.appendChild(linkWhatsapp);
+            });
+        }
+
+        formEnvioRelatorio.addEventListener('submit', async function(event) {
+            event.preventDefault();
+            const botao = document.getElementById('confirmarEnvioRelatorio');
+            const dados = Object.fromEntries(new FormData(formEnvioRelatorio).entries());
+            resultadoEnvio.style.display = 'none';
+            botao.disabled = true;
+
+            try {
+                const resposta = await fetch(`/cobranca/relatorio/envio${window.location.search}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                    body: JSON.stringify(dados)
+                });
+                const resultado = await resposta.json();
+                if (!resposta.ok) throw new Error(resultado.erro || 'Não foi possível preparar o envio.');
+                exibirResultadoEnvio(resultado);
+            } catch (erro) {
+                resultadoEnvio.className = 'envio-result envio-error';
+                resultadoEnvio.style.display = 'block';
+                resultadoEnvio.textContent = erro.message;
+            } finally {
+                botao.disabled = false;
+            }
+        });
+
+        canalEnvio.dispatchEvent(new Event('change'));
 
         function imprimirRelatorio() {
             document.title = 'Relatório de Contas em Aberto - Cobrança';
