@@ -12,6 +12,7 @@
         p { margin: 3px 0; }
         .actions { display: flex; gap: 8px; }
         button, .back { border: 1px solid #6c757d; border-radius: 4px; background: #fff; color: #212529; padding: 7px 12px; text-decoration: none; font-size: 12px; cursor: pointer; }
+        .export { border-color: #198754; color: #198754; }
         .filters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 16px; margin: 16px 0; padding: 12px; background: #f3f4f5; }
         .filters strong { display: block; margin-bottom: 2px; }
         .search { grid-column: 1 / -1; overflow-wrap: anywhere; }
@@ -40,7 +41,8 @@
         </div>
         <div class="actions">
             <a href="/cobranca" class="back">Voltar</a>
-            <button type="button" onclick="window.print()">Imprimir / Salvar em PDF</button>
+            <a href="/cobranca/relatorio/csv<%= queryString %>" class="back export">Exportar para Excel (CSV)</a>
+            <button type="button" onclick="imprimirRelatorio()">Imprimir / Salvar em PDF</button>
         </div>
     </header>
 
@@ -102,5 +104,17 @@
             </tr>
         </tfoot>
     </table>
+    <script>
+        const tituloOriginal = document.title;
+
+        function imprimirRelatorio() {
+            document.title = 'Relatório de Contas em Aberto - Cobrança';
+            window.print();
+        }
+
+        window.addEventListener('afterprint', function() {
+            document.title = tituloOriginal;
+        });
+    </script>
 </body>
 </html>

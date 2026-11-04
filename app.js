@@ -1208,11 +1208,74 @@ app.get('/cobranca/relatorio', verificarAutenticacao, async (req, res) => {
                 ordem: consulta.ordemAtual === 'ASC' ? 'Crescente' : 'Decrescente'
             },
             totalValorOriginalFmt: formatarMoedaSemSimbolo(totalValorOriginal),
-            totalCustasFmt: formatarMoedaSemSimbolo(totalCustas)
+            totalCustasFmt: formatarMoedaSemSimbolo(totalCustas),
+            queryString: req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : ''
         });
     } catch (err) {
         console.error('ERRO EM GET /cobranca/relatorio:', err);
         res.status(500).send('Erro interno ao gerar relatório');
+    }
+});
+
+app.get('/cobranca/relatorio/csv', verificarAutenticacao, async (req, res) => {
+    try {
+        const consulta = construirConsultaCobranca(req.query);
+        const result = await pool.query(consulta.queryText, consulta.queryParams);
+        const totalValorOriginal = result.rows.reduce((total, boleto) => total + (parseFloat(boleto.valor_original) || 0), 0);
+        const totalCustas = result.rows.reduce((total, boleto) => total + (parseFloat(boleto.valor_custas) || 0), 0);
+        const escaparCampoCsv = (valor, protegerFormula = false) => {
+            let texto = valor == null ? '' : String(valor);
+            if (protegerFormula && /^[\t\r\n ]*[=+\-@]/.test(texto)) {
+                texto = `'${texto}`;
+            }
+            return `"${texto.replace(/"/g, '""')}"`;
+        };
+        const formatarDataCsv = valor => {
+            if (!valor) return '';
+            const data = valor instanceof Date ? valor.toISOString().slice(0, 10) : String(valor).slice(0, 10);
+            const partes = data.split('-');
+            return partes.length === 3 ? `${partes[2]}/${partes[1]}/${partes[0]}` : '';
+        };
+        const cabecalho = [
+            'Nº Documento',
+            'Cliente',
+            'CNPJ/CPF',
+            'Gerente',
+            'Vendedor',
+            'Vencimento',
+            'Data de Emissão',
+            'Situação',
+            'Fase da Régua',
+            'Valor Original',
+            'Custas'
+        ];
+        const linhas = result.rows.map(boleto => [
+            escaparCampoCsv(boleto.numero_documento, true),
+            escaparCampoCsv(boleto.cliente_nome, true),
+            escaparCampoCsv(formatarCnpjCpf(boleto.cliente_cnpj), true),
+            escaparCampoCsv(boleto.gerente_nome, true),
+            escaparCampoCsv(boleto.vendedor_nome, true),
+            escaparCampoCsv(formatarDataCsv(boleto.data_vencimento)),
+            escaparCampoCsv(formatarDataCsv(boleto.data_emissao)),
+            escaparCampoCsv(boleto.situacao_boleto, true),
+            escaparCampoCsv(boleto.status_cobranca || 'Aguardando Régua', true),
+            escaparCampoCsv(formatarMoedaSemSimbolo(boleto.valor_original)),
+            escaparCampoCsv(formatarMoedaSemSimbolo(boleto.valor_custas))
+        ].join(';'));
+        const linhaTotais = [
+            escaparCampoCsv('Totais'),
+            ...Array(8).fill('""'),
+            escaparCampoCsv(formatarMoedaSemSimbolo(totalValorOriginal)),
+            escaparCampoCsv(formatarMoedaSemSimbolo(totalCustas))
+        ].join(';');
+        const csv = `\uFEFF${cabecalho.map(campo => escaparCampoCsv(campo)).join(';')}\r\n${linhas.join('\r\n')}${linhas.length ? '\r\n' : ''}${linhaTotais}\r\n`;
+
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', 'attachment; filename="relatorio-cobranca.csv"');
+        res.send(csv);
+    } catch (err) {
+        console.error('ERRO EM GET /cobranca/relatorio/csv:', err);
+        res.status(500).send('Erro interno ao exportar relatório');
     }
 });
 
