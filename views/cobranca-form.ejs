@@ -268,6 +268,9 @@
                             <button type="button" class="btn btn-outline-danger btn-sm" onclick="prepararEmailRetornado()">
                                 <i class="fa-solid fa-triangle-exclamation me-1"></i> Notificar E-mail Retornado (Gerente/Vendedor)
                             </button>
+                            <a href="/cobranca/nota-debito/<%= conta.id %>" target="_blank" rel="noopener noreferrer" class="btn btn-dark btn-sm">
+                                <i class="fa-solid fa-file-pdf me-1"></i> Gerar Nota de Débito (PDF)
+                            </a>
                         </div>
                         <div id="emailAvisoFeedback" class="alert d-none mt-3 mb-0" role="status" aria-live="polite"></div>
                     </div>

@@ -1200,6 +1200,35 @@ app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
     }
 });
 
+app.get('/cobranca/nota-debito/:id', verificarAutenticacao, async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT b.*, cl.nome AS cliente_nome,
+                   cl.nome_fantasia AS cliente_nome_fantasia,
+                   cl.cnpj_cpf AS cliente_cnpj
+            FROM boletos b
+            LEFT JOIN clientes cl ON cl.id = b.cliente_id
+            WHERE b.id = $1
+        `, [req.params.id]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).send('Boleto não encontrado.');
+        }
+
+        const conta = {
+            ...result.rows[0],
+            cliente_cnpj: formatarCnpjCpf(result.rows[0].cliente_cnpj),
+            valor_original_fmt: formatarMoedaSemSimbolo(result.rows[0].valor_original),
+            valor_custas_fmt: formatarMoedaSemSimbolo(result.rows[0].valor_custas)
+        };
+
+        res.render('nota-debito', { conta });
+    } catch (err) {
+        console.error('ERRO AO GERAR NOTA DE DÉBITO:', err);
+        res.status(500).send('Erro interno');
+    }
+});
+
 // EDITAR BOLETO E EXIBIR HISTÓRICO DA RÉGUA
 app.get('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
     try {
