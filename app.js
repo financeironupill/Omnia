@@ -189,23 +189,34 @@ app.get('/solucao', verificarAutenticacao, (req, res) => res.render('dashboard-s
 
 async function exibirDashboardCobranca(req, res) {
     try {
+        const filtrosRecuperacaoValidos = ['ativos', 'todos', 'fundo_perdido'];
+        const filtroRecuperacao = typeof req.query.filtro_recuperacao === 'string'
+            && filtrosRecuperacaoValidos.includes(req.query.filtro_recuperacao)
+            ? req.query.filtro_recuperacao
+            : 'ativos';
+
         await sincronizarPendenciasRegua(pool, req.session.usuario.id);
         const [agingRes, tarefasRes] = await Promise.all([
             pool.query(`
                 SELECT
-                    COUNT(*) FILTER (WHERE CURRENT_DATE - data_vencimento BETWEEN 1 AND 15) AS dias_1_15_qtd,
-                    COALESCE(SUM(valor_original) FILTER (WHERE CURRENT_DATE - data_vencimento BETWEEN 1 AND 15), 0) AS dias_1_15_valor,
-                    COUNT(*) FILTER (WHERE CURRENT_DATE - data_vencimento BETWEEN 16 AND 30) AS dias_16_30_qtd,
-                    COALESCE(SUM(valor_original) FILTER (WHERE CURRENT_DATE - data_vencimento BETWEEN 16 AND 30), 0) AS dias_16_30_valor,
-                    COUNT(*) FILTER (WHERE CURRENT_DATE - data_vencimento > 30) AS dias_31_mais_qtd,
-                    COALESCE(SUM(valor_original) FILTER (WHERE CURRENT_DATE - data_vencimento > 30), 0) AS dias_31_mais_valor,
-                    COUNT(*) FILTER (WHERE status_cobranca = 'Em Cartório / Negativado') AS cartorio_qtd,
-                    COALESCE(SUM(valor_original) FILTER (WHERE status_cobranca = 'Em Cartório / Negativado'), 0) AS cartorio_valor
-                FROM boletos
-                WHERE excluido_em IS NULL
-                  AND situacao_boleto IN ('Vencido', 'Pago com Pendência')
-                  AND data_vencimento < CURRENT_DATE
-            `),
+                    COUNT(*) FILTER (WHERE CURRENT_DATE - b.data_vencimento BETWEEN 1 AND 15) AS dias_1_15_qtd,
+                    COALESCE(SUM(b.valor_original) FILTER (WHERE CURRENT_DATE - b.data_vencimento BETWEEN 1 AND 15), 0) AS dias_1_15_valor,
+                    COUNT(*) FILTER (WHERE CURRENT_DATE - b.data_vencimento BETWEEN 16 AND 30) AS dias_16_30_qtd,
+                    COALESCE(SUM(b.valor_original) FILTER (WHERE CURRENT_DATE - b.data_vencimento BETWEEN 16 AND 30), 0) AS dias_16_30_valor,
+                    COUNT(*) FILTER (WHERE CURRENT_DATE - b.data_vencimento > 30) AS dias_31_mais_qtd,
+                    COALESCE(SUM(b.valor_original) FILTER (WHERE CURRENT_DATE - b.data_vencimento > 30), 0) AS dias_31_mais_valor,
+                    COUNT(*) FILTER (WHERE b.status_cobranca = 'Em Cartório / Negativado') AS cartorio_qtd,
+                    COALESCE(SUM(b.valor_original) FILTER (WHERE b.status_cobranca = 'Em Cartório / Negativado'), 0) AS cartorio_valor
+                FROM boletos AS b
+                WHERE b.excluido_em IS NULL
+                  AND b.situacao_boleto IN ('Vencido', 'Pago com Pendência')
+                  AND b.data_vencimento < CURRENT_DATE
+                  AND (
+                      $1 = 'todos'
+                      OR ($1 = 'ativos' AND b.fundo_perdido IS NOT TRUE)
+                      OR ($1 = 'fundo_perdido' AND b.fundo_perdido IS TRUE)
+                  )
+            `, [filtroRecuperacao]),
             pool.query(`
                 SELECT pendencia.id AS pendencia_id, pendencia.boleto_id AS id, pendencia.etapa,
                        pendencia.acao, pendencia.data_acao, b.numero_documento, b.data_vencimento,
@@ -219,8 +230,13 @@ async function exibirDashboardCobranca(req, res) {
                   AND b.situacao_boleto IN ('Vencido', 'Pago com Pendência')
                   AND pendencia.fase_origem = b.status_cobranca
                   AND pendencia.data_fase_origem = b.data_fase_cobranca
+                  AND (
+                      $1 = 'todos'
+                      OR ($1 = 'ativos' AND b.fundo_perdido IS NOT TRUE)
+                      OR ($1 = 'fundo_perdido' AND b.fundo_perdido IS TRUE)
+                  )
                 ORDER BY pendencia.data_acao, b.data_vencimento, b.id
-            `)
+            `, [filtroRecuperacao])
         ]);
         const aging = agingRes.rows[0];
         ['dias_1_15_valor', 'dias_16_30_valor', 'dias_31_mais_valor', 'cartorio_valor']
@@ -228,7 +244,8 @@ async function exibirDashboardCobranca(req, res) {
         res.render('cobranca-dashboard', {
             usuario: req.session.usuario,
             aging,
-            tarefas: tarefasRes.rows
+            tarefas: tarefasRes.rows,
+            filtroRecuperacaoAtual: filtroRecuperacao
         });
     } catch (err) {
         console.error('ERRO AO CARREGAR DASHBOARD DE COBRANÇA:', {

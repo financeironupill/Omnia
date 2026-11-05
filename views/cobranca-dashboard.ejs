@@ -22,7 +22,17 @@
                 <h2 class="fw-bold mb-1">Dashboard de Cobrança</h2>
                 <p class="text-muted mb-0">Aging de títulos vencidos e ações da régua que já atingiram o prazo.</p>
             </div>
-            <span class="text-muted small">Olá, <%= usuario.nome %></span>
+            <div class="d-flex flex-wrap align-items-center gap-3">
+                <form method="GET" action="/cobranca/dashboard" class="d-flex align-items-center gap-2">
+                    <label for="filtroRecuperacao" class="form-label mb-0 fw-semibold">Situação de Recuperação</label>
+                    <select id="filtroRecuperacao" name="filtro_recuperacao" class="form-select" onchange="this.form.submit()">
+                        <option value="ativos" <%= filtroRecuperacaoAtual === 'ativos' ? 'selected' : '' %>>Ativos</option>
+                        <option value="todos" <%= filtroRecuperacaoAtual === 'todos' ? 'selected' : '' %>>Todos</option>
+                        <option value="fundo_perdido" <%= filtroRecuperacaoAtual === 'fundo_perdido' ? 'selected' : '' %>>Fundo Perdido</option>
+                    </select>
+                </form>
+                <span class="text-muted small">Olá, <%= usuario.nome %></span>
+            </div>
         </div>
 
         <div class="row g-3 mb-4">
