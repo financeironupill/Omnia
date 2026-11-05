@@ -8,7 +8,9 @@ if (!process.env.DATABASE_URL) {
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   options: '-c timezone=America/Sao_Paulo',
-  ssl: true
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
 pool.connect((err, client, release) => {
