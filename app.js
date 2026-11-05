@@ -2026,11 +2026,11 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
         const sql = `UPDATE boletos SET 
             cliente_id = $1, gerente_id = $2, vendedor_id = $3, numero_documento = $4, banco = $5, 
             carteira = $6, valor_original = $7, data_emissao = $8, data_vencimento = $9, 
-            situacao_boleto = $10, status_cobranca = $11, data_previsao_pagamento = $12, 
+            situacao_boleto = $10, status_cobranca = $11::text, data_previsao_pagamento = $12,
             data_cartorio = $13, valor_custas = $14, data_pagamento = $15, data_pagamento_custas = $16,
             observacoes = $17, fundo_perdido = $18, atualizado_em = CURRENT_TIMESTAMP,
             data_fase_cobranca = CASE
-                WHEN status_cobranca IS DISTINCT FROM $11 THEN CURRENT_TIMESTAMP
+                WHEN status_cobranca IS DISTINCT FROM $11::text THEN CURRENT_TIMESTAMP
                 ELSE COALESCE(data_fase_cobranca, CURRENT_TIMESTAMP)
             END
             WHERE id = $19 AND excluido_em IS NULL`;
