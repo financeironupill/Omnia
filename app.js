@@ -7,11 +7,10 @@ const pool = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const trustProxy = process.env.TRUST_PROXY === 'true';
+app.set('trust proxy', 1);
 if (!process.env.SESSION_SECRET) {
     throw new Error('A variável SESSION_SECRET deve ser configurada no ambiente.');
 }
-if (trustProxy) app.set('trust proxy', 1);
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
@@ -25,7 +24,6 @@ app.use(session({
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    proxy: trustProxy,
     cookie: {
         httpOnly: true,
         sameSite: 'lax',
@@ -172,7 +170,14 @@ app.post('/login', async (req, res) => {
             return res.render('login', { erro: 'Utilizador ou palavra-passe incorretos.' });
         }
         req.session.usuario = { id: r.rows[0].id, nome: r.rows[0].nome, usuario: r.rows[0].usuario, nivel: r.rows[0].nivel };
-        res.redirect('/dashboard');
+        console.log(`Login bem-sucedido. ID do utilizador: ${req.session.usuario.id}`);
+        req.session.save((err) => {
+            if (err) {
+                console.error('Erro ao guardar sessão após login:', err);
+                return res.status(500).render('login', { erro: 'Erro interno.' });
+            }
+            res.redirect('/dashboard');
+        });
     } catch (e) {
         res.render('login', { erro: 'Erro interno.' });
     }
