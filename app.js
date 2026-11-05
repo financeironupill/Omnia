@@ -231,7 +231,12 @@ async function exibirDashboardCobranca(req, res) {
             tarefas: tarefasRes.rows
         });
     } catch (err) {
-        console.error('ERRO AO CARREGAR DASHBOARD DE COBRANÇA:', err);
+        console.error('ERRO AO CARREGAR DASHBOARD DE COBRANÇA:', {
+            name: err instanceof Error ? err.name : 'UnknownError',
+            message: err instanceof Error ? err.message : String(err),
+            code: err && err.code,
+            stack: err instanceof Error ? err.stack : undefined
+        });
         res.status(500).send('Erro ao carregar o dashboard de cobrança.');
     }
 }
