@@ -66,6 +66,10 @@
         <div><strong>Fundo Perdido</strong><%= filtros.fundoPerdido %></div>
         <div><strong>Vencimento inicial (De)</strong><%= filtros.vencimentoDe %></div>
         <div><strong>Vencimento final (Até)</strong><%= filtros.vencimentoAte %></div>
+        <% if (filtros.exibirAtualizado) { %>
+            <div><strong>Atualizado em (De)</strong><%= filtros.atualizadoDe %></div>
+            <div><strong>Atualizado em (Até)</strong><%= filtros.atualizadoAte %></div>
+        <% } %>
         <div><strong>Ordenação</strong><%= filtros.ordenar %> — <%= filtros.ordem %></div>
         <% if (filtros.busca) { %>
             <div class="search"><strong>Pesquisa</strong><%= filtros.busca %></div>

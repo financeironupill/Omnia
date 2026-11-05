@@ -164,6 +164,24 @@
                     <input type="date" name="data_vencimento_ate" class="form-control form-control-sm" value="<%= dataVencimentoAteAtual %>">
                 </div>
 
+                <div class="col-12">
+                    <div class="form-check">
+                        <input type="checkbox" name="exibir_atualizado" value="1" id="exibirAtualizado" class="form-check-input" <%= exibirAtualizado ? 'checked' : '' %> onchange="this.form.submit()">
+                        <label class="form-check-label small fw-bold" for="exibirAtualizado">Exibir coluna "Atualizado em"</label>
+                    </div>
+                </div>
+
+                <% if (exibirAtualizado) { %>
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold">Atualizado em (De)</label>
+                        <input type="date" name="data_atualizado_de" class="form-control form-control-sm" value="<%= dataAtualizadoDeAtual %>">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold">Atualizado em (Até)</label>
+                        <input type="date" name="data_atualizado_ate" class="form-control form-control-sm" value="<%= dataAtualizadoAteAtual %>">
+                    </div>
+                <% } %>
+
                 <div class="col-md-2">
                     <label class="form-label small fw-bold">Exibir Fundo Perdido?</label>
                     <select name="exibir_fundo_perdido" class="form-select form-select-sm">
@@ -185,7 +203,10 @@
                     if (locals.ordenarAtual === coluna && locals.ordemAtual === 'ASC') {
                         novaOrdem = 'DESC';
                     }
-                    return `/cobranca?ordenar=${coluna}&ordem=${novaOrdem}&${filtrosCobrancaQuery}`;
+                    const parametros = new URLSearchParams(filtrosCobrancaQuery);
+                    parametros.set('ordenar', coluna);
+                    parametros.set('ordem', novaOrdem);
+                    return `/cobranca?${parametros.toString()}`;
                 }
 
                 function iconeSeta(coluna) {
@@ -202,7 +223,9 @@
                                        (locals.gerenteAtual && locals.gerenteAtual !== '') ||
                                        (locals.vendedorAtual && locals.vendedorAtual !== '') ||
                                        (locals.dataVencimentoDeAtual && locals.dataVencimentoDeAtual !== '') ||
-                                       (locals.dataVencimentoAteAtual && locals.dataVencimentoAteAtual !== '');
+                                       (locals.dataVencimentoAteAtual && locals.dataVencimentoAteAtual !== '') ||
+                                       (locals.exibirAtualizado && ((locals.dataAtualizadoDeAtual && locals.dataAtualizadoDeAtual !== '') ||
+                                       (locals.dataAtualizadoAteAtual && locals.dataAtualizadoAteAtual !== '')));
             %>
 
             <!-- TABELA DE BOLETOS -->
@@ -213,6 +236,9 @@
                             <th><a href="<%= gerarLinkOrdenacao('documento') %>" class="th-ordenavel">Nº Doc <%- iconeSeta('documento') %></a></th>
                             <th><a href="<%= gerarLinkOrdenacao('cliente') %>" class="th-ordenavel">Cliente <%- iconeSeta('cliente') %></a></th>
                             <th><a href="<%= gerarLinkOrdenacao('vencimento') %>" class="th-ordenavel">Vencimento <%- iconeSeta('vencimento') %></a></th>
+                            <% if (exibirAtualizado) { %>
+                                <th><a href="<%= gerarLinkOrdenacao('atualizado') %>" class="th-ordenavel">Atualizado em <%- iconeSeta('atualizado') %></a></th>
+                            <% } %>
                             <th class="text-center">Dias Aberto</th>
                             <th><a href="<%= gerarLinkOrdenacao('previsao') %>" class="th-ordenavel">Previsão Pagto <%- iconeSeta('previsao') %></a></th>
                             <th class="text-end"><a href="<%= gerarLinkOrdenacao('valor') %>" class="th-ordenavel justify-content-end">Valor Orig. <%- iconeSeta('valor') %></a></th>
@@ -234,6 +260,9 @@
                                         </small>
                                     </td>
                                     <td><%= b.data_vencimento ? new Date(b.data_vencimento).toLocaleDateString('pt-BR') : '-' %></td>
+                                    <% if (exibirAtualizado) { %>
+                                        <td class="text-nowrap"><%= b.atualizado_em_fmt %></td>
+                                    <% } %>
                                     <td class="text-center">
                                         <% if (b.situacao_boleto === 'Vencido' && b.dias_atraso > 0) { %>
                                             <span class="badge bg-danger"><%= b.dias_atraso %> dia(s)</span>
@@ -345,7 +374,7 @@
                             <% }) %>
                         <% } else { %>
                             <tr>
-                                <td colspan="10" class="text-center py-4 text-muted">Nenhum boleto encontrado.</td>
+                                <td colspan="<%= 10 + (exibirAtualizado ? 1 : 0) %>" class="text-center py-4 text-muted">Nenhum boleto encontrado.</td>
                             </tr>
                         <% } %>
                     </tbody>
@@ -362,7 +391,7 @@
                                 </td>
                                 <td class="text-end text-dark"><%= locals.totalValorOriginalFmt || '0,00' %></td>
                                 <td class="text-end text-danger"><%= locals.totalCustasFmt || '0,00' %></td>
-                                <td colspan="3"></td>
+                                <td colspan="<%= exibirAtualizado ? 4 : 3 %>"></td>
                             </tr>
                         </tfoot>
                     <% } %>

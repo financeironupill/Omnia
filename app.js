@@ -959,16 +959,29 @@ function criarQueryFiltrosCobranca(query) {
         vendedor_id: '',
         data_vencimento_de: '',
         data_vencimento_ate: '',
+        exibir_atualizado: '',
+        data_atualizado_de: '',
+        data_atualizado_ate: '',
         exibir_fundo_perdido: 'ativos',
         ordenar: '',
         ordem: ''
     };
     const params = new URLSearchParams();
 
+    filtrosPadrao.data_atualizado_de = query.exibir_atualizado === '1' && typeof query.data_atualizado_de === 'string'
+        ? query.data_atualizado_de
+        : '';
+    filtrosPadrao.data_atualizado_ate = query.exibir_atualizado === '1' && typeof query.data_atualizado_ate === 'string'
+        ? query.data_atualizado_ate
+        : '';
+
     Object.entries(filtrosPadrao).forEach(([nome, valorPadrao]) => {
-        const valor = Object.prototype.hasOwnProperty.call(query, nome)
-            ? query[nome]
-            : valorPadrao;
+        const dataAtualizado = nome === 'data_atualizado_de' || nome === 'data_atualizado_ate';
+        const valor = dataAtualizado
+            ? valorPadrao
+            : Object.prototype.hasOwnProperty.call(query, nome)
+                ? query[nome]
+                : valorPadrao;
         params.set(nome, typeof valor === 'string' ? valor : '');
     });
 
@@ -976,7 +989,8 @@ function criarQueryFiltrosCobranca(query) {
 }
 
 function construirConsultaCobranca(query) {
-    const { busca, banco, status_boleto, status_cobranca, gerente_id, vendedor_id, data_vencimento_de, data_vencimento_ate, exibir_fundo_perdido, ordenar, ordem } = query;
+    const { busca, banco, status_boleto, status_cobranca, gerente_id, vendedor_id, data_vencimento_de, data_vencimento_ate, exibir_atualizado, data_atualizado_de, data_atualizado_ate, exibir_fundo_perdido, ordenar, ordem } = query;
+    const exibirAtualizado = exibir_atualizado === '1';
     const statusBoletoInformado = Object.prototype.hasOwnProperty.call(query, 'status_boleto');
     const statusBoletoSelecionado = typeof status_boleto === 'string' ? status_boleto : '';
     const statusBoletoPadrao = !statusBoletoInformado || statusBoletoSelecionado === 'pendentes';
@@ -991,7 +1005,8 @@ function construirConsultaCobranca(query) {
         previsao: 'b.data_previsao_pagamento',
         valor: 'b.valor_original',
         situacao: 'b.situacao_boleto',
-        regua: 'b.status_cobranca'
+        regua: 'b.status_cobranca',
+        atualizado: 'b.atualizado_em'
     };
     const ordenarAtual = typeof ordenar === 'string' && Object.prototype.hasOwnProperty.call(colunasOrdenacao, ordenar)
         ? ordenar
@@ -1068,6 +1083,18 @@ function construirConsultaCobranca(query) {
         idx++;
     }
 
+    if (exibirAtualizado && typeof data_atualizado_de === 'string' && data_atualizado_de !== '') {
+        queryText += ' AND b.atualizado_em >= $' + idx + '::date';
+        queryParams.push(data_atualizado_de);
+        idx++;
+    }
+
+    if (exibirAtualizado && typeof data_atualizado_ate === 'string' && data_atualizado_ate !== '') {
+        queryText += ' AND b.atualizado_em < ($' + idx + '::date + INTERVAL \'1 day\')';
+        queryParams.push(data_atualizado_ate);
+        idx++;
+    }
+
     if (fundoPerdidoFiltro === 'ativos') {
         queryText += ' AND b.fundo_perdido IS NOT TRUE';
     } else if (fundoPerdidoFiltro === 'perdidos') {
@@ -1075,7 +1102,27 @@ function construirConsultaCobranca(query) {
     }
 
     queryText += ' ORDER BY ' + colunasOrdenacao[ordenarAtual] + ' ' + ordemAtual;
-    return { queryText, queryParams, ordenarAtual, ordemAtual, statusBoletoPadrao, statusBoletoSelecionado, fundoPerdidoFiltro };
+    return { queryText, queryParams, ordenarAtual, ordemAtual, statusBoletoPadrao, statusBoletoSelecionado, fundoPerdidoFiltro, exibirAtualizado };
+}
+
+function formatarDataHoraCobranca(valor) {
+    if (!valor) return '-';
+    const data = valor instanceof Date ? valor : new Date(valor);
+    if (Number.isNaN(data.getTime())) return '-';
+
+    const partes = new Intl.DateTimeFormat('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23'
+    }).formatToParts(data).reduce((resultado, parte) => {
+        resultado[parte.type] = parte.value;
+        return resultado;
+    }, {});
+    return `${partes.day}/${partes.month}/${partes.year} às ${partes.hour}:${partes.minute}`;
 }
 
 function formatarResultadosCobranca(rows) {
@@ -1084,6 +1131,7 @@ function formatarResultadosCobranca(rows) {
         b.valor_original_fmt = formatarMoedaSemSimbolo(b.valor_original);
         b.valor_custas_fmt = formatarMoedaSemSimbolo(b.valor_custas);
         b.valor_estornado_fmt = formatarMoedaSemSimbolo(b.valor_estornado);
+        b.atualizado_em_fmt = formatarDataHoraCobranca(b.atualizado_em);
         b.reincidente_pendente = parseInt(b.total_pendentes_cliente, 10) > 1;
         b.dias_atraso = parseInt(b.dias_atraso, 10) > 0 ? parseInt(b.dias_atraso, 10) : 0;
     });
@@ -1093,7 +1141,7 @@ function formatarResultadosCobranca(rows) {
 app.get('/cobranca', verificarAutenticacao, async (req, res) => {
     try {
         const { busca, banco, status_cobranca, gerente_id, vendedor_id, data_vencimento_de, data_vencimento_ate } = req.query;
-        const { queryText, queryParams, ordenarAtual, ordemAtual, statusBoletoPadrao, statusBoletoSelecionado, fundoPerdidoFiltro } = construirConsultaCobranca(req.query);
+        const { queryText, queryParams, ordenarAtual, ordemAtual, statusBoletoPadrao, statusBoletoSelecionado, fundoPerdidoFiltro, exibirAtualizado } = construirConsultaCobranca(req.query);
         const result = await pool.query(queryText, queryParams);
         const totalValorOriginal = result.rows.reduce((total, boleto) => total + (parseFloat(boleto.valor_original) || 0), 0);
         const totalCustas = result.rows.reduce((total, boleto) => total + (parseFloat(boleto.valor_custas) || 0), 0);
@@ -1121,6 +1169,9 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
             vendedorAtual: vendedor_id || '',
             dataVencimentoDeAtual: typeof data_vencimento_de === 'string' ? data_vencimento_de : '',
             dataVencimentoAteAtual: typeof data_vencimento_ate === 'string' ? data_vencimento_ate : '',
+            exibirAtualizado,
+            dataAtualizadoDeAtual: exibirAtualizado && typeof req.query.data_atualizado_de === 'string' ? req.query.data_atualizado_de : '',
+            dataAtualizadoAteAtual: exibirAtualizado && typeof req.query.data_atualizado_ate === 'string' ? req.query.data_atualizado_ate : '',
             fundoPerdidoFiltroAtual: fundoPerdidoFiltro,
             ordenarAtual,
             ordemAtual,
@@ -1175,7 +1226,8 @@ app.get('/cobranca/relatorio', verificarAutenticacao, async (req, res) => {
             previsao: 'Previsão de pagamento',
             valor: 'Valor original',
             situacao: 'Situação',
-            regua: 'Fase da régua'
+            regua: 'Fase da régua',
+            atualizado: 'Data de atualização'
         };
         const statusSelecionado = req.query.status_boleto;
 
@@ -1207,7 +1259,14 @@ app.get('/cobranca/relatorio', verificarAutenticacao, async (req, res) => {
                     ? new Date(`${req.query.data_vencimento_ate}T00:00:00`).toLocaleDateString('pt-BR')
                     : 'Não definido',
                 ordenar: nomesOrdenacao[consulta.ordenarAtual],
-                ordem: consulta.ordemAtual === 'ASC' ? 'Crescente' : 'Decrescente'
+                ordem: consulta.ordemAtual === 'ASC' ? 'Crescente' : 'Decrescente',
+                exibirAtualizado: consulta.exibirAtualizado,
+                atualizadoDe: consulta.exibirAtualizado && req.query.data_atualizado_de
+                    ? new Date(`${req.query.data_atualizado_de}T00:00:00`).toLocaleDateString('pt-BR')
+                    : 'Não definido',
+                atualizadoAte: consulta.exibirAtualizado && req.query.data_atualizado_ate
+                    ? new Date(`${req.query.data_atualizado_ate}T00:00:00`).toLocaleDateString('pt-BR')
+                    : 'Não definido'
             },
             totalValorOriginalFmt: formatarMoedaSemSimbolo(totalValorOriginal),
             totalCustasFmt: formatarMoedaSemSimbolo(totalCustas),
