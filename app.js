@@ -1315,6 +1315,7 @@ app.get('/relatorios/comissoes', verificarAutenticacao, async (req, res) => {
                     COALESCE(SUM(ce.valor_estornado) FILTER (
                         WHERE b.situacao_boleto IN ('Pago', 'Pago com Pendência')
                           AND ce.data_estorno IS NOT NULL
+                          AND ce.data_restituicao IS NULL
                           AND ($2::date IS NULL OR ce.data_estorno >= $2::date)
                           AND ($3::date IS NULL OR ce.data_estorno < ($3::date + INTERVAL '1 day'))
                     ), 0) AS total_reembolso
