@@ -8,20 +8,20 @@ async function sincronizarPendenciasRegua(pool, usuarioId) {
         await db.query('BEGIN');
 
         const canceladas = await db.query(`
-            UPDATE boletos_regua_pendencias p
+            UPDATE boletos_regua_pendencias AS pendencia
             SET status = 'Cancelada', concluido_em = CURRENT_TIMESTAMP,
                 concluido_por = $1
-            WHERE p.status = 'Pendente'
+            WHERE pendencia.status = 'Pendente'
               AND NOT EXISTS (
                   SELECT 1
                   FROM boletos b
-                  WHERE b.id = p.boleto_id
+                  WHERE b.id = pendencia.boleto_id
                     AND b.excluido_em IS NULL
                     AND b.situacao_boleto IN ('Vencido', 'Pago com Pendência')
-                    AND b.status_cobranca = p.fase_origem
-                    AND b.data_fase_cobranca = p.data_fase_origem
+                    AND b.status_cobranca = pendencia.fase_origem
+                    AND b.data_fase_cobranca = pendencia.data_fase_origem
               )
-            RETURNING p.boleto_id, p.acao
+            RETURNING pendencia.boleto_id, pendencia.acao
         `, [Number(usuarioId)]);
 
         if (canceladas.rowCount > 0) {
@@ -130,7 +130,7 @@ async function sincronizarPendenciasRegua(pool, usuarioId) {
                   AND b.status_cobranca = 'Aviso 3 (Aviso Final)'
             ),
             novas AS (
-                INSERT INTO boletos_regua_pendencias
+                INSERT INTO boletos_regua_pendencias AS pendencia
                     (boleto_id, etapa, fase_origem, acao, data_fase_origem,
                      data_acao, status, criado_por)
                 SELECT boleto_id, etapa, fase_origem, acao, data_fase_origem,

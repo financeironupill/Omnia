@@ -207,19 +207,19 @@ async function exibirDashboardCobranca(req, res) {
                   AND data_vencimento < CURRENT_DATE
             `),
             pool.query(`
-                SELECT p.id AS pendencia_id, p.boleto_id AS id, p.etapa,
-                       p.acao, p.data_acao, b.numero_documento, b.data_vencimento,
+                SELECT pendencia.id AS pendencia_id, pendencia.boleto_id AS id, pendencia.etapa,
+                       pendencia.acao, pendencia.data_acao, b.numero_documento, b.data_vencimento,
                        b.valor_original, b.status_cobranca,
                        c.nome AS cliente_nome, c.email AS cliente_email
-                FROM boletos_regua_pendencias p
-                JOIN boletos b ON b.id = p.boleto_id
+                FROM boletos_regua_pendencias AS pendencia
+                JOIN boletos b ON b.id = pendencia.boleto_id
                 JOIN clientes c ON c.id = b.cliente_id
-                WHERE p.status = 'Pendente'
+                WHERE pendencia.status = 'Pendente'
                   AND b.excluido_em IS NULL
                   AND b.situacao_boleto IN ('Vencido', 'Pago com Pendência')
-                  AND p.fase_origem = b.status_cobranca
-                  AND p.data_fase_origem = b.data_fase_cobranca
-                ORDER BY p.data_acao, b.data_vencimento, b.id
+                  AND pendencia.fase_origem = b.status_cobranca
+                  AND pendencia.data_fase_origem = b.data_fase_cobranca
+                ORDER BY pendencia.data_acao, b.data_vencimento, b.id
             `)
         ]);
         const aging = agingRes.rows[0];

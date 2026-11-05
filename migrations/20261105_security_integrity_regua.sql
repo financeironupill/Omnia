@@ -26,6 +26,44 @@ CREATE TABLE IF NOT EXISTS boletos_regua_pendencias (
     concluido_em TIMESTAMPTZ
 );
 
+ALTER TABLE boletos_regua_pendencias
+    ADD COLUMN IF NOT EXISTS fase_origem TEXT,
+    ADD COLUMN IF NOT EXISTS data_fase_origem TIMESTAMPTZ;
+
+UPDATE boletos_regua_pendencias AS pendencia
+SET fase_origem = COALESCE(
+        pendencia.fase_origem,
+        boleto.status_cobranca,
+        CASE pendencia.etapa
+            WHEN 1 THEN 'Aguardando Régua'
+            WHEN 2 THEN 'Aviso 1 (Notificação)'
+            WHEN 3 THEN 'Aviso 2 (Alerta Cartório)'
+            WHEN 4 THEN 'Aviso 3 (Aviso Final)'
+        END
+    ),
+    data_fase_origem = COALESCE(
+        pendencia.data_fase_origem,
+        boleto.data_fase_cobranca,
+        CURRENT_TIMESTAMP
+    )
+FROM boletos AS boleto
+WHERE boleto.id = pendencia.boleto_id
+  AND (pendencia.fase_origem IS NULL OR pendencia.data_fase_origem IS NULL);
+
+UPDATE boletos_regua_pendencias
+SET fase_origem = CASE etapa
+        WHEN 1 THEN 'Aguardando Régua'
+        WHEN 2 THEN 'Aviso 1 (Notificação)'
+        WHEN 3 THEN 'Aviso 2 (Alerta Cartório)'
+        WHEN 4 THEN 'Aviso 3 (Aviso Final)'
+    END,
+    data_fase_origem = COALESCE(data_fase_origem, CURRENT_TIMESTAMP)
+WHERE fase_origem IS NULL OR data_fase_origem IS NULL;
+
+ALTER TABLE boletos_regua_pendencias
+    ALTER COLUMN fase_origem SET NOT NULL,
+    ALTER COLUMN data_fase_origem SET NOT NULL;
+
 CREATE UNIQUE INDEX IF NOT EXISTS uq_boletos_regua_pendencia_ativa
     ON boletos_regua_pendencias (boleto_id, etapa, data_fase_origem)
     WHERE status = 'Pendente';
