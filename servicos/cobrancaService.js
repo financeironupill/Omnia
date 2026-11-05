@@ -137,8 +137,7 @@ async function sincronizarPendenciasRegua(pool, usuarioId) {
                        data_acao, 'Pendente', $1
                 FROM candidatos
                 WHERE data_acao <= CURRENT_DATE
-                ON CONFLICT (boleto_id, etapa, data_fase_origem)
-                    WHERE status = 'Pendente'
+                ON CONFLICT ON CONSTRAINT uq_boleto_etapa_pendente
                 DO NOTHING
                 RETURNING boleto_id, etapa, acao, data_acao
             ),
