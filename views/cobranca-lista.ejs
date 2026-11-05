@@ -79,121 +79,131 @@
             <% if (locals.sucesso && sucesso) { %> <div class="alert alert-success py-2"><%= sucesso %></div> <% } %>
 
             <!-- FILTROS DE PESQUISA DA RÉGUA -->
-            <form action="/cobranca" method="GET" id="formFiltroCobranca" class="row g-2 mb-4 bg-light p-3 rounded border">
+            <form action="/cobranca" method="GET" id="formFiltroCobranca" class="mb-4 bg-light p-3 rounded border">
                 <input type="hidden" name="ordenar" value="<%= locals.ordenarAtual || '' %>">
                 <input type="hidden" name="ordem" value="<%= locals.ordemAtual || '' %>">
 
-                <div class="col-md-3">
-                    <label class="form-label small fw-bold">Cliente / Pesquisa Geral</label>
-                    <input type="text" name="busca" id="inputBuscaCliente" class="form-control form-control-sm" placeholder="Razão Social, Fantasia ou CNPJ..." value="<%= buscaAtual %>" autocomplete="off">
-                    <datalist id="listaClientesFiltro">
-                        <% if (locals.clientesLista && clientesLista.length > 0) { %>
-                            <% clientesLista.forEach(c => { %>
-                                <option value="<%= c.nome %>">
-                                <% if (c.nome_fantasia) { %><option value="<%= c.nome_fantasia %>"><% } %>
-                                <% if (c.cnpj_cpf) { %><option value="<%= c.cnpj_cpf %>"><% } %>
+                <div class="row g-3 mb-3">
+                    <div class="col-12 col-md-3">
+                        <label class="form-label small fw-bold">Cliente / Pesquisa Geral</label>
+                        <input type="text" name="busca" id="inputBuscaCliente" class="form-control form-control-sm" placeholder="Razão Social, Fantasia ou CNPJ..." value="<%= buscaAtual %>" autocomplete="off">
+                        <datalist id="listaClientesFiltro">
+                            <% if (locals.clientesLista && clientesLista.length > 0) { %>
+                                <% clientesLista.forEach(c => { %>
+                                    <option value="<%= c.nome %>">
+                                    <% if (c.nome_fantasia) { %><option value="<%= c.nome_fantasia %>"><% } %>
+                                    <% if (c.cnpj_cpf) { %><option value="<%= c.cnpj_cpf %>"><% } %>
+                                <% }) %>
+                            <% } %>
+                        </datalist>
+                    </div>
+
+                    <div class="col-12 col-md-2">
+                        <label class="form-label small fw-bold">Situação do Boleto</label>
+                        <select name="status_boleto" class="form-select form-select-sm">
+                            <option value="">Todas</option>
+                            <option value="pendentes" <%= statusBoletoAtual === 'pendentes' ? 'selected' : '' %>>Vencido e Pago com Pendência</option>
+                            <option value="Vencido" <%= statusBoletoAtual === 'Vencido' ? 'selected' : '' %>>Vencido</option>
+                            <option value="Pago" <%= statusBoletoAtual === 'Pago' ? 'selected' : '' %>>Pago</option>
+                            <option value="Pago com Pendência" <%= statusBoletoAtual === 'Pago com Pendência' ? 'selected' : '' %>>Pago com Pendência</option>
+                        </select>
+                    </div>
+
+                    <div class="col-12 col-md-2">
+                        <label class="form-label small fw-bold">Banco</label>
+                        <select name="banco" class="form-select form-select-sm">
+                            <option value="">Todos os Bancos</option>
+                            <% if (locals.bancos && bancos.length > 0) { %>
+                                <% bancos.forEach(b => { %>
+                                    <option value="<%= b.banco %>" <%= bancoAtual === b.banco ? 'selected' : '' %>><%= b.banco %></option>
+                                <% }) %>
+                            <% } %>
+                        </select>
+                    </div>
+
+                    <div class="col-12 col-md-2">
+                        <label class="form-label small fw-bold">Fase da Régua</label>
+                        <select name="status_cobranca" class="form-select form-select-sm">
+                            <option value="">Todas as Fases</option>
+                            <option value="Aguardando Régua" <%= statusCobrancaAtual === 'Aguardando Régua' ? 'selected' : '' %>>Aguardando Régua</option>
+                            <option value="Aviso 1 (Notificação)" <%= statusCobrancaAtual === 'Aviso 1 (Notificação)' ? 'selected' : '' %>>Aviso 1 (Notificação)</option>
+                            <option value="Aviso 2 (Alerta Cartório)" <%= statusCobrancaAtual === 'Aviso 2 (Alerta Cartório)' ? 'selected' : '' %>>Aviso 2 (Alerta Cartório)</option>
+                            <option value="Aviso 3 (Aviso Final)" <%= statusCobrancaAtual === 'Aviso 3 (Aviso Final)' ? 'selected' : '' %>>Aviso 3 (Aviso Final)</option>
+                            <option value="Em Cartório / Negativado" <%= statusCobrancaAtual === 'Em Cartório / Negativado' ? 'selected' : '' %>>Em Cartório / Negativado</option>
+                            <option value="Custas Pendentes (Cartório)" <%= statusCobrancaAtual === 'Custas Pendentes (Cartório)' ? 'selected' : '' %>>Custas Pendentes (Cartório)</option>
+                            <option value="Concluído" <%= statusCobrancaAtual === 'Concluído' ? 'selected' : '' %>>Concluído</option>
+                        </select>
+                    </div>
+
+                    <div class="col-12 col-md-3">
+                        <label class="form-label small fw-bold">Gerente</label>
+                        <select name="gerente_id" id="filtroGerente" class="form-select form-select-sm">
+                            <option value="">Todos os Gerentes</option>
+                            <% gerentes.forEach(g => { %>
+                                <option value="<%= g.id %>" <%= gerenteAtual == g.id ? 'selected' : '' %>><%= g.nome_resumido %></option>
                             <% }) %>
-                        <% } %>
-                    </datalist>
+                        </select>
+                    </div>
                 </div>
 
-                <div class="col-md-2">
-                    <label class="form-label small fw-bold">Situação do Boleto</label>
-                    <select name="status_boleto" class="form-select form-select-sm">
-                        <option value="">Todas</option>
-                        <option value="pendentes" <%= statusBoletoAtual === 'pendentes' ? 'selected' : '' %>>Vencido e Pago com Pendência</option>
-                        <option value="Vencido" <%= statusBoletoAtual === 'Vencido' ? 'selected' : '' %>>Vencido</option>
-                        <option value="Pago" <%= statusBoletoAtual === 'Pago' ? 'selected' : '' %>>Pago</option>
-                        <option value="Pago com Pendência" <%= statusBoletoAtual === 'Pago com Pendência' ? 'selected' : '' %>>Pago com Pendência</option>
-                    </select>
-                </div>
-
-                <div class="col-md-2">
-                    <label class="form-label small fw-bold">Banco</label>
-                    <select name="banco" class="form-select form-select-sm">
-                        <option value="">Todos os Bancos</option>
-                        <% if (locals.bancos && bancos.length > 0) { %>
-                            <% bancos.forEach(b => { %>
-                                <option value="<%= b.banco %>" <%= bancoAtual === b.banco ? 'selected' : '' %>><%= b.banco %></option>
+                <div class="row g-3 mb-3">
+                    <div class="col-12 col-md-3">
+                        <label class="form-label small fw-bold">Vendedor</label>
+                        <select name="vendedor_id" id="filtroVendedor" class="form-select form-select-sm">
+                            <option value="">Todos os Vendedores</option>
+                            <% vendedores.forEach(v => { %>
+                                <option value="<%= v.id %>" data-gerente-id="<%= v.gerente_id %>" <%= vendedorAtual == v.id ? 'selected' : '' %>><%= v.nome_resumido %></option>
                             <% }) %>
-                        <% } %>
-                    </select>
-                </div>
+                        </select>
+                    </div>
 
-                <div class="col-md-2">
-                    <label class="form-label small fw-bold">Fase da Régua</label>
-                    <select name="status_cobranca" class="form-select form-select-sm">
-                        <option value="">Todas as Fases</option>
-                        <option value="Aguardando Régua" <%= statusCobrancaAtual === 'Aguardando Régua' ? 'selected' : '' %>>Aguardando Régua</option>
-                        <option value="Aviso 1 (Notificação)" <%= statusCobrancaAtual === 'Aviso 1 (Notificação)' ? 'selected' : '' %>>Aviso 1 (Notificação)</option>
-                        <option value="Aviso 2 (Alerta Cartório)" <%= statusCobrancaAtual === 'Aviso 2 (Alerta Cartório)' ? 'selected' : '' %>>Aviso 2 (Alerta Cartório)</option>
-                        <option value="Aviso 3 (Aviso Final)" <%= statusCobrancaAtual === 'Aviso 3 (Aviso Final)' ? 'selected' : '' %>>Aviso 3 (Aviso Final)</option>
-                        <option value="Em Cartório / Negativado" <%= statusCobrancaAtual === 'Em Cartório / Negativado' ? 'selected' : '' %>>Em Cartório / Negativado</option>
-                        <option value="Custas Pendentes (Cartório)" <%= statusCobrancaAtual === 'Custas Pendentes (Cartório)' ? 'selected' : '' %>>Custas Pendentes (Cartório)</option>
-                        <option value="Concluído" <%= statusCobrancaAtual === 'Concluído' ? 'selected' : '' %>>Concluído</option>
-                    </select>
-                </div>
+                    <div class="col-12 col-md-3">
+                        <label class="form-label small fw-bold">Data de Vencimento Inicial (De)</label>
+                        <input type="date" name="data_vencimento_de" class="form-control form-control-sm" value="<%= dataVencimentoDeAtual %>">
+                    </div>
 
-                <div class="col-md-2">
-                    <label class="form-label small fw-bold">Gerente</label>
-                    <select name="gerente_id" id="filtroGerente" class="form-select form-select-sm">
-                        <option value="">Todos os Gerentes</option>
-                        <% gerentes.forEach(g => { %>
-                            <option value="<%= g.id %>" <%= gerenteAtual == g.id ? 'selected' : '' %>><%= g.nome_resumido %></option>
-                        <% }) %>
-                    </select>
-                </div>
+                    <div class="col-12 col-md-3">
+                        <label class="form-label small fw-bold">Data de Vencimento Final (Até)</label>
+                        <input type="date" name="data_vencimento_ate" class="form-control form-control-sm" value="<%= dataVencimentoAteAtual %>">
+                    </div>
 
-                <div class="col-md-2">
-                    <label class="form-label small fw-bold">Vendedor</label>
-                    <select name="vendedor_id" id="filtroVendedor" class="form-select form-select-sm">
-                        <option value="">Todos os Vendedores</option>
-                        <% vendedores.forEach(v => { %>
-                            <option value="<%= v.id %>" data-gerente-id="<%= v.gerente_id %>" <%= vendedorAtual == v.id ? 'selected' : '' %>><%= v.nome_resumido %></option>
-                        <% }) %>
-                    </select>
-                </div>
-
-                <div class="col-md-2">
-                    <label class="form-label small fw-bold">Data de Vencimento Inicial (De)</label>
-                    <input type="date" name="data_vencimento_de" class="form-control form-control-sm" value="<%= dataVencimentoDeAtual %>">
-                </div>
-
-                <div class="col-md-2">
-                    <label class="form-label small fw-bold">Data de Vencimento Final (Até)</label>
-                    <input type="date" name="data_vencimento_ate" class="form-control form-control-sm" value="<%= dataVencimentoAteAtual %>">
-                </div>
-
-                <div class="col-12">
-                    <div class="form-check">
-                        <input type="checkbox" name="exibir_atualizado" value="1" id="exibirAtualizado" class="form-check-input" <%= exibirAtualizado ? 'checked' : '' %> onchange="this.form.submit()">
-                        <label class="form-check-label small fw-bold" for="exibirAtualizado">Exibir coluna "Atualizado em"</label>
+                    <div class="col-12 col-md-3">
+                        <label class="form-label small fw-bold">Exibir Fundo Perdido?</label>
+                        <select name="exibir_fundo_perdido" class="form-select form-select-sm">
+                            <option value="ativos" <%= fundoPerdidoFiltroAtual === 'ativos' ? 'selected' : '' %>>Apenas Ativos (Padrão)</option>
+                            <option value="perdidos" <%= fundoPerdidoFiltroAtual === 'perdidos' ? 'selected' : '' %>>Apenas Fundo Perdido</option>
+                            <option value="todos" <%= fundoPerdidoFiltroAtual === 'todos' ? 'selected' : '' %>>Todos</option>
+                        </select>
                     </div>
                 </div>
 
-                <% if (exibirAtualizado) { %>
-                    <div class="col-md-2">
-                        <label class="form-label small fw-bold">Atualizado em (De)</label>
-                        <input type="date" name="data_atualizado_de" class="form-control form-control-sm" value="<%= dataAtualizadoDeAtual %>">
+                <div class="row g-3 align-items-end">
+                    <div class="col-12 <%= exibirAtualizado ? 'col-md-4' : 'col-md-8' %>">
+                        <div class="form-check">
+                            <input type="checkbox" name="exibir_atualizado" value="1" id="exibirAtualizado" class="form-check-input" <%= exibirAtualizado ? 'checked' : '' %> onchange="this.form.submit()">
+                            <label class="form-check-label small fw-bold" for="exibirAtualizado">Exibir coluna "Atualizado em"</label>
+                        </div>
                     </div>
-                    <div class="col-md-2">
-                        <label class="form-label small fw-bold">Atualizado em (Até)</label>
-                        <input type="date" name="data_atualizado_ate" class="form-control form-control-sm" value="<%= dataAtualizadoAteAtual %>">
-                    </div>
-                <% } %>
 
-                <div class="col-md-2">
-                    <label class="form-label small fw-bold">Exibir Fundo Perdido?</label>
-                    <select name="exibir_fundo_perdido" class="form-select form-select-sm">
-                        <option value="ativos" <%= fundoPerdidoFiltroAtual === 'ativos' ? 'selected' : '' %>>Apenas Ativos (Padrão)</option>
-                        <option value="perdidos" <%= fundoPerdidoFiltroAtual === 'perdidos' ? 'selected' : '' %>>Apenas Fundo Perdido</option>
-                        <option value="todos" <%= fundoPerdidoFiltroAtual === 'todos' ? 'selected' : '' %>>Todos</option>
-                    </select>
-                </div>
-
-                <div class="col-12 d-flex justify-content-end gap-1 mt-2">
-                    <button type="submit" class="btn btn-secondary btn-sm fw-semibold" title="Filtrar"><i class="fa-solid fa-filter"></i></button>
-                    <a href="/cobranca" class="btn btn-outline-secondary btn-sm fw-semibold" title="Limpar"><i class="fa-solid fa-rotate-left"></i></a>
+                    <% if (exibirAtualizado) { %>
+                        <div class="col-12 col-md-2">
+                            <label class="form-label small fw-bold">Atualizado em (De)</label>
+                            <input type="date" name="data_atualizado_de" class="form-control form-control-sm" value="<%= dataAtualizadoDeAtual %>">
+                        </div>
+                        <div class="col-12 col-md-2">
+                            <label class="form-label small fw-bold">Atualizado em (Até)</label>
+                            <input type="date" name="data_atualizado_ate" class="form-control form-control-sm" value="<%= dataAtualizadoAteAtual %>">
+                        </div>
+                        <div class="col-12 col-md-4 d-flex justify-content-md-end gap-2">
+                            <button type="submit" class="btn btn-secondary btn-sm fw-semibold" title="Filtrar"><i class="fa-solid fa-filter me-1"></i>Filtrar</button>
+                            <a href="/cobranca" class="btn btn-outline-secondary btn-sm fw-semibold" title="Limpar"><i class="fa-solid fa-rotate-left me-1"></i>Limpar</a>
+                        </div>
+                    <% } else { %>
+                        <div class="col-12 col-md-4 d-flex justify-content-md-end gap-2">
+                            <button type="submit" class="btn btn-secondary btn-sm fw-semibold" title="Filtrar"><i class="fa-solid fa-filter me-1"></i>Filtrar</button>
+                            <a href="/cobranca" class="btn btn-outline-secondary btn-sm fw-semibold" title="Limpar"><i class="fa-solid fa-rotate-left me-1"></i>Limpar</a>
+                        </div>
+                    <% } %>
                 </div>
             </form>
 
