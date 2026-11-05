@@ -29,6 +29,10 @@
 
             <!-- BARRA DE BUSCA -->
             <form action="/clientes" method="GET" class="mb-4">
+                <input type="hidden" name="campo" value="<%= campoAtual %>">
+                <input type="hidden" name="ord" value="<%= ordAtual %>">
+                <% if (paginaAtual) { %><input type="hidden" name="page" value="<%= paginaAtual %>"><% } %>
+                <% if (origemAtual) { %><input type="hidden" name="origem" value="<%= origemAtual %>"><% } %>
                 <div class="row g-2">
                     <div class="col-md-10">
                         <div class="input-group">
@@ -42,17 +46,33 @@
                 </div>
             </form>
 
+            <%
+                function linkOrdenacao(campo) {
+                    const proximaOrdem = campoAtual === campo && ordAtual === 'asc' ? 'desc' : 'asc';
+                    const params = new URLSearchParams({ campo, ord: proximaOrdem });
+                    if (buscaAtual) params.set('busca', buscaAtual);
+                    if (paginaAtual) params.set('page', paginaAtual);
+                    if (origemAtual) params.set('origem', origemAtual);
+                    return `/clientes?${params.toString()}`;
+                }
+
+                function iconeOrdenacao(campo) {
+                    if (campoAtual !== campo) return 'fa-sort';
+                    return ordAtual === 'asc' ? 'fa-sort-up' : 'fa-sort-down';
+                }
+            %>
+
             <!-- TABELA DE CLIENTES -->
             <div class="table-responsive">
                 <table class="table table-hover table-striped align-middle bg-white mb-0 border">
                     <thead class="table-dark">
                         <tr>
-                            <th style="width: 70px;">ID</th>
-                            <th>Tipo</th>
-                            <th>CPF / CNPJ</th>
-                            <th>Nome / Fantasia</th>
-                            <th>Gerente / Vendedor</th>
-                            <th>Cidade / UF</th>
+                            <th style="width: 70px;"><a href="<%= linkOrdenacao('id') %>" class="text-white text-decoration-none" title="Alternar ordem do ID">ID <i class="fa-solid <%= iconeOrdenacao('id') %> ms-1"></i></a></th>
+                            <th><a href="<%= linkOrdenacao('tipo') %>" class="text-white text-decoration-none" title="Alternar ordem do tipo">Tipo <i class="fa-solid <%= iconeOrdenacao('tipo') %> ms-1"></i></a></th>
+                            <th><a href="<%= linkOrdenacao('cpf_cnpj') %>" class="text-white text-decoration-none" title="Alternar ordem do CPF/CNPJ">CPF / CNPJ <i class="fa-solid <%= iconeOrdenacao('cpf_cnpj') %> ms-1"></i></a></th>
+                            <th><a href="<%= linkOrdenacao('nome') %>" class="text-white text-decoration-none" title="Alternar ordem do nome">Nome / Fantasia <i class="fa-solid <%= iconeOrdenacao('nome') %> ms-1"></i></a></th>
+                            <th><a href="<%= linkOrdenacao('gerente') %>" class="text-white text-decoration-none" title="Alternar ordem de gerente e vendedor">Gerente / Vendedor <i class="fa-solid <%= iconeOrdenacao('gerente') %> ms-1"></i></a></th>
+                            <th><a href="<%= linkOrdenacao('cidade_uf') %>" class="text-white text-decoration-none" title="Alternar ordem de cidade e UF">Cidade / UF <i class="fa-solid <%= iconeOrdenacao('cidade_uf') %> ms-1"></i></a></th>
                             <th class="text-end" style="width: 160px;">Ações</th>
                         </tr>
                     </thead>

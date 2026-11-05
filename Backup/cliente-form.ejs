@@ -96,6 +96,45 @@
                     </div>
                 </div>
 
+                <section class="card border-0 bg-light mt-4">
+                    <div class="card-body">
+                        <h5 class="fw-bold text-dark mb-3"><i class="fa-solid fa-building-columns text-primary me-2"></i>Dados Bancários &amp; PIX</h5>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Banco</label>
+                                <input type="text" name="banco" class="form-control" value="<%= cliente ? cliente.banco || '' : '' %>">
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Agência</label>
+                                <input type="text" name="agencia" class="form-control" value="<%= cliente ? cliente.agencia || '' : '' %>">
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Conta</label>
+                                <input type="text" name="conta" class="form-control" value="<%= cliente ? cliente.conta || '' : '' %>">
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Tipo de Chave PIX</label>
+                                <select name="tipo_chave_pix" class="form-select">
+                                    <option value="">Selecione o tipo...</option>
+                                    <option value="CPF" <%= (cliente && cliente.tipo_chave_pix === 'CPF') ? 'selected' : '' %>>CPF</option>
+                                    <option value="CNPJ" <%= (cliente && cliente.tipo_chave_pix === 'CNPJ') ? 'selected' : '' %>>CNPJ</option>
+                                    <option value="E-mail" <%= (cliente && cliente.tipo_chave_pix === 'E-mail') ? 'selected' : '' %>>E-mail</option>
+                                    <option value="Telefone" <%= (cliente && cliente.tipo_chave_pix === 'Telefone') ? 'selected' : '' %>>Telefone</option>
+                                    <option value="Aleatória" <%= (cliente && (cliente.tipo_chave_pix === 'Aleatória' || cliente.tipo_chave_pix === 'Chave Aleatória')) ? 'selected' : '' %>>Chave Aleatória</option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-8">
+                                <label class="form-label small fw-bold">Chave PIX</label>
+                                <input type="text" name="chave_pix" class="form-control" value="<%= cliente ? cliente.chave_pix || '' : '' %>">
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 <div class="d-flex justify-content-end gap-2 mt-4">
                     <a href="/clientes" class="btn btn-secondary">Cancelar</a>
                     <button type="submit" class="btn btn-primary fw-semibold px-4"><i class="fa-solid fa-save me-1"></i> Gravar Cliente</button>

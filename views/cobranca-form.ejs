@@ -685,7 +685,13 @@
                         assunto: document.getElementById('emailAssuntoModal').value,
                         corpo: document.getElementById('emailTextoModal').value
                     }
-                    : { etapa: emailReguaEtapaPendente };
+                    : {
+                        etapa: emailReguaEtapaPendente,
+                        para: document.getElementById('emailParaModal').value,
+                        cc: document.getElementById('emailCcModal').value,
+                        assunto: document.getElementById('emailAssuntoModal').value,
+                        corpo: document.getElementById('emailTextoModal').value
+                    };
                 const resposta = await fetch(`/cobranca/${rota}/confirmar/${encodeURIComponent(dadosBoleto.id)}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },

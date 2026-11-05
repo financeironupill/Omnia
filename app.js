@@ -1941,8 +1941,8 @@ app.post('/cobranca/email-liquidacao/confirmar/:id', verificarAutenticacao, asyn
 
 async function carregarEmailRegua(boletoId, etapa, executor = pool) {
     const boletoRes = await executor.query(`
-        SELECT b.id, b.numero_documento, b.data_vencimento, b.valor_original,
-               cl.nome, cl.nome_fantasia, cl.email,
+        SELECT b.id, b.cliente_id, b.numero_documento, b.data_vencimento, b.valor_original,
+               cl.cnpj_cpf AS cliente_cnpj, cl.nome, cl.nome_fantasia, cl.email,
                g.email AS gerente_email, v.email AS vendedor_email
         FROM boletos b
         LEFT JOIN clientes cl ON cl.id = b.cliente_id
@@ -1973,6 +1973,32 @@ async function carregarEmailRegua(boletoId, etapa, executor = pool) {
         ? new Date(boleto.data_vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' })
         : 'Não informado';
     const identificacaoTitulo = `**Vencimento: ${vencimento} - Doc: ${boleto.numero_documento} - ${clienteNome} - R$ ${formatarMoedaSemSimbolo(boleto.valor_original)}**`;
+    const outrosTitulosRes = await executor.query(`
+        SELECT b2.data_vencimento, b2.numero_documento, b2.valor_original, b2.status_cobranca
+        FROM boletos b2
+        LEFT JOIN clientes cl2 ON cl2.id = b2.cliente_id
+        WHERE b2.id <> $1
+          AND b2.situacao_boleto IN ('Vencido', 'Pago com Pendência')
+          AND (
+              ($2::integer IS NOT NULL AND b2.cliente_id = $2)
+              OR (
+                  NULLIF(regexp_replace(COALESCE($3, ''), '[^0-9]', '', 'g'), '') IS NOT NULL
+                  AND regexp_replace(COALESCE(cl2.cnpj_cpf, ''), '[^0-9]', '', 'g') =
+                      regexp_replace($3, '[^0-9]', '', 'g')
+              )
+          )
+        ORDER BY b2.data_vencimento ASC, b2.id ASC
+    `, [boleto.id, boleto.cliente_id, boleto.cliente_cnpj]);
+    const outrosTitulos = outrosTitulosRes.rows;
+    const listaOutrosTitulos = outrosTitulos.map(titulo => {
+        const situacaoCartorio = titulo.status_cobranca === 'Em Cartório / Negativado'
+            ? ' *(Situação: Em Cartório / Negativado)*'
+            : '';
+        return `- Vencimento: ${formatarDataEmail(titulo.data_vencimento)} | Nº do Documento: ${titulo.numero_documento || 'Não informado'} | Valor Original: R$ ${formatarMoedaSemSimbolo(titulo.valor_original)}${situacaoCartorio}`;
+    }).join('\n');
+    const blocoOutrosTitulos = outrosTitulos.length > 0
+        ? `Faturas vencidas adicionais em aberto:\n${listaOutrosTitulos}`
+        : '';
     const etapaConfig = etapasEmailRegua[etapa];
     let assunto;
     let corpo;
@@ -1987,7 +2013,7 @@ Estamos entrando em contato para informar que, em nosso sistema, consta como em 
 
 ${identificacaoTitulo}
 
-Se o pagamento já foi efetuado, por favor, nos avise e nos envie o comprovante para que possamos dar baixa em nosso registro.
+${blocoOutrosTitulos ? `${blocoOutrosTitulos}\n\n` : ''}Se o pagamento já foi efetuado, por favor, nos avise e nos envie o comprovante para que possamos dar baixa em nosso registro.
 
 Caso precise de qualquer informação para regularizar a situação, ou se houver alguma dúvida, estamos à disposição para ajudar. Você pode nos contatar em 11 4486-8977 ou responder a este e-mail.
 
@@ -2004,7 +2030,7 @@ Estamos enviando este segundo aviso para reforçar nosso contato anterior, refer
 
 ${identificacaoTitulo}
 
-Se o pagamento já foi efetuado, pedimos a gentileza de nos enviar o comprovante para que possamos atualizar o status em nosso sistema e evitar futuros lembretes.
+${blocoOutrosTitulos ? `Além do título acima, lembramos que também constam as seguintes faturas vencidas acumuladas:\n${listaOutrosTitulos}\n\n` : ''}Se o pagamento já foi efetuado, pedimos a gentileza de nos enviar o comprovante para que possamos atualizar o status em nosso sistema e evitar futuros lembretes.
 
 Caso haja alguma dificuldade para regularizar essa pendência, ou se precisar de qualquer informação adicional, por favor, entre em contato conosco o mais breve possível. Estamos à disposição para ajudar.
 
@@ -2023,7 +2049,9 @@ ${identificacaoTitulo}
 
 Apesar de nossos avisos anteriores o pagamento ainda não foi regularizado.
 
-Informamos que, na ausência de regularização, este título será encaminhado para protesto em cartório no próximo dia útil. O protesto pode acarretar custos adicionais e restrições de crédito para sua empresa/CPF.
+${outrosTitulos.length > 0
+        ? `Todos os títulos vencidos e não pagos relacionados serão cobrados em conjunto, incluindo o título acima e as seguintes faturas adicionais:\n${listaOutrosTitulos}\n\n`
+        : 'Todos os títulos vencidos e não pagos relacionados serão cobrados em conjunto, caso existam outros títulos em aberto além do título acima.\n\n'}Informamos que, na ausência de regularização, este título será encaminhado para protesto em cartório no próximo dia útil. O protesto pode acarretar custos adicionais e restrições de crédito para sua empresa/CPF.
 
 Caso o pagamento já tenha sido efetuado, por favor, nos envie o comprovante com urgência para que possamos evitar o protesto e atualizar nosso sistema.
 
@@ -2061,6 +2089,11 @@ app.post('/cobranca/email-regua/confirmar/:id', verificarAutenticacao, async (re
     if (!Number.isSafeInteger(boletoId) || boletoId <= 0 || !etapasEmailRegua[etapa]) {
         return res.status(400).json({ erro: 'Boleto ou etapa da régua inválida.' });
     }
+    const { para, cc, assunto, corpo } = req.body;
+    if ([para, cc, assunto, corpo].some(valor => typeof valor !== 'string') ||
+        !para.trim() || !assunto.trim() || !corpo.trim()) {
+        return res.status(400).json({ erro: 'Conteúdo do e-mail enviado inválido.' });
+    }
 
     let db;
     let transactionStarted = false;
@@ -2083,7 +2116,7 @@ app.post('/cobranca/email-regua/confirmar/:id', verificarAutenticacao, async (re
             return res.status(404).json({ erro: 'Boleto não encontrado.' });
         }
 
-        const resumo = `Status: Confirmado. Envio da etapa ${etapa} (${email.etapaConfig.fase}) confirmado pelo usuário. Para: ${email.para}. CC: ${email.cc.join(', ') || 'Nenhum'}. Assunto: ${email.assunto}\n\n${email.corpo}`;
+        const resumo = `Status: Confirmado. Envio da etapa ${etapa} (${email.etapaConfig.fase}) confirmado pelo usuário. Para: ${para.trim()}. CC: ${cc.trim() || 'Nenhum'}. Assunto: ${assunto.trim()}\n\n${corpo.trim()}`;
         const historicoRes = await db.query(`
             INSERT INTO boletos_historico
                 (boleto_id, usuario_id, tipo_contato, canal, contato_nome, resumo, status, data_hora)

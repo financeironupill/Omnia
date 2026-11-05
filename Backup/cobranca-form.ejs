@@ -26,7 +26,7 @@
                         <a class="nav-link" href="/dashboard"><i class="fa-solid fa-chart-line me-1"></i> Dashboard</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link active" href="/cobranca"><i class="fa-solid fa-file-invoice-dollar me-1"></i> Cobrança</a>
+                        <a class="nav-link active" href="/cobranca?<%= typeof filtrosCobrancaQuery === 'string' ? filtrosCobrancaQuery : '' %>"><i class="fa-solid fa-file-invoice-dollar me-1"></i> Cobrança</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="/ocorrencias"><i class="fa-solid fa-triangle-exclamation me-1"></i> Ocorrências</a>
@@ -52,13 +52,13 @@
                     </h3>
                     <p class="text-muted small mb-0">Dados do documento e régua de acompanhamento de cobrança.</p>
                 </div>
-                <a href="/cobranca" class="btn btn-outline-secondary btn-sm"><i class="fa-solid fa-arrow-left me-1"></i> Voltar</a>
+                <a href="/cobranca?<%= typeof filtrosCobrancaQuery === 'string' ? filtrosCobrancaQuery : '' %>" class="btn btn-outline-secondary btn-sm"><i class="fa-solid fa-arrow-left me-1"></i> Voltar</a>
             </div>
 
             <% if (locals.erro && erro) { %> <div class="alert alert-danger py-2"><%= erro %></div> <% } %>
             <% if (locals.sucesso && sucesso) { %> <div class="alert alert-success py-2"><%= sucesso %></div> <% } %>
 
-            <form action="/cobranca/<%= conta && conta.id ? 'editar/' + conta.id : 'novo' %>" method="POST" id="formBoleto">
+            <form action="/cobranca/<%= conta && conta.id ? 'editar/' + conta.id : 'novo' %><%= typeof filtrosCobrancaQuery === 'string' ? '?' + filtrosCobrancaQuery : '' %>" method="POST" id="formBoleto">
                 
                 <!-- SEÇÃO 1: DADOS DO DEVEDOR -->
                 <div class="card mb-4 border-0 bg-light">
@@ -68,22 +68,29 @@
                     <div class="card-body">
                         <div class="row g-3">
                             <div class="col-md-12">
-                                <label class="form-label small fw-bold">Cliente *</label>
+                                <label class="form-label small fw-bold">Cliente (Razão Social, Nome Fantasia ou CNPJ) *</label>
                                 <div class="input-group">
-                                    <input type="text" id="buscaCliente" class="form-control" placeholder="Digite um trecho do nome para filtrar..." autocomplete="off">
+                                    <input type="text" id="buscaCliente" class="form-control" placeholder="Digite qualquer trecho da Razão Social, Fantasia ou CNPJ..." autocomplete="off">
                                     <button type="button" class="btn btn-primary fw-semibold" data-bs-toggle="modal" data-bs-target="#modalNovoCliente">
                                         <i class="fa-solid fa-user-plus me-1"></i> Cadastrar Cliente
                                     </button>
                                 </div>
-                                <select name="cliente_id" id="selectCliente" class="form-select mt-2" size="4" required style="display: none;">
+                                <!-- Select ajustado para conter Razão Social, Fantasia e CNPJ para o filtro por trecho -->
+                                <select name="cliente_id" id="selectCliente" class="form-select mt-2 font-monospace" size="4" required style="display: none;">
                                     <% clientes.forEach(c => { %>
+                                        <% 
+                                            let textoExibicao = c.nome;
+                                            if (c.nome_fantasia) textoExibicao += ' - ' + c.nome_fantasia;
+                                            if (c.cnpj_cpf) textoExibicao += ' (' + c.cnpj_cpf + ')';
+                                        %>
                                         <option value="<%= c.id %>" 
+                                                data-texto-busca="<%= textoExibicao.toLowerCase() %>"
                                                 data-gerente-id="<%= c.gerente_id %>" 
                                                 data-vendedor-id="<%= c.vendedor_id %>"
                                                 data-gerente-nome="<%= c.gerente_nome || '' %>" 
                                                 data-vendedor-nome="<%= c.vendedor_nome || '' %>"
                                                 <%= conta && conta.cliente_id == c.id ? 'selected' : '' %>>
-                                            <%= c.nome %>
+                                            <%= textoExibicao %>
                                         </option>
                                     <% }) %>
                                 </select>
@@ -91,12 +98,22 @@
 
                             <div class="col-md-6">
                                 <label class="form-label small fw-bold">Gerente Vinculado</label>
-                                <input type="text" id="inputGerenteNome" class="form-control bg-white" placeholder="Selecione um cliente..." readonly>
+                                <select name="gerente_id" id="selectGerenteVinculado" class="form-select">
+                                    <option value="">Não vinculado</option>
+                                    <% if (locals.gerentes) { gerentes.forEach(g => { %>
+                                        <option value="<%= g.id %>" <%= conta && (conta.gerente_vinculado_id != null ? conta.gerente_vinculado_id : conta.gerente_id) == g.id ? 'selected' : '' %>><%= g.nome_resumido %></option>
+                                    <% }) } %>
+                                </select>
                             </div>
 
                             <div class="col-md-6">
                                 <label class="form-label small fw-bold">Vendedor Vinculado</label>
-                                <input type="text" id="inputVendedorNome" class="form-control bg-white" placeholder="Selecione um cliente..." readonly>
+                                <select name="vendedor_id" id="selectVendedorVinculado" class="form-select">
+                                    <option value="">Não vinculado</option>
+                                    <% if (locals.vendedores) { vendedores.forEach(v => { %>
+                                        <option value="<%= v.id %>" data-gerente-id="<%= v.gerente_id %>" <%= conta && (conta.vendedor_vinculado_id != null ? conta.vendedor_vinculado_id : conta.vendedor_id) == v.id ? 'selected' : '' %>><%= v.nome_resumido %></option>
+                                    <% }) } %>
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -160,6 +177,14 @@
                     <div class="card-body">
                         <div class="row g-3">
                             <% if (conta && conta.id) { %>
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-bold">Fundo Perdido</label>
+                                    <select name="fundo_perdido" class="form-select">
+                                        <option value="false" <%= String(conta.fundo_perdido) === 'true' ? '' : 'selected' %>>Não</option>
+                                        <option value="true" <%= String(conta.fundo_perdido) === 'true' ? 'selected' : '' %>>Sim</option>
+                                    </select>
+                                </div>
+
                                 <div class="col-md-4">
                                     <label class="form-label small fw-bold">Situação do Boleto *</label>
                                     <select name="situacao_boleto" id="situacaoBoleto" class="form-select" required>
@@ -232,7 +257,7 @@
                 </div>
 
                 <div class="d-flex justify-content-end align-items-center gap-2 mb-4">
-                    <a href="/cobranca" class="btn btn-secondary">Cancelar</a>
+                    <a href="/cobranca?<%= typeof filtrosCobrancaQuery === 'string' ? filtrosCobrancaQuery : '' %>" class="btn btn-secondary">Cancelar</a>
                     <button type="submit" class="btn btn-primary fw-semibold px-4"><i class="fa-solid fa-save me-1"></i> <%= conta && conta.id ? 'Salvar Alterações' : 'Gravar Boleto' %></button>
                 </div>
             </form>
@@ -261,6 +286,10 @@
                             <button type="button" class="btn btn-outline-danger btn-sm" onclick="prepararEmailRetornado()">
                                 <i class="fa-solid fa-triangle-exclamation me-1"></i> Notificar E-mail Retornado (Gerente/Vendedor)
                             </button>
+                            <a href="/cobranca/nota-debito/<%= conta.id %>" target="_blank" rel="noopener noreferrer" class="btn btn-dark btn-sm"
+                                onclick="this.href='/cobranca/nota-debito/<%= conta.id %>' + (confirm('Deseja registrar automaticamente uma interação no histórico de cobrança?') ? '?registrar=true' : '');">
+                                <i class="fa-solid fa-file-pdf me-1"></i> Gerar Nota de Débito (PDF)
+                            </a>
                         </div>
                         <div id="emailAvisoFeedback" class="alert d-none mt-3 mb-0" role="status" aria-live="polite"></div>
                     </div>
@@ -544,6 +573,7 @@
     <script>
         let emailAvisoPreparadoUrl = '';
         let emailReguaEtapaPendente = null;
+        let emailLiquidacaoPendente = false;
 
         const dadosBoleto = {
             id: "<%= conta ? conta.id : '' %>",
@@ -573,6 +603,7 @@
             emailAvisoPreparadoUrl = `mailto:${encodeURIComponent(para)}?cc=${encodeURIComponent(cc)}&subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
             window.location.href = emailAvisoPreparadoUrl;
             emailReguaEtapaPendente = null;
+            emailLiquidacaoPendente = false;
             document.getElementById('btnConfirmarEnvio').hidden = true;
             document.getElementById('emailConfirmFeedback').className = 'alert d-none';
 
@@ -598,6 +629,7 @@
             const feedback = document.getElementById('emailAvisoFeedback');
             const botaoConfirmar = document.getElementById('btnConfirmarEnvio');
             let janelaEmail = null;
+            emailLiquidacaoPendente = false;
             feedback.className = 'alert d-none mt-3 mb-0';
             try {
                 janelaEmail = window.open('about:blank', '_blank');
@@ -641,25 +673,35 @@
         async function confirmarEnvioEmail() {
             const botao = document.getElementById('btnConfirmarEnvio');
             const modalFeedback = document.getElementById('emailConfirmFeedback');
-            if (!emailReguaEtapaPendente) return;
+            if (!emailReguaEtapaPendente && !emailLiquidacaoPendente) return;
 
             botao.disabled = true;
             try {
-                const resposta = await fetch(`/cobranca/email-regua/confirmar/${encodeURIComponent(dadosBoleto.id)}`, {
+                const liquidacao = emailLiquidacaoPendente;
+                const rota = liquidacao ? 'email-liquidacao' : 'email-regua';
+                const corpo = liquidacao
+                    ? {
+                        para: document.getElementById('emailParaModal').value,
+                        assunto: document.getElementById('emailAssuntoModal').value,
+                        corpo: document.getElementById('emailTextoModal').value
+                    }
+                    : { etapa: emailReguaEtapaPendente };
+                const resposta = await fetch(`/cobranca/${rota}/confirmar/${encodeURIComponent(dadosBoleto.id)}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-                    body: JSON.stringify({ etapa: emailReguaEtapaPendente })
+                    body: JSON.stringify(corpo)
                 });
                 const resultado = await resposta.json();
                 if (!resposta.ok) throw new Error(resultado.erro || 'Não foi possível confirmar o envio.');
 
                 const faseSelect = document.querySelector('#formBoleto select[name="status_cobranca"]');
-                if (faseSelect) faseSelect.value = resultado.fase;
+                if (faseSelect && resultado.fase) faseSelect.value = resultado.fase;
                 document.getElementById('emailAvisoFeedback').textContent = resultado.sucesso;
                 document.getElementById('emailAvisoFeedback').className = 'alert alert-success mt-3 mb-0';
                 modalFeedback.textContent = resultado.sucesso;
                 modalFeedback.className = 'alert alert-success';
                 emailReguaEtapaPendente = null;
+                emailLiquidacaoPendente = false;
                 botao.hidden = true;
                 window.setTimeout(() => window.location.reload(), 900);
             } catch (err) {
@@ -683,30 +725,83 @@
             document.getElementById('editarResumo').value = botao.dataset.resumo;
         }
 
-        function prepararEmailAvisoComercial() {
-            const destinatarios = [dadosBoleto.gerente_email, dadosBoleto.vendedor_email].filter(Boolean).join(',');
-            let assunto = "";
-            let corpo = "";
+        async function prepararEmailAvisoComercial() {
+            const feedback = document.getElementById('emailAvisoFeedback');
+            const botaoConfirmar = document.getElementById('btnConfirmarEnvio');
+            let janelaEmail = null;
+            feedback.className = 'alert d-none mt-3 mb-0';
 
-            if (dadosBoleto.situacao_boleto === 'Pago') {
-                assunto = `AVISO DE LIQUIDAÇÃO: Cliente ${dadosBoleto.cliente_nome} - Boleto Nº ${dadosBoleto.numero_documento}`;
-                corpo = `Prezados Gerente e Vendedor,\n\nO boleto Nº ${dadosBoleto.numero_documento} referente ao cliente ${dadosBoleto.cliente_nome} foi totalmente liquidado sem pendências.\n\nO cadastro do cliente está liberado para novos pedidos no sistema.\n\nAtenciosamente,\nSetor Financeiro - Omnia`;
-            } else {
-                assunto = `PENDÊNCIA DE CUSTAS: Cliente ${dadosBoleto.cliente_nome} - Boleto Nº ${dadosBoleto.numero_documento}`;
-                corpo = `Prezados Gerente e Vendedor,\n\nO boleto Nº ${dadosBoleto.numero_documento} referente ao cliente ${dadosBoleto.cliente_nome} foi pago, porém possui pendência de custas bancárias/cartório no valor de ${dadosBoleto.valor_custas}.\n\nInformamos que novos pedidos permanecerão bloqueados até a quitação integral destas custas.\n\nAtenciosamente,\nSetor Financeiro - Omnia`;
+            try {
+                janelaEmail = window.open('about:blank', '_blank');
+                const resposta = await fetch(`/cobranca/email-liquidacao/preparar/${encodeURIComponent(dadosBoleto.id)}`, {
+                    method: 'POST',
+                    headers: { Accept: 'application/json' }
+                });
+                const resultado = await resposta.json();
+                if (!resposta.ok) throw new Error(resultado.erro || 'Não foi possível preparar o aviso de liquidação.');
+
+                document.getElementById('emailParaModal').value = resultado.para;
+                document.getElementById('emailCcModal').value = '';
+                document.getElementById('emailAssuntoModal').value = resultado.assunto;
+                document.getElementById('emailTextoModal').value = resultado.corpo;
+                emailAvisoPreparadoUrl = `mailto:${encodeURIComponent(resultado.para)}?subject=${encodeURIComponent(resultado.assunto)}&body=${encodeURIComponent(resultado.corpo)}`;
+                emailReguaEtapaPendente = null;
+                emailLiquidacaoPendente = true;
+                botaoConfirmar.hidden = false;
+                botaoConfirmar.disabled = false;
+
+                if (janelaEmail && !janelaEmail.closed) {
+                    janelaEmail.location.href = emailAvisoPreparadoUrl;
+                    feedback.textContent = 'E-mail preparado no cliente de e-mail. Após enviá-lo, confirme o envio para registrar a interação no histórico.';
+                    feedback.className = 'alert alert-info mt-3 mb-0';
+                } else {
+                    feedback.textContent = 'E-mail preparado. O navegador bloqueou a nova janela; use “Abrir cliente de e-mail”. Após enviar, confirme o envio.';
+                    feedback.className = 'alert alert-warning mt-3 mb-0';
+                }
+
+                const modalFeedback = document.getElementById('emailConfirmFeedback');
+                modalFeedback.textContent = 'A interação será gravada no histórico após confirmar que o e-mail foi enviado.';
+                modalFeedback.className = 'alert alert-info';
+                new bootstrap.Modal(document.getElementById('modalCopiarEmail')).show();
+            } catch (err) {
+                if (janelaEmail && !janelaEmail.closed) janelaEmail.close();
+                feedback.textContent = err.message;
+                feedback.className = 'alert alert-danger mt-3 mb-0';
             }
-
-            dispararEmail(destinatarios, '', assunto, corpo);
         }
 
-        function prepararEmailRetornado() {
+        async function prepararEmailRetornado() {
             const destinatarios = [dadosBoleto.gerente_email, dadosBoleto.vendedor_email].filter(Boolean).join(',');
             const emailAtual = dadosBoleto.cliente_email || 'Não informado';
             
-            const assunto = `FALHA NA ENTREGA DE E-MAIL: Cliente ${dadosBoleto.cliente_nome} - Boleto Nº ${dadosBoleto.numero_documento}`;
-            const corpo = `Prezados Gerente e Vendedor,\n\nInformamos que o e-mail de cobrança enviado para o cliente ${dadosBoleto.cliente_nome} através do endereço (${emailAtual}) retornou ou não pôde ser entregue (endereço incorreto ou caixa postal cheia).\n\nPrecisamos que por favor verifiquem e nos informem o e-mail correto do cliente para atualizarmos o cadastro, ou que entrem em contato diretamente com ele para alertá-lo sobre a cobrança em aberto do boleto Nº ${dadosBoleto.numero_documento}.\n\nContamos com a vossa colaboração.\n\nAtenciosamente,\nSetor Financeiro - Omnia`;
+            if (!destinatarios) {
+                alert('O gerente e/ou vendedor deste cliente não possuem e-mail cadastrado.');
+                return;
+            }
 
-            dispararEmail(destinatarios, '', assunto, corpo);
+            try {
+                const resposta = await fetch(`/cobranca/email-falha/${encodeURIComponent(dadosBoleto.id)}`, {
+                    method: 'POST',
+                    headers: { Accept: 'application/json' }
+                });
+                const resultado = await resposta.json();
+                if (!resposta.ok) {
+                    throw new Error(resultado.erro || 'Erro ao registrar a falha no histórico.');
+                }
+
+                dispararEmail(resultado.para, '', resultado.assunto, resultado.corpo);
+                const feedback = document.getElementById('emailAvisoFeedback');
+                feedback.textContent = resultado.sucesso + ' Atualizando a página...';
+                feedback.className = 'alert alert-success mt-3 mb-0';
+
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } catch (err) {
+                const feedback = document.getElementById('emailAvisoFeedback');
+                feedback.textContent = err.message || 'Erro ao registrar a falha no histórico.';
+                feedback.className = 'alert alert-danger mt-3 mb-0';
+            }
         }
 
         document.addEventListener('DOMContentLoaded', function() {
@@ -731,8 +826,8 @@
 
             const buscaCliente = document.getElementById('buscaCliente');
             const selectCliente = document.getElementById('selectCliente');
-            const inputGerenteNome = document.getElementById('inputGerenteNome');
-            const inputVendedorNome = document.getElementById('inputVendedorNome');
+            const selectGerenteVinculado = document.getElementById('selectGerenteVinculado');
+            const selectVendedorVinculado = document.getElementById('selectVendedorVinculado');
             const valorOriginal = document.getElementById('valorOriginal');
             const dataVencimento = document.getElementById('dataVencimento');
             const valorCustas = document.getElementById('valorCustas');
@@ -764,14 +859,15 @@
                 });
             }
 
+            // BUSCA INTELIGENTE POR TRECHO (RAZÃO SOCIAL, NOME FANTASIA E CNPJ)
             buscaCliente.addEventListener('input', function() {
                 const termo = this.value.toLowerCase().trim();
                 let visiveis = 0;
 
                 Array.from(selectCliente.options).forEach(opt => {
                     if (!opt.value) return;
-                    const texto = opt.text.toLowerCase();
-                    if (texto.includes(termo)) {
+                    const textoBusca = opt.getAttribute('data-texto-busca') || opt.text.toLowerCase();
+                    if (textoBusca.includes(termo)) {
                         opt.style.display = '';
                         visiveis++;
                     } else {
@@ -782,23 +878,25 @@
                 selectCliente.style.display = visiveis > 0 && termo.length > 0 ? 'block' : 'none';
             });
 
-            function atualizarVinculos() {
+            function atualizarVinculos(atualizarResponsaveis) {
                 const opt = selectCliente.options[selectCliente.selectedIndex];
                 if (opt && opt.value) {
-                    inputGerenteNome.value = opt.getAttribute('data-gerente-nome') || 'Não Vinculado';
-                    inputVendedorNome.value = opt.getAttribute('data-vendedor-nome') || 'Não Vinculado';
+                    if (atualizarResponsaveis) {
+                        selectGerenteVinculado.value = opt.getAttribute('data-gerente-id') || '';
+                        selectVendedorVinculado.value = opt.getAttribute('data-vendedor-id') || '';
+                    }
+                    // Extrai apenas o nome principal para o input de busca visual ou mantém limpo
                     buscaCliente.value = opt.text.trim();
                     selectCliente.style.display = 'none';
-                } else {
-                    inputGerenteNome.value = '';
-                    inputVendedorNome.value = '';
                 }
             }
 
-            selectCliente.addEventListener('change', atualizarVinculos);
+            selectCliente.addEventListener('change', function() {
+                atualizarVinculos(true);
+            });
 
             if (selectCliente.value) {
-                atualizarVinculos();
+                atualizarVinculos(false);
             }
 
             document.querySelectorAll('.mascara-moeda').forEach(input => {
@@ -889,7 +987,13 @@
                         if (data.sucesso) {
                             const newOption = document.createElement('option');
                             newOption.value = data.cliente.id;
-                            newOption.text = data.cliente.nome;
+                            
+                            let textoNovo = data.cliente.nome;
+                            if (data.cliente.nome_fantasia) textoNovo += ' - ' + data.cliente.nome_fantasia;
+                            if (data.cliente.cnpj_cpf) textoNovo += ' (' + data.cliente.cnpj_cpf + ')';
+
+                            newOption.text = textoNovo;
+                            newOption.setAttribute('data-texto-busca', textoNovo.toLowerCase());
                             newOption.setAttribute('data-gerente-id', data.cliente.gerente_id);
                             newOption.setAttribute('data-vendedor-id', data.cliente.vendedor_id);
                             newOption.setAttribute('data-gerente-nome', data.cliente.gerente_nome);
@@ -897,7 +1001,7 @@
                             newOption.selected = true;
 
                             selectCliente.appendChild(newOption);
-                            atualizarVinculos();
+                            atualizarVinculos(true);
 
                             const modalEl = document.getElementById('modalNovoCliente');
                             const modalInstance = bootstrap.Modal.getInstance(modalEl);
