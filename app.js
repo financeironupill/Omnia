@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const path = require('path');
 const https = require('https');
 const pool = require('./db');
+const { sincronizarPendenciasRegua } = require('./servicos/cobrancaService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -188,6 +189,7 @@ app.get('/solucao', verificarAutenticacao, (req, res) => res.render('dashboard-s
 
 async function exibirDashboardCobranca(req, res) {
     try {
+        await sincronizarPendenciasRegua(pool, req.session.usuario.id);
         const [agingRes, tarefasRes] = await Promise.all([
             pool.query(`
                 SELECT
@@ -205,93 +207,19 @@ async function exibirDashboardCobranca(req, res) {
                   AND data_vencimento < CURRENT_DATE
             `),
             pool.query(`
-                SELECT tarefas.*, c.nome AS cliente_nome, c.email AS cliente_email
-                FROM (
-                    SELECT b.id, b.numero_documento, b.data_vencimento, b.valor_original,
-                           b.status_cobranca, b.data_fase_cobranca,
-                           1 AS etapa, 'Aviso 1 (Notificação)' AS acao,
-                           b.data_vencimento + 1 AS data_acao
-                    FROM boletos b
-                    WHERE b.excluido_em IS NULL
-                      AND b.situacao_boleto IN ('Vencido', 'Pago com Pendência')
-                      AND b.status_cobranca = 'Aguardando Régua'
-                      AND b.data_vencimento + 1 <= CURRENT_DATE
-
-                    UNION ALL
-
-                    SELECT b.id, b.numero_documento, b.data_vencimento, b.valor_original,
-                           b.status_cobranca, b.data_fase_cobranca,
-                           2 AS etapa, 'Aviso 2 (Alerta Cartório)' AS acao,
-                           prazo.data_acao
-                    FROM boletos b
-                    CROSS JOIN LATERAL (
-                        SELECT dia::date AS data_acao
-                        FROM generate_series(
-                            (b.data_fase_cobranca::date + 1)::timestamp,
-                            (b.data_fase_cobranca::date + 14)::timestamp,
-                            INTERVAL '1 day'
-                        ) AS calendario(dia)
-                        WHERE EXTRACT(ISODOW FROM dia) BETWEEN 1 AND 5
-                          AND NOT omnia_is_feriado_bancario(dia::date)
-                        ORDER BY dia
-                        OFFSET 1 LIMIT 1
-                    ) prazo
-                    WHERE b.excluido_em IS NULL
-                      AND b.situacao_boleto IN ('Vencido', 'Pago com Pendência')
-                      AND b.status_cobranca = 'Aviso 1 (Notificação)'
-                      AND prazo.data_acao <= CURRENT_DATE
-
-                    UNION ALL
-
-                    SELECT b.id, b.numero_documento, b.data_vencimento, b.valor_original,
-                           b.status_cobranca, b.data_fase_cobranca,
-                           3 AS etapa, 'Aviso 3 (Aviso Final)' AS acao,
-                           prazo.data_acao
-                    FROM boletos b
-                    CROSS JOIN LATERAL (
-                        SELECT dia::date AS data_acao
-                        FROM generate_series(
-                            (b.data_fase_cobranca::date + 1)::timestamp,
-                            (b.data_fase_cobranca::date + 14)::timestamp,
-                            INTERVAL '1 day'
-                        ) AS calendario(dia)
-                        WHERE EXTRACT(ISODOW FROM dia) BETWEEN 1 AND 5
-                          AND NOT omnia_is_feriado_bancario(dia::date)
-                        ORDER BY dia
-                        OFFSET 1 LIMIT 1
-                    ) prazo
-                    WHERE b.excluido_em IS NULL
-                      AND b.situacao_boleto IN ('Vencido', 'Pago com Pendência')
-                      AND b.status_cobranca = 'Aviso 2 (Alerta Cartório)'
-                      AND prazo.data_acao <= CURRENT_DATE
-
-                    UNION ALL
-
-                    SELECT b.id, b.numero_documento, b.data_vencimento, b.valor_original,
-                           b.status_cobranca, b.data_fase_cobranca,
-                           NULL::integer AS etapa, 'Encaminhamento ao Cartório' AS acao,
-                           prazo.data_acao
-                    FROM boletos b
-                    CROSS JOIN LATERAL (
-                        SELECT dia::date AS data_acao
-                        FROM generate_series(
-                            (b.data_fase_cobranca::date + 1)::timestamp,
-                            (b.data_fase_cobranca::date + 14)::timestamp,
-                            INTERVAL '1 day'
-                        ) AS calendario(dia)
-                        WHERE EXTRACT(ISODOW FROM dia) BETWEEN 1 AND 5
-                          AND NOT omnia_is_feriado_bancario(dia::date)
-                        ORDER BY dia
-                        LIMIT 1
-                    ) prazo
-                    WHERE b.excluido_em IS NULL
-                      AND b.situacao_boleto IN ('Vencido', 'Pago com Pendência')
-                      AND b.status_cobranca = 'Aviso 3 (Aviso Final)'
-                      AND prazo.data_acao <= CURRENT_DATE
-                ) tarefas
-                JOIN boletos b ON b.id = tarefas.id
+                SELECT p.id AS pendencia_id, p.boleto_id AS id, p.etapa,
+                       p.acao, p.data_acao, b.numero_documento, b.data_vencimento,
+                       b.valor_original, b.status_cobranca,
+                       c.nome AS cliente_nome, c.email AS cliente_email
+                FROM boletos_regua_pendencias p
+                JOIN boletos b ON b.id = p.boleto_id
                 JOIN clientes c ON c.id = b.cliente_id
-                ORDER BY tarefas.data_acao, tarefas.data_vencimento, tarefas.id
+                WHERE p.status = 'Pendente'
+                  AND b.excluido_em IS NULL
+                  AND b.situacao_boleto IN ('Vencido', 'Pago com Pendência')
+                  AND p.fase_origem = b.status_cobranca
+                  AND p.data_fase_origem = b.data_fase_cobranca
+                ORDER BY p.data_acao, b.data_vencimento, b.id
             `)
         ]);
         const aging = agingRes.rows[0];
@@ -1932,6 +1860,8 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
         data_pagamento, data_pagamento_custas, observacoes, fundo_perdido
     } = req.body;
 
+    let db;
+    let transactionStarted = false;
     try {
         const erroValidacao = validarDadosBoleto({
             valor_original,
@@ -1946,12 +1876,42 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
         if (erroValidacao) {
             return res.redirect(`/cobranca/editar/${encodeURIComponent(boletoId)}?erro=${encodeURIComponent(erroValidacao)}`);
         }
+        if (status_cobranca === 'Em Cartório / Negativado' && !data_cartorio) {
+            return res.redirect(`/cobranca/editar/${encodeURIComponent(boletoId)}?erro=${encodeURIComponent('Informe a data de encaminhamento ao cartório.')}`);
+        }
         if (typeof cliente_id !== 'string' || !/^\d+$/.test(cliente_id) ||
             typeof numero_documento !== 'string' || !numero_documento.trim()) {
             return res.redirect(`/cobranca/editar/${encodeURIComponent(boletoId)}?erro=${encodeURIComponent('Informe um cliente e um número de documento válidos.')}`);
         }
         const gerenteId = gerente_id ? parseInt(gerente_id, 10) : null;
         const vendedorId = vendedor_id ? parseInt(vendedor_id, 10) : null;
+
+        db = await pool.connect();
+        await db.query('BEGIN');
+        transactionStarted = true;
+        const boletoAtual = await db.query(
+            'SELECT status_cobranca FROM boletos WHERE id = $1 AND excluido_em IS NULL FOR UPDATE',
+            [parseInt(boletoId, 10)]
+        );
+        if (boletoAtual.rows.length === 0) {
+            await db.query('ROLLBACK');
+            transactionStarted = false;
+            return res.redirect(`/cobranca?erro=${encodeURIComponent('Boleto não encontrado ou arquivado.')}`);
+        }
+
+        const faseAnterior = boletoAtual.rows[0].status_cobranca || 'Aguardando Régua';
+        const faseNova = status_cobranca || faseAnterior;
+        if (!fasesCobrancaValidas.includes(faseNova)) {
+            await db.query('ROLLBACK');
+            transactionStarted = false;
+            return res.redirect(`/cobranca/editar/${encodeURIComponent(boletoId)}?erro=${encodeURIComponent('A fase da régua de cobrança é inválida.')}`);
+        }
+        if (faseNova !== faseAnterior &&
+            ['Aviso 1 (Notificação)', 'Aviso 2 (Alerta Cartório)', 'Aviso 3 (Aviso Final)'].includes(faseNova)) {
+            await db.query('ROLLBACK');
+            transactionStarted = false;
+            return res.redirect(`/cobranca/editar/${encodeURIComponent(boletoId)}?erro=${encodeURIComponent('Confirme o envio do e-mail da régua para avançar esta fase.')}`);
+        }
 
         const sql = `UPDATE boletos SET 
             cliente_id = $1, gerente_id = $2, vendedor_id = $3, numero_documento = $4, banco = $5, 
@@ -1965,7 +1925,7 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
             END
             WHERE id = $19 AND excluido_em IS NULL`;
 
-        await pool.query(sql, [
+        await db.query(sql, [
             parseInt(cliente_id, 10),
             gerenteId,
             vendedorId,
@@ -1976,7 +1936,7 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
             tratarData(data_emissao),
             tratarData(data_vencimento),
             situacao_boleto || 'Vencido',
-            status_cobranca || 'Aguardando Régua',
+            faseNova,
             tratarData(data_previsao_pagamento),
             tratarData(data_cartorio),
             limparValorMonetario(valor_custas),
@@ -1987,16 +1947,49 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
             parseInt(boletoId, 10)
         ]);
 
+        if (faseNova !== faseAnterior) {
+            await db.query(`
+                INSERT INTO boletos_historico
+                    (boleto_id, usuario_id, tipo_contato, canal, contato_nome, resumo, status, data_hora)
+                VALUES ($1, $2, 'Interno', 'Sistema', $3, $4, 'Registrado', CURRENT_TIMESTAMP)
+            `, [
+                parseInt(boletoId, 10),
+                req.session.usuario.id,
+                req.session.usuario.nome || 'Usuário',
+                `Fase da régua alterada de "${faseAnterior}" para "${faseNova}" pelo formulário.`
+            ]);
+        }
+        if (faseNova === 'Em Cartório / Negativado' &&
+            faseAnterior === 'Aviso 3 (Aviso Final)') {
+            await db.query(`
+                UPDATE boletos_regua_pendencias
+                SET status = 'Concluida', concluido_em = CURRENT_TIMESTAMP,
+                    concluido_por = $2
+                WHERE boleto_id = $1 AND etapa = 4 AND status = 'Pendente'
+            `, [parseInt(boletoId, 10), req.session.usuario.id]);
+        }
+        await db.query('COMMIT');
+        transactionStarted = false;
+
         const paramsRetorno = new URLSearchParams(criarQueryFiltrosCobranca(req.query));
         paramsRetorno.set('sucesso', 'Boleto atualizado com sucesso!');
         res.redirect(`/cobranca?${paramsRetorno.toString()}`);
     } catch (err) {
+        if (db && transactionStarted) {
+            try {
+                await db.query('ROLLBACK');
+            } catch (rollbackErr) {
+                console.error('ERRO AO DESFAZER ATUALIZAÇÃO DO BOLETO:', rollbackErr);
+            }
+        }
         console.error('ERRO AO EDITAR BOLETO:', err);
         const filtrosQuery = criarQueryFiltrosCobranca(req.query);
         const mensagem = err.code === '23505'
             ? 'Este número de documento já foi lançado para este cliente.'
             : 'Erro ao atualizar boleto.';
         res.redirect(`/cobranca/editar/${boletoId}?${filtrosQuery}&erro=${encodeURIComponent(mensagem)}`);
+    } finally {
+        if (db) db.release();
     }
 });
 
@@ -2047,9 +2040,9 @@ app.get('/cobranca/duplicar/:id', verificarAutenticacao, async (req, res) => {
 });
 
 const etapasEmailRegua = {
-    1: { fase: 'Aviso 1 (Notificação)', tipoAcao: 'E-mail 1 - Aviso de Vencimento' },
-    2: { fase: 'Aviso 2 (Alerta Cartório)', tipoAcao: 'E-mail 2 - Risco de Cartório' },
-    3: { fase: 'Aviso 3 (Aviso Final)', tipoAcao: 'E-mail 3 - Aviso Final (Próximo Dia Útil)' }
+    1: { faseAnterior: 'Aguardando Régua', fase: 'Aviso 1 (Notificação)', tipoAcao: 'E-mail 1 - Aviso de Vencimento' },
+    2: { faseAnterior: 'Aviso 1 (Notificação)', fase: 'Aviso 2 (Alerta Cartório)', tipoAcao: 'E-mail 2 - Risco de Cartório' },
+    3: { faseAnterior: 'Aviso 2 (Alerta Cartório)', fase: 'Aviso 3 (Aviso Final)', tipoAcao: 'E-mail 3 - Aviso Final (Próximo Dia Útil)' }
 };
 
 function formatarDataEmail(data) {
@@ -2245,6 +2238,7 @@ app.post('/cobranca/email-liquidacao/confirmar/:id', verificarAutenticacao, asyn
 async function carregarEmailRegua(boletoId, etapa, executor = pool) {
     const boletoRes = await executor.query(`
         SELECT b.id, b.cliente_id, b.numero_documento, b.data_vencimento, b.valor_original,
+               b.status_cobranca, b.situacao_boleto,
                cl.cnpj_cpf AS cliente_cnpj, cl.nome, cl.nome_fantasia, cl.email,
                g.email AS gerente_email, v.email AS vendedor_email
         FROM boletos b
@@ -2379,6 +2373,10 @@ app.post('/cobranca/email-regua/preparar/:id', verificarAutenticacao, async (req
     try {
         const email = await carregarEmailRegua(boletoId, etapa);
         if (!email) return res.status(404).json({ erro: 'Boleto não encontrado.' });
+        if (email.status_cobranca !== email.etapaConfig.faseAnterior ||
+            !['Vencido', 'Pago com Pendência'].includes(email.situacao_boleto)) {
+            return res.status(409).json({ erro: 'A etapa não corresponde à fase atual ou o boleto não está em aberto.' });
+        }
         res.json({ ...email, etapa, fase: email.etapaConfig.fase });
     } catch (err) {
         if (err.status === 400) return res.status(400).json({ erro: err.message });
@@ -2407,6 +2405,10 @@ app.post('/cobranca/email-regua/confirmar/:id', verificarAutenticacao, async (re
         if (!email) {
             return res.status(404).json({ erro: 'Boleto não encontrado.' });
         }
+        if (email.status_cobranca !== email.etapaConfig.faseAnterior ||
+            !['Vencido', 'Pago com Pendência'].includes(email.situacao_boleto)) {
+            return res.status(409).json({ erro: 'A etapa não corresponde à fase atual ou o boleto não está em aberto.' });
+        }
 
         await db.query('BEGIN');
         transactionStarted = true;
@@ -2414,14 +2416,20 @@ app.post('/cobranca/email-regua/confirmar/:id', verificarAutenticacao, async (re
             `UPDATE boletos
              SET status_cobranca = $1, data_fase_cobranca = CURRENT_TIMESTAMP,
                  atualizado_em = CURRENT_TIMESTAMP
-             WHERE id = $2 AND excluido_em IS NULL`,
-            [email.etapaConfig.fase, boletoId]
+             WHERE id = $2 AND excluido_em IS NULL AND status_cobranca = $3`,
+            [email.etapaConfig.fase, boletoId, email.etapaConfig.faseAnterior]
         );
         if (updateRes.rowCount === 0) {
             await db.query('ROLLBACK');
             transactionStarted = false;
-            return res.status(404).json({ erro: 'Boleto não encontrado.' });
+            return res.status(409).json({ erro: 'A fase do boleto mudou. Atualize a página antes de confirmar o envio.' });
         }
+        await db.query(`
+            UPDATE boletos_regua_pendencias
+            SET status = 'Concluida', concluido_em = CURRENT_TIMESTAMP,
+                concluido_por = $3
+            WHERE boleto_id = $1 AND etapa = $2 AND status = 'Pendente'
+        `, [boletoId, etapa, req.session.usuario.id]);
 
         const resumo = `Status: Confirmado. Envio da etapa ${etapa} (${email.etapaConfig.fase}) confirmado pelo usuário. Para: ${para.trim()}. CC: ${cc.trim() || 'Nenhum'}. Assunto: ${assunto.trim()}\n\n${corpo.trim()}`;
         const historicoRes = await db.query(`

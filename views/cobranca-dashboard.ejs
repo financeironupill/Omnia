@@ -97,7 +97,7 @@
                                     <td><span class="badge text-bg-secondary"><%= tarefa.acao %></span></td>
                                     <td class="text-end">R$ <%= Number(tarefa.valor_original).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
                                     <td class="text-end">
-                                        <% if (tarefa.etapa) { %>
+                                        <% if (tarefa.etapa >= 1 && tarefa.etapa <= 3) { %>
                                             <a class="btn btn-sm btn-primary" href="/cobranca/editar/<%= tarefa.id %>?email_etapa=<%= tarefa.etapa %>#modalCopiarEmail">
                                                 <i class="fa-solid fa-envelope me-1"></i>Abrir e-mail
                                             </a>
