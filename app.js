@@ -1277,6 +1277,93 @@ function formatarResultadosCobranca(rows) {
     return rows;
 }
 
+app.get('/relatorios/comissoes', verificarAutenticacao, async (req, res) => {
+    const dataDe = typeof req.query.data_de === 'string' ? req.query.data_de : '';
+    const dataAte = typeof req.query.data_ate === 'string' ? req.query.data_ate : '';
+    const vendedorIdInformado = typeof req.query.vendedor_id === 'string' ? req.query.vendedor_id : '';
+
+    if (!validarDataOpcional(dataDe) || !validarDataOpcional(dataAte)) {
+        return res.status(400).send('Informe um período válido para o relatório.');
+    }
+    if (dataDe && dataAte && dataDe > dataAte) {
+        return res.status(400).send('A data inicial não pode ser posterior à data final.');
+    }
+
+    let vendedorId = null;
+    if (vendedorIdInformado) {
+        if (!/^\d+$/.test(vendedorIdInformado) || !Number.isSafeInteger(Number(vendedorIdInformado)) ||
+            Number(vendedorIdInformado) <= 0) {
+            return res.status(400).send('Selecione um vendedor válido.');
+        }
+        vendedorId = Number(vendedorIdInformado);
+    }
+
+    try {
+        const [vendedoresRes, comissoesRes] = await Promise.all([
+            pool.query('SELECT id, nome_resumido FROM vendedores ORDER BY nome_resumido ASC'),
+            pool.query(`
+                SELECT
+                    v.id AS vendedor_id,
+                    v.nome_resumido AS vendedor_nome,
+                    COALESCE(SUM(ce.valor_estornado) FILTER (
+                        WHERE b.situacao_boleto = 'Vencido'
+                          AND b.status_cobranca = 'Em Cartório / Negativado'
+                          AND ce.data_estorno IS NULL
+                          AND ($2::date IS NULL OR b.data_vencimento >= $2::date)
+                          AND ($3::date IS NULL OR b.data_vencimento < ($3::date + INTERVAL '1 day'))
+                    ), 0) AS total_debito,
+                    COALESCE(SUM(ce.valor_estornado) FILTER (
+                        WHERE b.situacao_boleto IN ('Pago', 'Pago com Pendência')
+                          AND ce.data_estorno IS NOT NULL
+                          AND ($2::date IS NULL OR ce.data_estorno >= $2::date)
+                          AND ($3::date IS NULL OR ce.data_estorno < ($3::date + INTERVAL '1 day'))
+                    ), 0) AS total_reembolso
+                FROM boletos AS b
+                LEFT JOIN clientes AS cl ON cl.id = b.cliente_id
+                JOIN vendedores AS v ON v.id = COALESCE(b.vendedor_id, cl.vendedor_id)
+                LEFT JOIN comissoes_estornos AS ce ON ce.boleto_id = b.id
+                WHERE b.excluido_em IS NULL
+                  AND ($1::integer IS NULL OR v.id = $1::integer)
+                GROUP BY v.id, v.nome_resumido
+                ORDER BY v.nome_resumido ASC
+            `, [vendedorId, dataDe || null, dataAte || null])
+        ]);
+
+        if (vendedorId !== null && !vendedoresRes.rows.some(vendedor => vendedor.id === vendedorId)) {
+            return res.status(400).send('O vendedor selecionado não foi encontrado.');
+        }
+
+        const totaisCentavos = { debito: 0, reembolso: 0 };
+        const linhas = comissoesRes.rows.map(linha => {
+            const totalDebito = Number(linha.total_debito) || 0;
+            const totalReembolso = Number(linha.total_reembolso) || 0;
+            totaisCentavos.debito += Math.round(totalDebito * 100);
+            totaisCentavos.reembolso += Math.round(totalReembolso * 100);
+            return {
+                ...linha,
+                total_debito: totalDebito,
+                total_reembolso: totalReembolso
+            };
+        });
+        const totais = {
+            debito: totaisCentavos.debito / 100,
+            reembolso: totaisCentavos.reembolso / 100
+        };
+
+        res.render('relatorio-comissoes', {
+            usuario: req.session.usuario,
+            linhas,
+            vendedores: vendedoresRes.rows,
+            filtros: { dataDe, dataAte, vendedorId: vendedorIdInformado },
+            totais,
+            formatarMoeda: formatarMoedaSemSimbolo
+        });
+    } catch (err) {
+        console.error('ERRO EM GET /relatorios/comissoes:', err);
+        res.status(500).send('Erro ao carregar o relatório de comissões.');
+    }
+});
+
 app.get('/cobranca', verificarAutenticacao, async (req, res) => {
     try {
         const { busca, banco, status_cobranca, gerente_id, vendedor_id, data_vencimento_de, data_vencimento_ate } = req.query;

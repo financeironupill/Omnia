@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatório de Comissões - Omnia</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-light">
+    <nav class="navbar navbar-dark bg-dark px-4">
+        <a class="navbar-brand fw-bold" href="/dashboard">
+            <i class="fa-solid fa-layer-group text-primary me-2"></i>OMNIA
+        </a>
+        <div class="d-flex gap-2">
+            <a href="/cobranca" class="btn btn-outline-light btn-sm">
+                <i class="fa-solid fa-arrow-left me-1"></i>Cobrança
+            </a>
+            <a href="/logout" class="btn btn-outline-light btn-sm">Sair</a>
+        </div>
+    </nav>
+
+    <main class="container-fluid px-4 py-4">
+        <div class="mb-4">
+            <h1 class="h3 fw-bold mb-1"><i class="fa-solid fa-scale-balanced text-primary me-2"></i>Débitos e Reembolsos de Vendedores</h1>
+            <p class="text-muted mb-0">Resumo de comissões agrupado pelo cadastro oficial de vendedores utilizado na cobrança.</p>
+        </div>
+
+        <form method="GET" action="/relatorios/comissoes" class="card border-0 shadow-sm mb-4">
+            <div class="card-body">
+                <div class="row g-3 align-items-end">
+                    <div class="col-sm-6 col-lg-3">
+                        <label for="dataDe" class="form-label">Período — de</label>
+                        <input id="dataDe" name="data_de" type="date" class="form-control" value="<%= filtros.dataDe %>">
+                    </div>
+                    <div class="col-sm-6 col-lg-3">
+                        <label for="dataAte" class="form-label">Período — até</label>
+                        <input id="dataAte" name="data_ate" type="date" class="form-control" value="<%= filtros.dataAte %>">
+                    </div>
+                    <div class="col-sm-8 col-lg-4">
+                        <label for="vendedorId" class="form-label">Vendedor</label>
+                        <select id="vendedorId" name="vendedor_id" class="form-select">
+                            <option value="">Todos os vendedores</option>
+                            <% vendedores.forEach(vendedor => { %>
+                                <option value="<%= vendedor.id %>" <%= String(filtros.vendedorId) === String(vendedor.id) ? 'selected' : '' %>>
+                                    <%= vendedor.nome_resumido %>
+                                </option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div class="col-sm-4 col-lg-2 d-grid">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fa-solid fa-filter me-1"></i>Filtrar
+                        </button>
+                    </div>
+                </div>
+                <div class="form-text mt-2">O período considera o vencimento nos débitos (sem data de estorno) e a data do estorno nos reembolsos.</div>
+            </div>
+        </form>
+
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <div class="card border-0 border-start border-4 border-danger shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">Total a debitar</div>
+                        <div class="fs-4 fw-bold text-danger">R$ <%= formatarMoeda(totais.debito) %></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-0 border-start border-4 border-success shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">Total a reembolsar</div>
+                        <div class="fs-4 fw-bold text-success">R$ <%= formatarMoeda(totais.reembolso) %></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <% const saldoLiquido = totais.reembolso - totais.debito; %>
+                <div class="card border-0 border-start border-4 <%= saldoLiquido < 0 ? 'border-danger' : 'border-primary' %> shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">Saldo líquido (reembolsos − débitos)</div>
+                        <div class="fs-4 fw-bold <%= saldoLiquido < 0 ? 'text-danger' : 'text-primary' %>">R$ <%= formatarMoeda(saldoLiquido) %></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <section class="card border-0 shadow-sm">
+            <div class="card-header bg-white py-3">
+                <h2 class="h5 fw-bold mb-0"><i class="fa-solid fa-users me-2 text-primary"></i>Resumo por vendedor</h2>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Nome do Vendedor</th>
+                            <th class="text-end">Total a Debitar</th>
+                            <th class="text-end">Total a Reembolsar</th>
+                            <th class="text-end">Saldo Líquido</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (linhas.length) { %>
+                            <% linhas.forEach(linha => { %>
+                                <% const saldo = linha.total_reembolso - linha.total_debito; %>
+                                <tr>
+                                    <td class="fw-semibold"><%= linha.vendedor_nome %></td>
+                                    <td class="text-end text-danger">R$ <%= formatarMoeda(linha.total_debito) %></td>
+                                    <td class="text-end text-success">R$ <%= formatarMoeda(linha.total_reembolso) %></td>
+                                    <td class="text-end fw-semibold <%= saldo < 0 ? 'text-danger' : 'text-primary' %>">R$ <%= formatarMoeda(saldo) %></td>
+                                </tr>
+                            <% }) %>
+                        <% } else { %>
+                            <tr><td colspan="4" class="text-center text-muted py-4">Nenhum movimento encontrado para os filtros selecionados.</td></tr>
+                        <% } %>
+                    </tbody>
+                    <% if (linhas.length) { %>
+                        <tfoot class="table-light fw-bold">
+                            <tr>
+                                <td>Total</td>
+                                <td class="text-end text-danger">R$ <%= formatarMoeda(totais.debito) %></td>
+                                <td class="text-end text-success">R$ <%= formatarMoeda(totais.reembolso) %></td>
+                                <td class="text-end">R$ <%= formatarMoeda(totais.reembolso - totais.debito) %></td>
+                            </tr>
+                        </tfoot>
+                    <% } %>
+                </table>
+            </div>
+        </section>
+    </main>
+</body>
+</html>
