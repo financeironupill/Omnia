@@ -1750,6 +1750,195 @@ const etapasEmailRegua = {
     3: { fase: 'Aviso 3 (Aviso Final)', tipoAcao: 'E-mail 3 - Aviso Final (Próximo Dia Útil)' }
 };
 
+function formatarDataEmail(data) {
+    if (!data) return 'Não informado';
+    if (data instanceof Date) {
+        return data.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+    }
+
+    const texto = String(data).trim();
+    const dataIso = texto.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (dataIso) return `${dataIso[3]}/${dataIso[2]}/${dataIso[1]}`;
+
+    const dataConvertida = new Date(texto);
+    return Number.isNaN(dataConvertida.getTime())
+        ? 'Não informado'
+        : dataConvertida.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+}
+
+async function carregarEmailAvisoComercial(boletoId, executor = pool) {
+    const boletoRes = await executor.query(`
+        SELECT b.id, b.cliente_id, b.numero_documento, b.data_vencimento, b.valor_original,
+               b.valor_custas, b.situacao_boleto, b.status_cobranca,
+               cl.cnpj_cpf AS cliente_cnpj, cl.nome AS cliente_nome,
+               cl.nome_fantasia AS cliente_nome_fantasia,
+               g.email AS gerente_email, v.email AS vendedor_email
+        FROM boletos b
+        LEFT JOIN clientes cl ON cl.id = b.cliente_id
+        LEFT JOIN vendedores v ON v.id = COALESCE(b.vendedor_id, cl.vendedor_id)
+        LEFT JOIN gerentes g ON g.id = COALESCE(b.gerente_id, cl.gerente_id, v.gerente_id)
+        WHERE b.id = $1
+    `, [boletoId]);
+
+    if (boletoRes.rows.length === 0) return null;
+
+    const boleto = boletoRes.rows[0];
+    const destinatarios = [...new Set([boleto.gerente_email, boleto.vendedor_email]
+        .filter(email => typeof email === 'string' && email.trim() !== '')
+        .map(email => email.trim()))];
+    if (destinatarios.length === 0) {
+        const error = new Error('O gerente e o vendedor não possuem e-mail cadastrado.');
+        error.status = 400;
+        throw error;
+    }
+
+    const titulosRes = await executor.query(`
+        SELECT b2.data_vencimento, b2.numero_documento, b2.valor_original,
+               b2.status_cobranca, cl2.nome AS cliente_nome,
+               cl2.nome_fantasia AS cliente_nome_fantasia
+        FROM boletos b2
+        LEFT JOIN clientes cl2 ON cl2.id = b2.cliente_id
+        WHERE b2.id <> $1
+          AND b2.situacao_boleto IN ('Vencido', 'Pago com Pendência')
+          AND (
+              ($2::integer IS NOT NULL AND b2.cliente_id = $2)
+              OR (
+                  NULLIF(regexp_replace(COALESCE($3, ''), '[^0-9]', '', 'g'), '') IS NOT NULL
+                  AND regexp_replace(COALESCE(cl2.cnpj_cpf, ''), '[^0-9]', '', 'g') =
+                      regexp_replace($3, '[^0-9]', '', 'g')
+              )
+          )
+        ORDER BY b2.data_vencimento ASC, b2.id ASC
+    `, [boleto.id, boleto.cliente_id, boleto.cliente_cnpj]);
+
+    const clienteNome = boleto.cliente_nome || 'Cliente';
+    const nomeFantasia = boleto.cliente_nome_fantasia || '';
+    const assunto = boleto.situacao_boleto === 'Pago'
+        ? `AVISO DE LIQUIDAÇÃO: Cliente ${clienteNome} - Boleto Nº ${boleto.numero_documento}`
+        : `PENDÊNCIA DE CUSTAS: Cliente ${clienteNome} - Boleto Nº ${boleto.numero_documento}`;
+    const corpo = boleto.situacao_boleto === 'Pago'
+        ? `Prezados Gerente e Vendedor,
+
+O boleto Nº ${boleto.numero_documento} referente ao cliente ${clienteNome} foi liquidado.
+
+${titulosRes.rows.length === 0
+        ? 'O cliente está com o extrato totalmente quitado e o cadastro está liberado para novos pedidos no sistema.'
+        : `O cliente ainda possui os seguintes títulos em aberto:\n\n${titulosRes.rows.map(titulo => `- Vencimento: ${formatarDataEmail(titulo.data_vencimento)} | Nº do Documento: ${titulo.numero_documento || 'Não informado'} | Razão Social: ${titulo.cliente_nome || 'Não informada'} | Nome Fantasia: ${titulo.cliente_nome_fantasia || 'Não informado'} | Valor Original: R$ ${formatarMoedaSemSimbolo(titulo.valor_original)} | Fase da Régua: ${titulo.status_cobranca || 'Aguardando Régua'}`).join('\n')}`}
+
+Atenciosamente,
+Setor Financeiro - Omnia`
+        : `Prezados Gerente e Vendedor,
+
+O boleto Nº ${boleto.numero_documento} referente ao cliente ${clienteNome}${nomeFantasia ? ` (${nomeFantasia})` : ''} foi pago, porém possui pendência de custas bancárias/cartório no valor de R$ ${formatarMoedaSemSimbolo(boleto.valor_custas)}.
+
+${titulosRes.rows.length === 0
+        ? 'O cliente está com o extrato totalmente quitado, exceto pela pendência de custas deste boleto.'
+        : `O cliente ainda possui os seguintes títulos em aberto:\n\n${titulosRes.rows.map(titulo => `- Vencimento: ${formatarDataEmail(titulo.data_vencimento)} | Nº do Documento: ${titulo.numero_documento || 'Não informado'} | Razão Social: ${titulo.cliente_nome || 'Não informada'} | Nome Fantasia: ${titulo.cliente_nome_fantasia || 'Não informado'} | Valor Original: R$ ${formatarMoedaSemSimbolo(titulo.valor_original)} | Fase da Régua: ${titulo.status_cobranca || 'Aguardando Régua'}`).join('\n')}`}
+
+Informamos que novos pedidos permanecerão bloqueados até a quitação integral destas custas.
+
+Atenciosamente,
+Setor Financeiro - Omnia`;
+
+    return {
+        boleto,
+        para: destinatarios.join(','),
+        assunto,
+        corpo,
+        contatoNome: nomeFantasia ? `${clienteNome} (${nomeFantasia})` : clienteNome
+    };
+}
+
+app.post('/cobranca/email-liquidacao/preparar/:id', verificarAutenticacao, async (req, res) => {
+    const boletoId = Number(req.params.id);
+    if (!Number.isSafeInteger(boletoId) || boletoId <= 0) {
+        return res.status(400).json({ erro: 'Identificador do boleto inválido.' });
+    }
+
+    try {
+        const email = await carregarEmailAvisoComercial(boletoId);
+        if (!email) return res.status(404).json({ erro: 'Boleto não encontrado.' });
+        res.json({ para: email.para, assunto: email.assunto, corpo: email.corpo });
+    } catch (err) {
+        if (err.status === 400) return res.status(400).json({ erro: err.message });
+        console.error('ERRO AO PREPARAR AVISO DE LIQUIDAÇÃO:', err);
+        res.status(500).json({ erro: 'Erro ao preparar o aviso de liquidação.' });
+    }
+});
+
+app.post('/cobranca/email-liquidacao/confirmar/:id', verificarAutenticacao, async (req, res) => {
+    const boletoId = Number(req.params.id);
+    if (!Number.isSafeInteger(boletoId) || boletoId <= 0) {
+        return res.status(400).json({ erro: 'Identificador do boleto inválido.' });
+    }
+
+    let db;
+    let transactionStarted = false;
+    try {
+        db = await pool.connect();
+        await db.query('BEGIN');
+        transactionStarted = true;
+        const boletoRes = await db.query(`
+            SELECT cl.nome AS cliente_nome, cl.nome_fantasia AS cliente_nome_fantasia
+            FROM boletos b
+            LEFT JOIN clientes cl ON cl.id = b.cliente_id
+            WHERE b.id = $1
+        `, [boletoId]);
+        if (boletoRes.rows.length === 0) {
+            await db.query('ROLLBACK');
+            transactionStarted = false;
+            return res.status(404).json({ erro: 'Boleto não encontrado.' });
+        }
+
+        const { para, assunto, corpo } = req.body;
+        if ([para, assunto, corpo].some(valor => typeof valor !== 'string' || valor.trim() === '')) {
+            await db.query('ROLLBACK');
+            transactionStarted = false;
+            return res.status(400).json({ erro: 'Conteúdo do aviso de liquidação inválido.' });
+        }
+        const resumo = `Aviso de liquidação/pagamento enviado para gerente e vendedor (${para.trim()}). Assunto: ${assunto.trim()}.\n\n${corpo.trim()}`;
+        const clienteNome = boletoRes.rows[0].cliente_nome || 'Cliente';
+        const contatoNome = boletoRes.rows[0].cliente_nome_fantasia
+            ? `${clienteNome} (${boletoRes.rows[0].cliente_nome_fantasia})`
+            : clienteNome;
+        const historicoRes = await db.query(`
+            INSERT INTO boletos_historico
+                (boleto_id, usuario_id, tipo_contato, canal, contato_nome, resumo, status, data_hora)
+            VALUES ($1, $2, 'Interno', 'E-mail', $3, $4, 'Confirmado', CURRENT_TIMESTAMP)
+            RETURNING id, data_hora
+        `, [boletoId, req.session.usuario.id, contatoNome, resumo]);
+        await db.query('COMMIT');
+        transactionStarted = false;
+
+        res.json({
+            sucesso: 'Aviso de liquidação confirmado e registrado no histórico.',
+            interacao: {
+                id: historicoRes.rows[0].id,
+                data_hora: historicoRes.rows[0].data_hora,
+                tipo_contato: 'Interno',
+                canal: 'E-mail',
+                contato_nome: contatoNome,
+                resumo,
+                status: 'Confirmado',
+                usuario_nome: req.session.usuario.nome || 'Usuário atual'
+            }
+        });
+    } catch (err) {
+        if (db && transactionStarted) {
+            try {
+                await db.query('ROLLBACK');
+            } catch (rollbackErr) {
+                console.error('ERRO AO DESFAZER REGISTRO DO AVISO DE LIQUIDAÇÃO:', rollbackErr);
+            }
+        }
+        if (err.status === 400) return res.status(400).json({ erro: err.message });
+        console.error('ERRO AO CONFIRMAR AVISO DE LIQUIDAÇÃO:', err);
+        res.status(500).json({ erro: 'Erro ao registrar o aviso de liquidação no histórico.' });
+    } finally {
+        if (db) db.release();
+    }
+});
+
 async function carregarEmailRegua(boletoId, etapa, executor = pool) {
     const boletoRes = await executor.query(`
         SELECT b.id, b.numero_documento, b.data_vencimento, b.valor_original,

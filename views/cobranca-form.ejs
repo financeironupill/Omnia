@@ -573,6 +573,7 @@
     <script>
         let emailAvisoPreparadoUrl = '';
         let emailReguaEtapaPendente = null;
+        let emailLiquidacaoPendente = false;
 
         const dadosBoleto = {
             id: "<%= conta ? conta.id : '' %>",
@@ -602,6 +603,7 @@
             emailAvisoPreparadoUrl = `mailto:${encodeURIComponent(para)}?cc=${encodeURIComponent(cc)}&subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
             window.location.href = emailAvisoPreparadoUrl;
             emailReguaEtapaPendente = null;
+            emailLiquidacaoPendente = false;
             document.getElementById('btnConfirmarEnvio').hidden = true;
             document.getElementById('emailConfirmFeedback').className = 'alert d-none';
 
@@ -627,6 +629,7 @@
             const feedback = document.getElementById('emailAvisoFeedback');
             const botaoConfirmar = document.getElementById('btnConfirmarEnvio');
             let janelaEmail = null;
+            emailLiquidacaoPendente = false;
             feedback.className = 'alert d-none mt-3 mb-0';
             try {
                 janelaEmail = window.open('about:blank', '_blank');
@@ -670,25 +673,35 @@
         async function confirmarEnvioEmail() {
             const botao = document.getElementById('btnConfirmarEnvio');
             const modalFeedback = document.getElementById('emailConfirmFeedback');
-            if (!emailReguaEtapaPendente) return;
+            if (!emailReguaEtapaPendente && !emailLiquidacaoPendente) return;
 
             botao.disabled = true;
             try {
-                const resposta = await fetch(`/cobranca/email-regua/confirmar/${encodeURIComponent(dadosBoleto.id)}`, {
+                const liquidacao = emailLiquidacaoPendente;
+                const rota = liquidacao ? 'email-liquidacao' : 'email-regua';
+                const corpo = liquidacao
+                    ? {
+                        para: document.getElementById('emailParaModal').value,
+                        assunto: document.getElementById('emailAssuntoModal').value,
+                        corpo: document.getElementById('emailTextoModal').value
+                    }
+                    : { etapa: emailReguaEtapaPendente };
+                const resposta = await fetch(`/cobranca/${rota}/confirmar/${encodeURIComponent(dadosBoleto.id)}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-                    body: JSON.stringify({ etapa: emailReguaEtapaPendente })
+                    body: JSON.stringify(corpo)
                 });
                 const resultado = await resposta.json();
                 if (!resposta.ok) throw new Error(resultado.erro || 'Não foi possível confirmar o envio.');
 
                 const faseSelect = document.querySelector('#formBoleto select[name="status_cobranca"]');
-                if (faseSelect) faseSelect.value = resultado.fase;
+                if (faseSelect && resultado.fase) faseSelect.value = resultado.fase;
                 document.getElementById('emailAvisoFeedback').textContent = resultado.sucesso;
                 document.getElementById('emailAvisoFeedback').className = 'alert alert-success mt-3 mb-0';
                 modalFeedback.textContent = resultado.sucesso;
                 modalFeedback.className = 'alert alert-success';
                 emailReguaEtapaPendente = null;
+                emailLiquidacaoPendente = false;
                 botao.hidden = true;
                 window.setTimeout(() => window.location.reload(), 900);
             } catch (err) {
@@ -712,20 +725,49 @@
             document.getElementById('editarResumo').value = botao.dataset.resumo;
         }
 
-        function prepararEmailAvisoComercial() {
-            const destinatarios = [dadosBoleto.gerente_email, dadosBoleto.vendedor_email].filter(Boolean).join(',');
-            let assunto = "";
-            let corpo = "";
+        async function prepararEmailAvisoComercial() {
+            const feedback = document.getElementById('emailAvisoFeedback');
+            const botaoConfirmar = document.getElementById('btnConfirmarEnvio');
+            let janelaEmail = null;
+            feedback.className = 'alert d-none mt-3 mb-0';
 
-            if (dadosBoleto.situacao_boleto === 'Pago') {
-                assunto = `AVISO DE LIQUIDAÇÃO: Cliente ${dadosBoleto.cliente_nome} - Boleto Nº ${dadosBoleto.numero_documento}`;
-                corpo = `Prezados Gerente e Vendedor,\n\nO boleto Nº ${dadosBoleto.numero_documento} referente ao cliente ${dadosBoleto.cliente_nome} foi totalmente liquidado sem pendências.\n\nO cadastro do cliente está liberado para novos pedidos no sistema.\n\nAtenciosamente,\nSetor Financeiro - Omnia`;
-            } else {
-                assunto = `PENDÊNCIA DE CUSTAS: Cliente ${dadosBoleto.cliente_nome} - Boleto Nº ${dadosBoleto.numero_documento}`;
-                corpo = `Prezados Gerente e Vendedor,\n\nO boleto Nº ${dadosBoleto.numero_documento} referente ao cliente ${dadosBoleto.cliente_nome} foi pago, porém possui pendência de custas bancárias/cartório no valor de ${dadosBoleto.valor_custas}.\n\nInformamos que novos pedidos permanecerão bloqueados até a quitação integral destas custas.\n\nAtenciosamente,\nSetor Financeiro - Omnia`;
+            try {
+                janelaEmail = window.open('about:blank', '_blank');
+                const resposta = await fetch(`/cobranca/email-liquidacao/preparar/${encodeURIComponent(dadosBoleto.id)}`, {
+                    method: 'POST',
+                    headers: { Accept: 'application/json' }
+                });
+                const resultado = await resposta.json();
+                if (!resposta.ok) throw new Error(resultado.erro || 'Não foi possível preparar o aviso de liquidação.');
+
+                document.getElementById('emailParaModal').value = resultado.para;
+                document.getElementById('emailCcModal').value = '';
+                document.getElementById('emailAssuntoModal').value = resultado.assunto;
+                document.getElementById('emailTextoModal').value = resultado.corpo;
+                emailAvisoPreparadoUrl = `mailto:${encodeURIComponent(resultado.para)}?subject=${encodeURIComponent(resultado.assunto)}&body=${encodeURIComponent(resultado.corpo)}`;
+                emailReguaEtapaPendente = null;
+                emailLiquidacaoPendente = true;
+                botaoConfirmar.hidden = false;
+                botaoConfirmar.disabled = false;
+
+                if (janelaEmail && !janelaEmail.closed) {
+                    janelaEmail.location.href = emailAvisoPreparadoUrl;
+                    feedback.textContent = 'E-mail preparado no cliente de e-mail. Após enviá-lo, confirme o envio para registrar a interação no histórico.';
+                    feedback.className = 'alert alert-info mt-3 mb-0';
+                } else {
+                    feedback.textContent = 'E-mail preparado. O navegador bloqueou a nova janela; use “Abrir cliente de e-mail”. Após enviar, confirme o envio.';
+                    feedback.className = 'alert alert-warning mt-3 mb-0';
+                }
+
+                const modalFeedback = document.getElementById('emailConfirmFeedback');
+                modalFeedback.textContent = 'A interação será gravada no histórico após confirmar que o e-mail foi enviado.';
+                modalFeedback.className = 'alert alert-info';
+                new bootstrap.Modal(document.getElementById('modalCopiarEmail')).show();
+            } catch (err) {
+                if (janelaEmail && !janelaEmail.closed) janelaEmail.close();
+                feedback.textContent = err.message;
+                feedback.className = 'alert alert-danger mt-3 mb-0';
             }
-
-            dispararEmail(destinatarios, '', assunto, corpo);
         }
 
         async function prepararEmailRetornado() {
