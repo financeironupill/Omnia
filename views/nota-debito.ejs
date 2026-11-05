@@ -55,7 +55,7 @@
             <div class="card-header bg-dark text-white py-1 small fw-bold">2. DISCRIMINAÇÃO DOS VALORES</div>
             <div class="card-body py-2 small">
                 <p class="text-justify mb-3">
-                    A presente Nota de Débito refere-se ao ressarcimento de despesas operacionais e bancárias decorrentes do atraso do pagamento do título original abaixo especificado, o qual precisou ser encaminhado a protesto em cartório devido ao inadimplemento na data de vencimento.
+                    <%= conta.descricao_nota %>
                 </p>
                 <div class="row mb-2">
                     <div class="col-4"><strong>Documento de Origem:</strong> <%= conta.numero_documento %></div>
@@ -72,14 +72,14 @@
                     </thead>
                     <tbody>
                         <tr>
-                            <td>Ressarcimento de Custas Cartorárias, multa e juros por Atraso</td>
-                            <td class="text-end fw-bold">R$ <%= conta.valor_custas_fmt || conta.valor_custas || '0,00' %></td>
+                            <td><%= conta.descricao_encargo %></td>
+                            <td class="text-end fw-bold">R$ <%= conta.valor_encargo_fmt %></td>
                         </tr>
                     </tbody>
                     <tfoot>
                         <tr class="table-light">
                             <td class="text-end fw-bold">Valor Total a Pagar:</td>
-                            <td class="text-end fw-bold text-danger">R$ <%= conta.valor_custas_fmt || conta.valor_custas || '0,00' %></td>
+                            <td class="text-end fw-bold text-danger">R$ <%= conta.valor_total_nota_fmt %></td>
                         </tr>
                     </tfoot>
                 </table>

@@ -1860,11 +1860,26 @@ app.get('/cobranca/nota-debito/:id', verificarAutenticacao, async (req, res) => 
             return res.status(404).send('Boleto não encontrado.');
         }
 
+        const boleto = result.rows[0];
+        const valorOriginalCentavos = Math.round((Number(boleto.valor_original) || 0) * 100);
+        const valorCustasCentavos = Math.round((Number(boleto.valor_custas) || 0) * 100);
+        const boletoVencido = boleto.situacao_boleto === 'Vencido';
+        const valorEncargoCentavos = boletoVencido
+            ? valorOriginalCentavos + valorCustasCentavos
+            : valorCustasCentavos;
         const conta = {
-            ...result.rows[0],
+            ...boleto,
             cliente_cnpj: formatarCnpjCpf(result.rows[0].cliente_cnpj),
             valor_original_fmt: formatarMoedaSemSimbolo(result.rows[0].valor_original),
-            valor_custas_fmt: formatarMoedaSemSimbolo(result.rows[0].valor_custas)
+            valor_custas_fmt: formatarMoedaSemSimbolo(result.rows[0].valor_custas),
+            descricao_encargo: boletoVencido
+                ? `Encargo acumulado referente ao documento original Nº ${boleto.numero_documento}, incluindo o valor do título e as custas cartorárias.`
+                : 'Ressarcimento de Custas Cartorárias, multa e juros por Atraso',
+            valor_encargo_fmt: formatarMoedaSemSimbolo(valorEncargoCentavos / 100),
+            valor_total_nota_fmt: formatarMoedaSemSimbolo(valorEncargoCentavos / 100),
+            descricao_nota: boletoVencido
+                ? `A presente Nota de Débito refere-se ao valor do título original Nº ${boleto.numero_documento}, acrescido das custas cartorárias decorrentes do atraso.`
+                : 'A presente Nota de Débito refere-se ao ressarcimento de despesas operacionais e bancárias decorrentes do atraso do pagamento do título original abaixo especificado, o qual precisou ser encaminhado a protesto em cartório devido ao inadimplemento na data de vencimento.'
         };
 
         res.render('nota-debito', { conta });
