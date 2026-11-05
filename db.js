@@ -1,12 +1,14 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
+if (!process.env.DATABASE_URL) {
+  throw new Error('A variável DATABASE_URL deve ser configurada no ambiente.');
+}
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   options: '-c timezone=America/Sao_Paulo',
-  ssl: {
-    rejectUnauthorized: false
-  }
+  ssl: true
 });
 
 pool.connect((err, client, release) => {

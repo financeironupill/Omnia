@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Cobrança - Omnia</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-light">
+    <nav class="navbar navbar-dark bg-dark px-4">
+        <a class="navbar-brand fw-bold" href="/dashboard"><i class="fa-solid fa-layer-group text-primary me-2"></i>OMNIA</a>
+        <div class="d-flex gap-2">
+            <a href="/cobranca" class="btn btn-outline-light btn-sm">Lista de cobrança</a>
+            <a href="/logout" class="btn btn-outline-light btn-sm">Sair</a>
+        </div>
+    </nav>
+
+    <main class="container-fluid px-4 py-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="fw-bold mb-1">Dashboard de Cobrança</h2>
+                <p class="text-muted mb-0">Aging de títulos vencidos e ações da régua que já atingiram o prazo.</p>
+            </div>
+            <span class="text-muted small">Olá, <%= usuario.nome %></span>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-sm-6 col-xl-3">
+                <div class="card border-0 border-start border-4 border-warning shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">Vencidos há 1-15 dias</div>
+                        <div class="fs-3 fw-bold"><%= aging.dias_1_15_qtd %></div>
+                        <div class="text-muted">R$ <%= aging.dias_1_15_valor %></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+                <div class="card border-0 border-start border-4 border-orange shadow-sm h-100" style="--bs-border-opacity: 1; border-color: #fd7e14 !important;">
+                    <div class="card-body">
+                        <div class="text-muted small">Vencidos há 16-30 dias</div>
+                        <div class="fs-3 fw-bold"><%= aging.dias_16_30_qtd %></div>
+                        <div class="text-muted">R$ <%= aging.dias_16_30_valor %></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+                <div class="card border-0 border-start border-4 border-danger shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">Vencidos há 31+ dias</div>
+                        <div class="fs-3 fw-bold"><%= aging.dias_31_mais_qtd %></div>
+                        <div class="text-muted">R$ <%= aging.dias_31_mais_valor %></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+                <div class="card border-0 border-start border-4 border-dark shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">Em cartório / negativados</div>
+                        <div class="fs-3 fw-bold"><%= aging.cartorio_qtd %></div>
+                        <div class="text-muted">R$ <%= aging.cartorio_valor %></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <section class="card border-0 shadow-sm">
+            <div class="card-header bg-white py-3 d-flex flex-wrap justify-content-between align-items-center">
+                <div>
+                    <h5 class="mb-1 fw-bold"><i class="fa-solid fa-list-check text-primary me-2"></i>Hoje a fazer</h5>
+                    <small class="text-muted">Dias úteis excluem fins de semana e feriados bancários nacionais do Brasil; feriados locais não são considerados.</small>
+                </div>
+                <span class="badge text-bg-primary"><%= tarefas.length %> ação(ões)</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Prazo</th>
+                            <th>Documento / Cliente</th>
+                            <th>Vencimento</th>
+                            <th>Fase</th>
+                            <th class="text-end">Valor</th>
+                            <th class="text-end">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (tarefas.length) { %>
+                            <% tarefas.forEach(tarefa => { %>
+                                <tr>
+                                    <td class="text-nowrap"><%= new Date(tarefa.data_acao).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) %></td>
+                                    <td>
+                                        <div class="fw-semibold"><%= tarefa.numero_documento %></div>
+                                        <small class="text-muted"><%= tarefa.cliente_nome %></small>
+                                    </td>
+                                    <td><%= new Date(tarefa.data_vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) %></td>
+                                    <td><span class="badge text-bg-secondary"><%= tarefa.acao %></span></td>
+                                    <td class="text-end">R$ <%= Number(tarefa.valor_original).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+                                    <td class="text-end">
+                                        <% if (tarefa.etapa) { %>
+                                            <a class="btn btn-sm btn-primary" href="/cobranca/editar/<%= tarefa.id %>?email_etapa=<%= tarefa.etapa %>#modalCopiarEmail">
+                                                <i class="fa-solid fa-envelope me-1"></i>Abrir e-mail
+                                            </a>
+                                        <% } else { %>
+                                            <a class="btn btn-sm btn-outline-danger" href="/cobranca/editar/<%= tarefa.id %>">
+                                                <i class="fa-solid fa-gavel me-1"></i>Registrar cartório
+                                            </a>
+                                        <% } %>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        <% } else { %>
+                            <tr><td colspan="6" class="text-center text-muted py-4">Nenhuma ação da régua está vencida hoje.</td></tr>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+</body>
+</html>

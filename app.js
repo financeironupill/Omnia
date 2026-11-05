@@ -7,6 +7,11 @@ const pool = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const trustProxy = process.env.TRUST_PROXY === 'true';
+if (!process.env.SESSION_SECRET) {
+    throw new Error('A variável SESSION_SECRET deve ser configurada no ambiente.');
+}
+if (trustProxy) app.set('trust proxy', 1);
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
@@ -17,9 +22,15 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'omnia_chave_secreta_2026',
+    secret: process.env.SESSION_SECRET,
     resave: false,
-    saveUninitialized: false
+    saveUninitialized: false,
+    proxy: trustProxy,
+    cookie: {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production'
+    }
 }));
 
 function formatarCapitalizacao(texto) {
@@ -83,6 +94,54 @@ function limparValorMonetario(valor) {
     return parseFloat(limpo) || 0;
 }
 
+function validarValorMonetario(valor, { permitirZero = false } = {}) {
+    if (typeof valor === 'number') {
+        return Number.isFinite(valor) && (permitirZero ? valor >= 0 : valor > 0);
+    }
+    if (typeof valor !== 'string') return false;
+    const texto = valor.trim();
+    const formatoBrasileiro = /^(?:\d+|\d{1,3}(?:\.\d{3})+)(?:,\d{1,2})?$/;
+    if (!formatoBrasileiro.test(texto)) return false;
+    const numero = Number(texto.replace(/\./g, '').replace(',', '.'));
+    return Number.isFinite(numero) && (permitirZero ? numero >= 0 : numero > 0);
+}
+
+function validarDataOpcional(valor) {
+    if (valor === undefined || valor === null || valor === '') return true;
+    if (typeof valor !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(valor)) return false;
+    const data = new Date(`${valor}T00:00:00Z`);
+    return !Number.isNaN(data.getTime()) && data.toISOString().slice(0, 10) === valor;
+}
+
+const situacoesBoletoValidas = ['Vencido', 'Pago', 'Pago com Pendência'];
+const fasesCobrancaValidas = [
+    'Aguardando Régua',
+    'Aviso 1 (Notificação)',
+    'Aviso 2 (Alerta Cartório)',
+    'Aviso 3 (Aviso Final)',
+    'Em Cartório / Negativado',
+    'Custas Pendentes (Cartório)',
+    'Concluído'
+];
+
+function validarDadosBoleto({ valor_original, situacao_boleto, status_cobranca, data_pagamento, valor_custas }) {
+    if (!validarValorMonetario(valor_original)) return 'O valor original deve ser maior que zero.';
+    if (valor_custas !== undefined && !validarValorMonetario(valor_custas, { permitirZero: true })) {
+        return 'O valor das custas não pode ser negativo ou inválido.';
+    }
+    if (situacao_boleto !== undefined && !situacoesBoletoValidas.includes(situacao_boleto)) {
+        return 'A situação do boleto é inválida.';
+    }
+    if (status_cobranca !== undefined && !fasesCobrancaValidas.includes(status_cobranca)) {
+        return 'A fase da régua de cobrança é inválida.';
+    }
+    if (!validarDataOpcional(data_pagamento)) return 'A data de pagamento é inválida.';
+    if (['Pago', 'Pago com Pendência'].includes(situacao_boleto) && !data_pagamento) {
+        return 'Informe a data de pagamento para marcar o boleto como pago.';
+    }
+    return null;
+}
+
 function tratarData(dataInput) {
     if (!dataInput) return null;
     if (dataInput instanceof Date) {
@@ -121,6 +180,131 @@ app.post('/login', async (req, res) => {
 
 app.get('/dashboard', verificarAutenticacao, (req, res) => res.render('dashboard', { usuario: req.session.usuario, erro: req.query.erro || null }));
 app.get('/solucao', verificarAutenticacao, (req, res) => res.render('dashboard-solucao', { usuario: req.session.usuario }));
+
+async function exibirDashboardCobranca(req, res) {
+    try {
+        const [agingRes, tarefasRes] = await Promise.all([
+            pool.query(`
+                SELECT
+                    COUNT(*) FILTER (WHERE CURRENT_DATE - data_vencimento BETWEEN 1 AND 15) AS dias_1_15_qtd,
+                    COALESCE(SUM(valor_original) FILTER (WHERE CURRENT_DATE - data_vencimento BETWEEN 1 AND 15), 0) AS dias_1_15_valor,
+                    COUNT(*) FILTER (WHERE CURRENT_DATE - data_vencimento BETWEEN 16 AND 30) AS dias_16_30_qtd,
+                    COALESCE(SUM(valor_original) FILTER (WHERE CURRENT_DATE - data_vencimento BETWEEN 16 AND 30), 0) AS dias_16_30_valor,
+                    COUNT(*) FILTER (WHERE CURRENT_DATE - data_vencimento > 30) AS dias_31_mais_qtd,
+                    COALESCE(SUM(valor_original) FILTER (WHERE CURRENT_DATE - data_vencimento > 30), 0) AS dias_31_mais_valor,
+                    COUNT(*) FILTER (WHERE status_cobranca = 'Em Cartório / Negativado') AS cartorio_qtd,
+                    COALESCE(SUM(valor_original) FILTER (WHERE status_cobranca = 'Em Cartório / Negativado'), 0) AS cartorio_valor
+                FROM boletos
+                WHERE excluido_em IS NULL
+                  AND situacao_boleto IN ('Vencido', 'Pago com Pendência')
+                  AND data_vencimento < CURRENT_DATE
+            `),
+            pool.query(`
+                SELECT tarefas.*, c.nome AS cliente_nome, c.email AS cliente_email
+                FROM (
+                    SELECT b.id, b.numero_documento, b.data_vencimento, b.valor_original,
+                           b.status_cobranca, b.data_fase_cobranca,
+                           1 AS etapa, 'Aviso 1 (Notificação)' AS acao,
+                           b.data_vencimento + 1 AS data_acao
+                    FROM boletos b
+                    WHERE b.excluido_em IS NULL
+                      AND b.situacao_boleto IN ('Vencido', 'Pago com Pendência')
+                      AND b.status_cobranca = 'Aguardando Régua'
+                      AND b.data_vencimento + 1 <= CURRENT_DATE
+
+                    UNION ALL
+
+                    SELECT b.id, b.numero_documento, b.data_vencimento, b.valor_original,
+                           b.status_cobranca, b.data_fase_cobranca,
+                           2 AS etapa, 'Aviso 2 (Alerta Cartório)' AS acao,
+                           prazo.data_acao
+                    FROM boletos b
+                    CROSS JOIN LATERAL (
+                        SELECT dia::date AS data_acao
+                        FROM generate_series(
+                            (b.data_fase_cobranca::date + 1)::timestamp,
+                            (b.data_fase_cobranca::date + 14)::timestamp,
+                            INTERVAL '1 day'
+                        ) AS calendario(dia)
+                        WHERE EXTRACT(ISODOW FROM dia) BETWEEN 1 AND 5
+                          AND NOT omnia_is_feriado_bancario(dia::date)
+                        ORDER BY dia
+                        OFFSET 1 LIMIT 1
+                    ) prazo
+                    WHERE b.excluido_em IS NULL
+                      AND b.situacao_boleto IN ('Vencido', 'Pago com Pendência')
+                      AND b.status_cobranca = 'Aviso 1 (Notificação)'
+                      AND prazo.data_acao <= CURRENT_DATE
+
+                    UNION ALL
+
+                    SELECT b.id, b.numero_documento, b.data_vencimento, b.valor_original,
+                           b.status_cobranca, b.data_fase_cobranca,
+                           3 AS etapa, 'Aviso 3 (Aviso Final)' AS acao,
+                           prazo.data_acao
+                    FROM boletos b
+                    CROSS JOIN LATERAL (
+                        SELECT dia::date AS data_acao
+                        FROM generate_series(
+                            (b.data_fase_cobranca::date + 1)::timestamp,
+                            (b.data_fase_cobranca::date + 14)::timestamp,
+                            INTERVAL '1 day'
+                        ) AS calendario(dia)
+                        WHERE EXTRACT(ISODOW FROM dia) BETWEEN 1 AND 5
+                          AND NOT omnia_is_feriado_bancario(dia::date)
+                        ORDER BY dia
+                        OFFSET 1 LIMIT 1
+                    ) prazo
+                    WHERE b.excluido_em IS NULL
+                      AND b.situacao_boleto IN ('Vencido', 'Pago com Pendência')
+                      AND b.status_cobranca = 'Aviso 2 (Alerta Cartório)'
+                      AND prazo.data_acao <= CURRENT_DATE
+
+                    UNION ALL
+
+                    SELECT b.id, b.numero_documento, b.data_vencimento, b.valor_original,
+                           b.status_cobranca, b.data_fase_cobranca,
+                           NULL::integer AS etapa, 'Encaminhamento ao Cartório' AS acao,
+                           prazo.data_acao
+                    FROM boletos b
+                    CROSS JOIN LATERAL (
+                        SELECT dia::date AS data_acao
+                        FROM generate_series(
+                            (b.data_fase_cobranca::date + 1)::timestamp,
+                            (b.data_fase_cobranca::date + 14)::timestamp,
+                            INTERVAL '1 day'
+                        ) AS calendario(dia)
+                        WHERE EXTRACT(ISODOW FROM dia) BETWEEN 1 AND 5
+                          AND NOT omnia_is_feriado_bancario(dia::date)
+                        ORDER BY dia
+                        LIMIT 1
+                    ) prazo
+                    WHERE b.excluido_em IS NULL
+                      AND b.situacao_boleto IN ('Vencido', 'Pago com Pendência')
+                      AND b.status_cobranca = 'Aviso 3 (Aviso Final)'
+                      AND prazo.data_acao <= CURRENT_DATE
+                ) tarefas
+                JOIN boletos b ON b.id = tarefas.id
+                JOIN clientes c ON c.id = b.cliente_id
+                ORDER BY tarefas.data_acao, tarefas.data_vencimento, tarefas.id
+            `)
+        ]);
+        const aging = agingRes.rows[0];
+        ['dias_1_15_valor', 'dias_16_30_valor', 'dias_31_mais_valor', 'cartorio_valor']
+            .forEach(campo => { aging[campo] = formatarMoedaSemSimbolo(aging[campo]); });
+        res.render('cobranca-dashboard', {
+            usuario: req.session.usuario,
+            aging,
+            tarefas: tarefasRes.rows
+        });
+    } catch (err) {
+        console.error('ERRO AO CARREGAR DASHBOARD DE COBRANÇA:', err);
+        res.status(500).send('Erro ao carregar o dashboard de cobrança.');
+    }
+}
+
+app.get('/cobranca/dashboard', verificarAutenticacao, exibirDashboardCobranca);
+app.get('/cobranca/hoje-a-fazer', verificarAutenticacao, exibirDashboardCobranca);
 
 // CONSULTA CNPJ COM HTTPS NATIVO
 app.get('/api/consultar-cnpj/:cnpj', verificarAutenticacao, (req, res) => {
@@ -393,8 +577,8 @@ app.get('/clientes', verificarAutenticacao, async (req, res) => {
             ordemAtual,
             ordAtual,
             paginaAtual: typeof page === 'string' ? page : '',
-            origemAtual: origem || 'dashboard', 
-            erro: null, 
+            origemAtual: origem || 'dashboard',
+            erro: null,
             sucesso: null 
         });
     } catch (err) {
@@ -558,7 +742,7 @@ app.get('/gerentes', verificarAutenticacao, async (req, res) => {
             ordenarAtual: col, 
             ordemAtual: dir, 
             statusAtual: statusFiltro,
-            erro: null, 
+            erro: null,
             sucesso: null 
         });
     } catch (err) {
@@ -1016,7 +1200,7 @@ function construirConsultaCobranca(query) {
             SELECT b.*, cl.nome AS cliente_nome, cl.cnpj_cpf AS cliente_cnpj, cl.email AS cliente_email, cl.telefone AS cliente_telefone,
                    g.nome_resumido AS gerente_nome, g.email AS gerente_email,
                    v.nome_resumido AS vendedor_nome, v.email AS vendedor_email,
-                   (SELECT COUNT(*) FROM boletos b2 WHERE b2.cliente_id = b.cliente_id AND b2.situacao_boleto IN ('Vencido', 'Pago com Pendência')) AS total_pendentes_cliente,
+                   (SELECT COUNT(*) FROM boletos b2 WHERE b2.excluido_em IS NULL AND b2.cliente_id = b.cliente_id AND b2.situacao_boleto IN ('Vencido', 'Pago com Pendência')) AS total_pendentes_cliente,
                    CASE 
                        WHEN b.situacao_boleto = 'Vencido' THEN (CURRENT_DATE - b.data_vencimento)
                        WHEN b.situacao_boleto IN ('Pago', 'Pago com Pendência') AND b.data_pagamento IS NOT NULL THEN (b.data_pagamento - b.data_vencimento)
@@ -1028,7 +1212,7 @@ function construirConsultaCobranca(query) {
             LEFT JOIN gerentes g ON b.gerente_id = g.id 
             LEFT JOIN vendedores v ON b.vendedor_id = v.id 
             LEFT JOIN comissoes_estornos ce ON ce.boleto_id = b.id
-            WHERE 1=1
+            WHERE b.excluido_em IS NULL
         `;
     const queryParams = [];
     let idx = 1;
@@ -1149,7 +1333,7 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
         const totalCustasFmt = formatarMoedaSemSimbolo(totalCustas);
         const gerentes = await pool.query('SELECT id, nome_resumido FROM gerentes WHERE ativo = 1 ORDER BY nome_resumido ASC');
         const vendedores = await pool.query('SELECT id, nome_resumido, gerente_id FROM vendedores WHERE ativo = 1 ORDER BY nome_resumido ASC');
-        const bancos = await pool.query("SELECT DISTINCT banco FROM boletos WHERE banco IS NOT NULL AND banco != '' ORDER BY banco ASC");
+        const bancos = await pool.query("SELECT DISTINCT banco FROM boletos WHERE excluido_em IS NULL AND banco IS NOT NULL AND banco != '' ORDER BY banco ASC");
         const clientes = await pool.query('SELECT id, nome, nome_fantasia, cnpj_cpf FROM clientes ORDER BY nome ASC');
         formatarResultadosCobranca(result.rows);
 
@@ -1177,7 +1361,7 @@ app.get('/cobranca', verificarAutenticacao, async (req, res) => {
             ordemAtual,
             totalValorOriginalFmt,
             totalCustasFmt,
-            erro: req.query.erro || null, 
+            erro: req.query.erro || null,
             sucesso: req.query.sucesso || null 
         });
     } catch (err) {
@@ -1454,10 +1638,15 @@ app.get('/cobranca/relatorio/csv', verificarAutenticacao, async (req, res) => {
 app.post('/cobranca/estorno/:id', verificarAutenticacao, async (req, res) => {
     const boletoId = req.params.id;
     const { data_estorno, valor_estornado, data_restituicao, observacoes } = req.body;
+    if ((valor_estornado !== undefined && valor_estornado !== '' &&
+            !validarValorMonetario(valor_estornado, { permitirZero: true })) ||
+        ![data_estorno, data_restituicao].every(validarDataOpcional)) {
+        return res.redirect(`/cobranca?erro=${encodeURIComponent('Valor ou data do estorno inválido.')}`);
+    }
 
     try {
         // Buscar o vendedor_id vinculado ao boleto
-        const bolRes = await pool.query('SELECT vendedor_id FROM boletos WHERE id = $1', [boletoId]);
+        const bolRes = await pool.query('SELECT vendedor_id FROM boletos WHERE id = $1 AND excluido_em IS NULL', [boletoId]);
         let vendedorId = bolRes.rows.length > 0 ? bolRes.rows[0].vendedor_id : null;
 
         // Verificar se já existe estorno para este boleto
@@ -1514,7 +1703,7 @@ app.get('/cobranca/nova', verificarAutenticacao, async (req, res) => {
             vendedores: vendedores.rows, 
             filtrosCobrancaQuery: criarQueryFiltrosCobranca(req.query),
             historico: [],
-            erro: null, 
+            erro: req.query.erro || null,
             sucesso: null 
         });
     } catch (err) {
@@ -1527,11 +1716,25 @@ app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
     const { cliente_id, gerente_id, vendedor_id, numero_documento, banco, carteira, valor_original, data_emissao, data_vencimento, situacao_boleto, status_cobranca, data_previsao_pagamento, observacoes } = req.body;
 
     try {
+        const erroValidacao = validarDadosBoleto({
+            valor_original,
+            situacao_boleto: situacao_boleto || 'Vencido',
+            status_cobranca: status_cobranca || 'Aguardando Régua'
+        }) || (![data_emissao, data_vencimento, data_previsao_pagamento].every(validarDataOpcional)
+            ? 'Uma ou mais datas informadas são inválidas.'
+            : null);
+        if (erroValidacao) {
+            return res.redirect(`/cobranca/nova?erro=${encodeURIComponent(erroValidacao)}`);
+        }
+        if (typeof cliente_id !== 'string' || !/^\d+$/.test(cliente_id) ||
+            typeof numero_documento !== 'string' || !numero_documento.trim()) {
+            return res.redirect(`/cobranca/nova?erro=${encodeURIComponent('Informe um cliente e um número de documento válidos.')}`);
+        }
         const clienteId = parseInt(cliente_id, 10);
         const numeroDocumento = numero_documento ? numero_documento.trim().toUpperCase() : '';
         const boletoExistente = await pool.query(
             `SELECT id FROM boletos
-             WHERE cliente_id = $1 AND UPPER(numero_documento) = $2
+             WHERE excluido_em IS NULL AND cliente_id = $1 AND UPPER(numero_documento) = $2
              LIMIT 1`,
             [clienteId, numeroDocumento]
         );
@@ -1556,8 +1759,8 @@ app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
 
         const sql = `INSERT INTO boletos (
             cliente_id, gerente_id, vendedor_id, numero_documento, banco, carteira, valor_original, 
-            data_emissao, data_vencimento, situacao_boleto, status_cobranca, data_previsao_pagamento, observacoes, criado_em, atualizado_em
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`;
+            data_emissao, data_vencimento, situacao_boleto, status_cobranca, data_previsao_pagamento, observacoes, criado_em, atualizado_em, data_fase_cobranca
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`;
 
         await pool.query(sql, [
             parseInt(cliente_id, 10),
@@ -1591,7 +1794,9 @@ app.post('/cobranca/novo', verificarAutenticacao, async (req, res) => {
             vendedores: vendedores.rows, 
             filtrosCobrancaQuery: criarQueryFiltrosCobranca(req.query),
             historico: [],
-            erro: 'Erro ao cadastrar boleto: ' + err.message, 
+            erro: err.code === '23505'
+                ? 'Este número de documento já foi lançado para este cliente.'
+                : 'Erro ao cadastrar boleto. Confira os dados e tente novamente.',
             sucesso: null 
         });
     }
@@ -1605,24 +1810,11 @@ app.get('/cobranca/nota-debito/:id', verificarAutenticacao, async (req, res) => 
                    cl.cnpj_cpf AS cliente_cnpj
             FROM boletos b
             LEFT JOIN clientes cl ON cl.id = b.cliente_id
-            WHERE b.id = $1
+            WHERE b.id = $1 AND b.excluido_em IS NULL
         `, [req.params.id]);
 
         if (result.rows.length === 0) {
             return res.status(404).send('Boleto não encontrado.');
-        }
-
-        if (req.query.registrar === 'true') {
-            await pool.query(`
-                INSERT INTO boletos_historico
-                    (boleto_id, usuario_id, tipo_contato, canal, contato_nome, resumo, status, data_hora)
-                VALUES ($1, $2, 'Cliente', 'E-mail', $3, $4, 'Registrado', CURRENT_TIMESTAMP)
-            `, [
-                result.rows[0].id,
-                req.session.usuario.id,
-                result.rows[0].cliente_nome || 'Cliente',
-                'Nota de Débito gerada para envio ao cliente'
-            ]);
         }
 
         const conta = {
@@ -1639,6 +1831,28 @@ app.get('/cobranca/nota-debito/:id', verificarAutenticacao, async (req, res) => 
     }
 });
 
+app.post('/cobranca/nota-debito/:id/registrar', verificarAutenticacao, async (req, res) => {
+    try {
+        const boleto = await pool.query(
+            'SELECT id, cliente_id FROM boletos WHERE id = $1 AND excluido_em IS NULL',
+            [req.params.id]
+        );
+        if (boleto.rows.length === 0) return res.status(404).send('Boleto não encontrado.');
+        await pool.query(`
+            INSERT INTO boletos_historico
+                (boleto_id, usuario_id, tipo_contato, canal, contato_nome, resumo, status, data_hora)
+            SELECT b.id, $2, 'Cliente', 'E-mail', c.nome, $3, 'Registrado', CURRENT_TIMESTAMP
+            FROM boletos b
+            LEFT JOIN clientes c ON c.id = b.cliente_id
+            WHERE b.id = $1 AND b.excluido_em IS NULL
+        `, [boleto.rows[0].id, req.session.usuario.id, 'Nota de Débito gerada para envio ao cliente']);
+        res.redirect(303, `/cobranca/nota-debito/${boleto.rows[0].id}`);
+    } catch (err) {
+        console.error('ERRO AO REGISTRAR NOTA DE DÉBITO:', err);
+        res.status(500).send('Erro ao registrar a nota de débito.');
+    }
+});
+
 // EDITAR BOLETO E EXIBIR HISTÓRICO DA RÉGUA
 app.get('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
     try {
@@ -1652,7 +1866,7 @@ app.get('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
             LEFT JOIN clientes cl ON b.cliente_id = cl.id 
             LEFT JOIN vendedores v ON v.id = COALESCE(b.vendedor_id, cl.vendedor_id)
             LEFT JOIN gerentes g ON g.id = COALESCE(b.gerente_id, cl.gerente_id, v.gerente_id)
-            WHERE b.id = $1
+            WHERE b.id = $1 AND b.excluido_em IS NULL
         `, [boletoId]);
         
         if (boletoRes.rows.length === 0) {
@@ -1677,7 +1891,7 @@ app.get('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
             SELECT h.*, u.nome AS usuario_nome 
             FROM boletos_historico h 
             LEFT JOIN usuarios u ON h.usuario_id = u.id 
-            WHERE h.boleto_id = $1 
+            WHERE h.boleto_id = $1 AND h.excluido_em IS NULL
             ORDER BY h.data_hora DESC
         `, [boletoId]);
 
@@ -1694,7 +1908,7 @@ app.get('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
             vendedores: vendedores.rows, 
             filtrosCobrancaQuery: criarQueryFiltrosCobranca(req.query),
             historico: historicoRes.rows,
-            erro: null, 
+            erro: req.query.erro || null,
             sucesso: req.query.sucesso || null 
         });
     } catch (err) {
@@ -1714,6 +1928,23 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
     } = req.body;
 
     try {
+        const erroValidacao = validarDadosBoleto({
+            valor_original,
+            valor_custas,
+            situacao_boleto,
+            status_cobranca,
+            data_pagamento
+        }) || (![data_emissao, data_vencimento, data_previsao_pagamento, data_cartorio, data_pagamento_custas]
+            .every(validarDataOpcional)
+            ? 'Uma ou mais datas informadas são inválidas.'
+            : null);
+        if (erroValidacao) {
+            return res.redirect(`/cobranca/editar/${encodeURIComponent(boletoId)}?erro=${encodeURIComponent(erroValidacao)}`);
+        }
+        if (typeof cliente_id !== 'string' || !/^\d+$/.test(cliente_id) ||
+            typeof numero_documento !== 'string' || !numero_documento.trim()) {
+            return res.redirect(`/cobranca/editar/${encodeURIComponent(boletoId)}?erro=${encodeURIComponent('Informe um cliente e um número de documento válidos.')}`);
+        }
         const gerenteId = gerente_id ? parseInt(gerente_id, 10) : null;
         const vendedorId = vendedor_id ? parseInt(vendedor_id, 10) : null;
 
@@ -1722,8 +1953,12 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
             carteira = $6, valor_original = $7, data_emissao = $8, data_vencimento = $9, 
             situacao_boleto = $10, status_cobranca = $11, data_previsao_pagamento = $12, 
             data_cartorio = $13, valor_custas = $14, data_pagamento = $15, data_pagamento_custas = $16,
-            observacoes = $17, fundo_perdido = $18, atualizado_em = CURRENT_TIMESTAMP
-            WHERE id = $19`;
+            observacoes = $17, fundo_perdido = $18, atualizado_em = CURRENT_TIMESTAMP,
+            data_fase_cobranca = CASE
+                WHEN status_cobranca IS DISTINCT FROM $11 THEN CURRENT_TIMESTAMP
+                ELSE COALESCE(data_fase_cobranca, CURRENT_TIMESTAMP)
+            END
+            WHERE id = $19 AND excluido_em IS NULL`;
 
         await pool.query(sql, [
             parseInt(cliente_id, 10),
@@ -1736,7 +1971,7 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
             tratarData(data_emissao),
             tratarData(data_vencimento),
             situacao_boleto || 'Vencido',
-            status_cobranca || 'Aviso 1 (Notificação)',
+            status_cobranca || 'Aguardando Régua',
             tratarData(data_previsao_pagamento),
             tratarData(data_cartorio),
             limparValorMonetario(valor_custas),
@@ -1753,14 +1988,17 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
     } catch (err) {
         console.error('ERRO AO EDITAR BOLETO:', err);
         const filtrosQuery = criarQueryFiltrosCobranca(req.query);
-        res.redirect(`/cobranca/editar/${boletoId}?${filtrosQuery}&erro=Erro ao atualizar boleto.`);
+        const mensagem = err.code === '23505'
+            ? 'Este número de documento já foi lançado para este cliente.'
+            : 'Erro ao atualizar boleto.';
+        res.redirect(`/cobranca/editar/${boletoId}?${filtrosQuery}&erro=${encodeURIComponent(mensagem)}`);
     }
 });
 
 // DUPLICAR LANÇAMENTO DE BOLETO
 app.get('/cobranca/duplicar/:id', verificarAutenticacao, async (req, res) => {
     try {
-        const boletoOriginal = await pool.query('SELECT * FROM boletos WHERE id = $1', [req.params.id]);
+        const boletoOriginal = await pool.query('SELECT * FROM boletos WHERE id = $1 AND excluido_em IS NULL', [req.params.id]);
         if (boletoOriginal.rows.length === 0) {
             return res.redirect('/cobranca?erro=Boleto para duplicação não encontrado.');
         }
@@ -1836,7 +2074,7 @@ async function carregarEmailAvisoComercial(boletoId, executor = pool) {
         LEFT JOIN clientes cl ON cl.id = b.cliente_id
         LEFT JOIN vendedores v ON v.id = COALESCE(b.vendedor_id, cl.vendedor_id)
         LEFT JOIN gerentes g ON g.id = COALESCE(b.gerente_id, cl.gerente_id, v.gerente_id)
-        WHERE b.id = $1
+        WHERE b.id = $1 AND b.excluido_em IS NULL
     `, [boletoId]);
 
     if (boletoRes.rows.length === 0) return null;
@@ -1858,6 +2096,7 @@ async function carregarEmailAvisoComercial(boletoId, executor = pool) {
         FROM boletos b2
         LEFT JOIN clientes cl2 ON cl2.id = b2.cliente_id
         WHERE b2.id <> $1
+          AND b2.excluido_em IS NULL
           AND b2.situacao_boleto IN ('Vencido', 'Pago com Pendência')
           AND (
               ($2::integer IS NOT NULL AND b2.cliente_id = $2)
@@ -1941,7 +2180,7 @@ app.post('/cobranca/email-liquidacao/confirmar/:id', verificarAutenticacao, asyn
             SELECT cl.nome AS cliente_nome, cl.nome_fantasia AS cliente_nome_fantasia
             FROM boletos b
             LEFT JOIN clientes cl ON cl.id = b.cliente_id
-            WHERE b.id = $1
+            WHERE b.id = $1 AND b.excluido_em IS NULL
         `, [boletoId]);
         if (boletoRes.rows.length === 0) {
             await db.query('ROLLBACK');
@@ -2007,7 +2246,7 @@ async function carregarEmailRegua(boletoId, etapa, executor = pool) {
         LEFT JOIN clientes cl ON cl.id = b.cliente_id
         LEFT JOIN vendedores v ON v.id = COALESCE(b.vendedor_id, cl.vendedor_id)
         LEFT JOIN gerentes g ON g.id = COALESCE(b.gerente_id, cl.gerente_id, v.gerente_id)
-        WHERE b.id = $1
+        WHERE b.id = $1 AND b.excluido_em IS NULL
     `, [boletoId]);
 
     if (boletoRes.rows.length === 0) return null;
@@ -2037,6 +2276,7 @@ async function carregarEmailRegua(boletoId, etapa, executor = pool) {
         FROM boletos b2
         LEFT JOIN clientes cl2 ON cl2.id = b2.cliente_id
         WHERE b2.id <> $1
+          AND b2.excluido_em IS NULL
           AND b2.situacao_boleto IN ('Vencido', 'Pago com Pendência')
           AND (
               ($2::integer IS NOT NULL AND b2.cliente_id = $2)
@@ -2166,7 +2406,10 @@ app.post('/cobranca/email-regua/confirmar/:id', verificarAutenticacao, async (re
         await db.query('BEGIN');
         transactionStarted = true;
         const updateRes = await db.query(
-            'UPDATE boletos SET status_cobranca = $1, atualizado_em = CURRENT_TIMESTAMP WHERE id = $2',
+            `UPDATE boletos
+             SET status_cobranca = $1, data_fase_cobranca = CURRENT_TIMESTAMP,
+                 atualizado_em = CURRENT_TIMESTAMP
+             WHERE id = $2 AND excluido_em IS NULL`,
             [email.etapaConfig.fase, boletoId]
         );
         if (updateRes.rowCount === 0) {
@@ -2255,7 +2498,7 @@ app.post('/cobranca/historico/editar/:boletoId/:historicoId', verificarAutentica
         const result = await pool.query(`
             UPDATE boletos_historico
             SET tipo_contato = $1, canal = $2, contato_nome = $3, resumo = $4
-            WHERE id = $5 AND boleto_id = $6
+            WHERE id = $5 AND boleto_id = $6 AND excluido_em IS NULL
         `, [
             tipo_contato,
             canal,
@@ -2283,8 +2526,11 @@ app.post('/cobranca/historico/excluir/:boletoId/:id', verificarAutenticacao, asy
 
     try {
         const result = await pool.query(
-            'DELETE FROM boletos_historico WHERE boleto_id = $1 AND id = $2',
-            [boletoId, historicoId]
+            `UPDATE boletos_historico
+             SET excluido_em = CURRENT_TIMESTAMP, excluido_por = $3,
+                 motivo_exclusao = 'Exclusão solicitada pelo usuário'
+             WHERE boleto_id = $1 AND id = $2 AND excluido_em IS NULL`,
+            [boletoId, historicoId, req.session.usuario.id]
         );
         if (result.rowCount === 0) {
             return res.redirect(`/cobranca/editar/${boletoId}?erro=Interação não encontrada.`);
@@ -2311,7 +2557,7 @@ app.post('/cobranca/email-falha/:id', verificarAutenticacao, async (req, res) =>
             LEFT JOIN clientes cl ON cl.id = b.cliente_id
             LEFT JOIN vendedores v ON v.id = COALESCE(b.vendedor_id, cl.vendedor_id)
             LEFT JOIN gerentes g ON g.id = COALESCE(b.gerente_id, cl.gerente_id, v.gerente_id)
-            WHERE b.id = $1
+            WHERE b.id = $1 AND b.excluido_em IS NULL
         `, [boletoId]);
 
         if (boletoRes.rows.length === 0) {
@@ -2357,9 +2603,20 @@ ${corpo}`;
 
 // EXCLUIR BOLETO
 app.post('/cobranca/excluir/:id', verificarAutenticacao, async (req, res) => {
+    const motivo = typeof req.body.motivo_exclusao === 'string' ? req.body.motivo_exclusao.trim() : '';
+    if (!motivo) {
+        return res.redirect(`/cobranca?erro=${encodeURIComponent('Informe o motivo da exclusão do boleto.')}`);
+    }
     try {
-        await pool.query('DELETE FROM boletos WHERE id = $1', [req.params.id]);
-        res.redirect('/cobranca?sucesso=Boleto excluído com sucesso!');
+        const result = await pool.query(`
+            UPDATE boletos
+            SET excluido_em = CURRENT_TIMESTAMP, excluido_por = $2,
+                motivo_exclusao = $3, atualizado_em = CURRENT_TIMESTAMP
+            WHERE id = $1 AND excluido_em IS NULL
+        `, [req.params.id, req.session.usuario.id, motivo]);
+        res.redirect(result.rowCount
+            ? '/cobranca?sucesso=Boleto arquivado com sucesso.'
+            : '/cobranca?erro=Boleto não encontrado ou já arquivado.');
     } catch (err) {
         console.error('ERRO AO EXCLUIR BOLETO:', err);
         res.redirect('/cobranca?erro=Erro ao excluir boleto.');
