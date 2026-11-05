@@ -71,10 +71,12 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr>
-                            <td><%= conta.descricao_encargo %></td>
-                            <td class="text-end fw-bold">R$ <%= conta.valor_encargo_fmt %></td>
-                        </tr>
+                        <% conta.linhas_encargo.forEach(linha => { %>
+                            <tr>
+                                <td><%= linha.descricao %></td>
+                                <td class="text-end fw-bold">R$ <%= linha.valor_fmt %></td>
+                            </tr>
+                        <% }) %>
                     </tbody>
                     <tfoot>
                         <tr class="table-light">

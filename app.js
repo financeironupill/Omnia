@@ -1867,15 +1867,30 @@ app.get('/cobranca/nota-debito/:id', verificarAutenticacao, async (req, res) => 
         const valorEncargoCentavos = boletoVencido
             ? valorOriginalCentavos + valorCustasCentavos
             : valorCustasCentavos;
+        const linhasEncargo = boletoVencido
+            ? [
+                {
+                    descricao: `Referente ao documento original Nº ${boleto.numero_documento}`,
+                    valor: valorOriginalCentavos
+                },
+                {
+                    descricao: 'Ressarcimento de Custas Cartorárias, multa e juros por Atraso',
+                    valor: valorCustasCentavos
+                }
+            ]
+            : [{
+                descricao: 'Ressarcimento de Custas Cartorárias, multa e juros por Atraso',
+                valor: valorCustasCentavos
+            }];
         const conta = {
             ...boleto,
             cliente_cnpj: formatarCnpjCpf(result.rows[0].cliente_cnpj),
             valor_original_fmt: formatarMoedaSemSimbolo(result.rows[0].valor_original),
             valor_custas_fmt: formatarMoedaSemSimbolo(result.rows[0].valor_custas),
-            descricao_encargo: boletoVencido
-                ? `Encargo acumulado referente ao documento original Nº ${boleto.numero_documento}, incluindo o valor do título e as custas cartorárias.`
-                : 'Ressarcimento de Custas Cartorárias, multa e juros por Atraso',
-            valor_encargo_fmt: formatarMoedaSemSimbolo(valorEncargoCentavos / 100),
+            linhas_encargo: linhasEncargo.map(linha => ({
+                descricao: linha.descricao,
+                valor_fmt: formatarMoedaSemSimbolo(linha.valor / 100)
+            })),
             valor_total_nota_fmt: formatarMoedaSemSimbolo(valorEncargoCentavos / 100),
             descricao_nota: boletoVencido
                 ? `A presente Nota de Débito refere-se ao valor do título original Nº ${boleto.numero_documento}, acrescido das custas cartorárias decorrentes do atraso.`
