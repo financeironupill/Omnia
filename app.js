@@ -2040,7 +2040,9 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
         }
 
         const faseAnterior = boletoAtual.rows[0].status_cobranca || 'Aguardando Régua';
-        const faseNova = status_cobranca || faseAnterior;
+        const faseNova = situacao_boleto === 'Pago'
+            ? 'Concluído'
+            : (status_cobranca || faseAnterior);
         if (!fasesCobrancaValidas.includes(faseNova)) {
             await db.query('ROLLBACK');
             transactionStarted = false;
