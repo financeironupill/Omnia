@@ -137,13 +137,11 @@
                         <div class="form-group">
                             <label for="status">Status:</label>
                             <select id="status" name="status" required>
-                                <option value="Em Aberto" <%= ocorrenciaEditando.status === 'Em Aberto' ? 'selected' : '' %>>Em Aberto</option>
-                                <option value="Em Análise" <%= ocorrenciaEditando.status === 'Em Análise' ? 'selected' : '' %>>Em Análise</option>
-                                <option value="Aprovada" <%= ocorrenciaEditando.status === 'Aprovada' ? 'selected' : '' %>>Aprovada</option>
-                                <option value="Reprovada" <%= ocorrenciaEditando.status === 'Reprovada' ? 'selected' : '' %>>Reprovada</option>
-                                <option value="Aguardando Débito/Crédito" <%= ocorrenciaEditando.status === 'Aguardando Débito/Crédito' ? 'selected' : '' %>>Aguardando Débito/Crédito</option>
-                                <option value="Finalizada" <%= ocorrenciaEditando.status === 'Finalizada' ? 'selected' : '' %>>Finalizada</option>
-                                <option value="Cancelada" <%= ocorrenciaEditando.status === 'Cancelada' ? 'selected' : '' %>>Cancelada</option>
+                                <option value="Em Processo Interno" <%= ocorrenciaEditando.status === 'Em Processo Interno' ? 'selected' : '' %>>Em Processo Interno</option>
+                                <option value="Aguardando Autorização" <%= ocorrenciaEditando.status === 'Aguardando Autorização' ? 'selected' : '' %>>Aguardando Autorização</option>
+                                <option value="Aprovado" <%= ocorrenciaEditando.status === 'Aprovado' ? 'selected' : '' %>>Aprovado</option>
+                                <option value="Aguardando Recebimento/Pagamento" <%= ocorrenciaEditando.status === 'Aguardando Recebimento/Pagamento' ? 'selected' : '' %>>Aguardando Recebimento/Pagamento</option>
+                                <option value="Concluído" <%= ocorrenciaEditando.status === 'Concluído' ? 'selected' : '' %>>Concluído</option>
                             </select>
                         </div>
 
@@ -284,22 +282,18 @@
                             <% } %>
                         </td>
                         <td>
-                            <% if (o.status === 'Em Aberto') { %>
-                                <span class="badge badge-aberto">Em Aberto</span>
-                            <% } else if (o.status === 'Em Análise') { %>
-                                <span class="badge badge-analise">Em Análise</span>
-                            <% } else if (o.status === 'Aprovada') { %>
-                                <span class="badge badge-aprovada">Aprovada</span>
-                            <% } else if (o.status === 'Reprovada') { %>
-                                <span class="badge badge-reprovada">Reprovada</span>
-                            <% } else if (o.status === 'Aguardando Débito/Crédito') { %>
-                                <span class="badge badge-debcred">Aguard. Déb/Créd</span>
-                            <% } else if (o.status === 'Finalizada') { %>
-                                <span class="badge badge-finalizada">Finalizada</span>
-                            <% } else if (o.status === 'Cancelada') { %>
-                                <span class="badge badge-cancelada">Cancelada</span>
+                            <% if (o.status === 'Em Processo Interno') { %>
+                                <span class="badge badge-aberto">Em Processo Interno</span>
+                            <% } else if (o.status === 'Aguardando Autorização') { %>
+                                <span class="badge badge-analise">Aguardando Autorização</span>
+                            <% } else if (o.status === 'Aprovado') { %>
+                                <span class="badge badge-aprovada">Aprovado</span>
+                            <% } else if (o.status === 'Aguardando Recebimento/Pagamento') { %>
+                                <span class="badge badge-debcred">Aguardando Recebimento/Pagamento</span>
+                            <% } else if (o.status === 'Concluído') { %>
+                                <span class="badge badge-finalizada">Concluído</span>
                             <% } else { %>
-                                <span class="badge badge-aberto"><%= o.status || 'Em Aberto' %></span>
+                                <span class="badge badge-aberto"><%= o.status || 'Em Processo Interno' %></span>
                             <% } %>
                         </td>
                         <td>

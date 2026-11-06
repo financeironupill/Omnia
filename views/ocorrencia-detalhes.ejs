@@ -45,7 +45,7 @@
             </div>
             <div class="info-group">
                 <label>Status:</label>
-                <span style="color: <%= ocorrencia.status === 'Resolvido' ? '#28a745' : '#dc3545' %>;"><%= ocorrencia.status %></span>
+                <span id="statusOcorrencia" style="color: <%= ocorrencia.status === 'Concluído' ? '#28a745' : '#0d6efd' %>;"><%= ocorrencia.status %></span>
             </div>
             <div class="info-group">
                 <label>Cliente:</label>
@@ -89,7 +89,7 @@
             <textarea id="textoEmail" readonly></textarea>
 
             <div class="btn-group">
-                <a id="linkMailto" href="#" class="btn-email" onclick="prepararEmail(event)">Abrir no Cliente de E-mail</a>
+                <a id="linkMailto" href="#" class="btn-email" onclick="prepararEmail(event)">Enviar E-mail de Autorização</a>
                 <button type="button" class="btn-copy" onclick="copiarTexto()">Copiar Texto</button>
             </div>
         </div>
@@ -114,7 +114,7 @@
             const saudacao = obterSaudacao();
             const numero = "<%= ocorrencia.numero %>";
             const tipo = "<%= ocorrencia.tipo_descricao || 'N/A' %>";
-            const status = "<%= ocorrencia.status %>";
+            const status = document.getElementById('statusOcorrencia').textContent.trim();
             const cliente = "<%= ocorrencia.cliente_nome_real || ocorrencia.cliente_nome || 'N/A' %>";
             const transportadora = "<%= ocorrencia.transportadora_nome || 'N/A' %>";
             const nfOrigem = "<%= ocorrencia.nf_origem || '-' %>";
@@ -143,11 +143,43 @@
             textarea.value = gerarTextoEmail();
         }
 
-        function prepararEmail(e) {
+        async function prepararEmail(e) {
+            e.preventDefault();
             const numero = "<%= ocorrencia.numero %>";
             const assunto = encodeURIComponent(`Solicitação de autorização da ocorrência: ${numero}`);
-            const corpo = encodeURIComponent(document.getElementById('textoEmail').value);
-            window.location.href = `mailto:?subject=${assunto}&body=${corpo}`;
+            const endpoint = `/ocorrencias/<%= ocorrencia.id %>/preparar-email-autorizacao`;
+
+            try {
+                let resposta = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+                let resultado = await resposta.json();
+
+                if (resposta.status === 409 && resultado.confirmacaoNecessaria) {
+                    const atualizar = window.confirm(
+                        `O status atual é "${resultado.statusAtual || 'não informado'}". Deseja alterá-lo para "Aguardando Autorização" antes de abrir o e-mail?`
+                    );
+                    resposta = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ confirmarAtualizacao: atualizar })
+                    });
+                    resultado = await resposta.json();
+                }
+
+                if (!resposta.ok) {
+                    throw new Error(resultado.erro || 'Não foi possível preparar o e-mail.');
+                }
+
+                document.getElementById('statusOcorrencia').textContent = resultado.status;
+                document.getElementById('textoEmail').value = gerarTextoEmail();
+                const corpo = encodeURIComponent(document.getElementById('textoEmail').value);
+                window.location.href = `mailto:?subject=${assunto}&body=${corpo}`;
+            } catch (erro) {
+                alert(erro.message || 'Não foi possível preparar o e-mail de autorização.');
+            }
         }
 
         function copiarTexto() {

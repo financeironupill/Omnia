@@ -116,9 +116,15 @@
                     <div class="form-group span-2">
                         <label for="status">Status da Ocorrência:</label>
                         <select id="status" name="status" required>
-                            <option value="Em Aberto" <%= ocorrencia.status === 'Em Aberto' ? 'selected' : '' %>>Em Aberto</option>
-                            <option value="Resolvido" <%= ocorrencia.status === 'Resolvido' ? 'selected' : '' %>>Resolvido</option>
+                            <% statusOcorrenciaValidos.forEach(status => { %>
+                                <option value="<%= status %>" <%= ocorrencia.status === status ? 'selected' : '' %>><%= status %></option>
+                            <% }); %>
                         </select>
+                    </div>
+                <% } else { %>
+                    <div class="form-group span-2">
+                        <label for="statusInicial">Status da Ocorrência:</label>
+                        <input type="text" id="statusInicial" value="Em Processo Interno" readonly>
                     </div>
                 <% } %>
 

@@ -227,6 +227,13 @@ const fasesCobrancaValidas = [
     'Custas Pendentes (Cartório)',
     'Concluído'
 ];
+const statusOcorrenciaValidos = [
+    'Em Processo Interno',
+    'Aguardando Autorização',
+    'Aprovado',
+    'Aguardando Recebimento/Pagamento',
+    'Concluído'
+];
 
 function validarDadosBoleto({ valor_original, situacao_boleto, status_cobranca, data_pagamento, valor_custas }) {
     if (!validarValorMonetario(valor_original)) return 'O valor original deve ser maior que zero.';
@@ -1084,11 +1091,15 @@ app.get('/ocorrencias', verificarAutenticacao, async (req, res) => {
             }
         }
 
-        let statusFiltro = status !== undefined ? status : 'Em Aberto';
+        let statusFiltro = typeof status === 'string' ? status : '';
         if (statusFiltro && statusFiltro !== '') {
             queryText += ' AND o.status = $' + idx; 
             queryParams.push(statusFiltro); 
             idx++; 
+        }
+        const mostrarConcluidos = req.query.mostrar_concluidos === '1';
+        if (!mostrarConcluidos && statusFiltro !== 'Concluído') {
+            queryText += ` AND o.status IS DISTINCT FROM 'Concluído'`;
         }
 
         let col = 'o.id';
@@ -1109,7 +1120,7 @@ app.get('/ocorrencias', verificarAutenticacao, async (req, res) => {
             ocorrencias: result.rows, tipos: tipos.rows, clientes: clientes.rows, transportadoras: transportadoras.rows,
             buscaAtual: busca || '', tipoAtual: tipo_id || '', clienteAtual: clienteIdFiltro, 
             transportadoraAtual: transportadoraIdFiltro, statusAtual: statusFiltro, 
-            ordenarAtual: ordenar || 'id', ordemAtual: dir, erro: null, sucesso: null 
+            ordenarAtual: ordenar || 'id', ordemAtual: dir, mostrarConcluidos, erro: null, sucesso: null
         });
     } catch (err) {
         console.error(err);
@@ -1139,7 +1150,7 @@ app.post('/ocorrencias/novo', verificarAutenticacao, async (req, res) => {
     try {
         const cli = await pool.query('SELECT nome FROM clientes WHERE id = $1', [cliente_id]);
         const cliNome = cli.rows.length > 0 ? cli.rows[0].nome : '';
-        const sql = 'INSERT INTO ocorrencias (numero, tipo_ocorrencia_id, cliente_id, transportadora_id, usuario_id, cliente_nome, nf_origem, valor_nf_origem, vencimento_atual, nfd, tipo_financeiro, valor_financeiro, descricao_problema, status, criado_em, atualizado_em) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, \'Em Aberto\', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)';
+        const sql = 'INSERT INTO ocorrencias (numero, tipo_ocorrencia_id, cliente_id, transportadora_id, usuario_id, cliente_nome, nf_origem, valor_nf_origem, vencimento_atual, nfd, tipo_financeiro, valor_financeiro, descricao_problema, status, criado_em, atualizado_em) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, \'Em Processo Interno\', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)';
         await pool.query(sql, [gerarNumeroOcorrencia(), parseInt(tipo_ocorrencia_id, 10), parseInt(cliente_id, 10), transportadora_id ? parseInt(transportadora_id, 10) : null, req.session.usuario.id, cliNome, nf_origem ? nf_origem.trim().toUpperCase() : '', valorNfOrigem.valor, tratarData(vencimento_atual), nfd ? nfd.trim().toUpperCase() : '', tipo_financeiro || null, valorFinanceiro.valor, formatarCapitalizacao(descricao_problema)]);
         res.redirect('/ocorrencias?sucesso=Ocorrência registrada!');
     } catch (err) {
@@ -1159,6 +1170,66 @@ app.get('/ocorrencias/detalhes/:id', verificarAutenticacao, async (req, res) => 
     }
 });
 
+app.post('/ocorrencias/:id/preparar-email-autorizacao', verificarAutenticacao, async (req, res) => {
+    const ocorrenciaId = req.params.id;
+    const confirmarAtualizacao = req.body.confirmarAtualizacao;
+    if (!/^[1-9]\d*$/.test(ocorrenciaId) ||
+        (confirmarAtualizacao !== undefined && typeof confirmarAtualizacao !== 'boolean')) {
+        return res.status(400).json({ erro: 'Solicitação inválida.' });
+    }
+
+    let db;
+    let transactionStarted = false;
+    try {
+        db = await pool.connect();
+        await db.query('BEGIN');
+        transactionStarted = true;
+        const resultado = await db.query(
+            'SELECT status FROM ocorrencias WHERE id = $1 FOR UPDATE',
+            [Number(ocorrenciaId)]
+        );
+        if (resultado.rows.length === 0) {
+            await db.query('ROLLBACK');
+            transactionStarted = false;
+            return res.status(404).json({ erro: 'Ocorrência não encontrada.' });
+        }
+
+        let statusAtual = resultado.rows[0].status;
+        if (statusAtual !== 'Aguardando Autorização' && confirmarAtualizacao === undefined) {
+            await db.query('ROLLBACK');
+            transactionStarted = false;
+            return res.status(409).json({
+                confirmacaoNecessaria: true,
+                statusAtual
+            });
+        }
+
+        if (statusAtual !== 'Aguardando Autorização' && confirmarAtualizacao === true) {
+            await db.query(
+                'UPDATE ocorrencias SET status = $1, atualizado_em = CURRENT_TIMESTAMP WHERE id = $2',
+                ['Aguardando Autorização', Number(ocorrenciaId)]
+            );
+            statusAtual = 'Aguardando Autorização';
+        }
+
+        await db.query('COMMIT');
+        transactionStarted = false;
+        return res.json({ status: statusAtual });
+    } catch (err) {
+        if (db && transactionStarted) {
+            try {
+                await db.query('ROLLBACK');
+            } catch (rollbackErr) {
+                console.error('ERRO AO DESFAZER PREPARAÇÃO DE E-MAIL DA OCORRÊNCIA:', rollbackErr);
+            }
+        }
+        console.error('ERRO AO PREPARAR E-MAIL DE AUTORIZAÇÃO DA OCORRÊNCIA:', err);
+        return res.status(500).json({ erro: 'Não foi possível preparar o e-mail de autorização.' });
+    } finally {
+        if (db) db.release();
+    }
+});
+
 app.get('/ocorrencias/editar/:id', verificarAutenticacao, async (req, res) => {
     try {
         const edit = await pool.query('SELECT * FROM ocorrencias WHERE id = $1', [req.params.id]);
@@ -1166,7 +1237,7 @@ app.get('/ocorrencias/editar/:id', verificarAutenticacao, async (req, res) => {
         const tipos = await pool.query('SELECT id, descricao FROM tipos_ocorrencia ORDER BY descricao ASC');
         const clientes = await pool.query('SELECT id, nome FROM clientes ORDER BY nome ASC');
         const transportadoras = await pool.query('SELECT id, nome FROM transportadoras ORDER BY nome ASC');
-        res.render('ocorrencia-form', { ocorrencia: edit.rows[0], tipos: tipos.rows, clientes: clientes.rows, transportadoras: transportadoras.rows, numeroSugerido: edit.rows[0].numero, erro: req.query.erro || null });
+        res.render('ocorrencia-form', { ocorrencia: edit.rows[0], tipos: tipos.rows, clientes: clientes.rows, transportadoras: transportadoras.rows, numeroSugerido: edit.rows[0].numero, statusOcorrenciaValidos, erro: req.query.erro || null });
     } catch (err) {
         res.redirect('/ocorrencias?erro=Erro.');
     }
@@ -1179,6 +1250,9 @@ app.post('/ocorrencias/editar/:id', verificarAutenticacao, async (req, res) => {
     if (valorNfOrigem.erro || valorFinanceiro.erro) {
         const erro = valorNfOrigem.erro || valorFinanceiro.erro;
         return res.redirect(`/ocorrencias/editar/${encodeURIComponent(req.params.id)}?erro=${encodeURIComponent(erro)}`);
+    }
+    if (!statusOcorrenciaValidos.includes(status)) {
+        return res.redirect(`/ocorrencias/editar/${encodeURIComponent(req.params.id)}?erro=${encodeURIComponent('O status da ocorrência é inválido.')}`);
     }
     try {
         const cli = await pool.query('SELECT nome FROM clientes WHERE id = $1', [cliente_id]);
