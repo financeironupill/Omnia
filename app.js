@@ -1934,11 +1934,14 @@ app.get('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
             SELECT b.*, cl.nome AS cliente_nome, cl.nome_fantasia AS cliente_nome_fantasia,
                    cl.email AS cliente_email, cl.telefone AS cliente_telefone,
                    g.id AS gerente_vinculado_id, g.nome_resumido AS gerente_nome, g.email AS gerente_email,
-                   v.id AS vendedor_vinculado_id, v.nome_resumido AS vendedor_nome, v.email AS vendedor_email
+                   v.id AS vendedor_vinculado_id, v.nome_resumido AS vendedor_nome, v.email AS vendedor_email,
+                   ce.id AS estorno_id, ce.data_estorno, ce.valor_estornado, ce.data_restituicao,
+                   ce.observacoes AS observacoes_estorno
             FROM boletos b 
             LEFT JOIN clientes cl ON b.cliente_id = cl.id 
             LEFT JOIN vendedores v ON v.id = COALESCE(b.vendedor_id, cl.vendedor_id)
             LEFT JOIN gerentes g ON g.id = COALESCE(b.gerente_id, cl.gerente_id, v.gerente_id)
+            LEFT JOIN comissoes_estornos ce ON ce.boleto_id = b.id
             WHERE b.id = $1 AND b.excluido_em IS NULL
         `, [boletoId]);
         
@@ -1971,7 +1974,11 @@ app.get('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
         const contaObj = {
             ...boletoRes.rows[0],
             valor_original: formatarMoedaSemSimbolo(boletoRes.rows[0].valor_original),
-            valor_custas: formatarMoedaSemSimbolo(boletoRes.rows[0].valor_custas)
+            valor_custas: formatarMoedaSemSimbolo(boletoRes.rows[0].valor_custas),
+            valor_estornado: boletoRes.rows[0].valor_estornado != null
+                ? formatarMoedaSemSimbolo(boletoRes.rows[0].valor_estornado)
+                : '',
+            observacoes_estorno: boletoRes.rows[0].observacoes_estorno || ''
         };
 
         res.render('cobranca-form', { 
@@ -1997,7 +2004,8 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
     const { 
         cliente_id, gerente_id, vendedor_id, numero_documento, banco, carteira, valor_original, data_emissao, data_vencimento,
         situacao_boleto, status_cobranca, data_previsao_pagamento, data_cartorio, valor_custas, 
-        data_pagamento, data_pagamento_custas, observacoes, fundo_perdido
+        data_pagamento, data_pagamento_custas, observacoes, fundo_perdido,
+        data_estorno, valor_estornado, data_restituicao, observacoes_estorno, estorno_observacoes
     } = req.body;
 
     let db;
@@ -2009,9 +2017,13 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
             situacao_boleto,
             status_cobranca,
             data_pagamento
-        }) || (![data_emissao, data_vencimento, data_previsao_pagamento, data_cartorio, data_pagamento_custas]
+        }) || (![data_emissao, data_vencimento, data_previsao_pagamento, data_cartorio, data_pagamento_custas, data_estorno, data_restituicao]
             .every(validarDataOpcional)
             ? 'Uma ou mais datas informadas são inválidas.'
+            : null)
+        || (valor_estornado !== undefined && valor_estornado !== '' &&
+            !validarValorMonetario(valor_estornado, { permitirZero: true })
+            ? 'O valor estornado informado é inválido.'
             : null);
         if (erroValidacao) {
             return res.redirect(`/cobranca/editar/${encodeURIComponent(boletoId)}?erro=${encodeURIComponent(erroValidacao)}`);
@@ -2110,6 +2122,65 @@ app.post('/cobranca/editar/:id', verificarAutenticacao, async (req, res) => {
                 WHERE boleto_id = $1 AND etapa = 4 AND status = 'Pendente'
             `, [parseInt(boletoId, 10), req.session.usuario.id]);
         }
+
+        // Gestão de estorno de comissão integrada na edição do boleto
+        const dataEstornoTratada = tratarData(data_estorno);
+        const dataRestituicaoTratada = tratarData(data_restituicao);
+        const valorEstornadoLimpo = limparValorMonetario(valor_estornado);
+        const observacoesEstornoTratadas = formatarCapitalizacao(observacoes_estorno || estorno_observacoes);
+
+        let estornoVendedorId = vendedorId;
+        if (!estornoVendedorId && cliente_id) {
+            const clRes = await db.query('SELECT vendedor_id FROM clientes WHERE id = $1', [parseInt(cliente_id, 10)]);
+            if (clRes.rows.length > 0 && clRes.rows[0].vendedor_id) {
+                estornoVendedorId = clRes.rows[0].vendedor_id;
+            }
+        }
+
+        const temEstorno = Boolean(
+            dataEstornoTratada || 
+            dataRestituicaoTratada || 
+            (valor_estornado !== undefined && valor_estornado !== '' && valorEstornadoLimpo > 0) || 
+            (observacoesEstornoTratadas && observacoesEstornoTratadas.trim() !== '')
+        );
+
+        const estRes = await db.query(
+            'SELECT id FROM comissoes_estornos WHERE boleto_id = $1 FOR UPDATE',
+            [parseInt(boletoId, 10)]
+        );
+
+        if (temEstorno) {
+            if (estRes.rows.length > 0) {
+                await db.query(`
+                    UPDATE comissoes_estornos 
+                    SET vendedor_id = $1, data_estorno = $2, valor_estornado = $3, data_restituicao = $4, observacoes = $5 
+                    WHERE boleto_id = $6
+                `, [
+                    estornoVendedorId,
+                    dataEstornoTratada,
+                    valorEstornadoLimpo,
+                    dataRestituicaoTratada,
+                    observacoesEstornoTratadas,
+                    parseInt(boletoId, 10)
+                ]);
+            } else {
+                await db.query(`
+                    INSERT INTO comissoes_estornos 
+                        (boleto_id, vendedor_id, data_estorno, valor_estornado, data_restituicao, observacoes) 
+                    VALUES ($1, $2, $3, $4, $5, $6)
+                `, [
+                    parseInt(boletoId, 10),
+                    estornoVendedorId,
+                    dataEstornoTratada,
+                    valorEstornadoLimpo,
+                    dataRestituicaoTratada,
+                    observacoesEstornoTratadas
+                ]);
+            }
+        } else if (estRes.rows.length > 0) {
+            await db.query('DELETE FROM comissoes_estornos WHERE boleto_id = $1', [parseInt(boletoId, 10)]);
+        }
+
         await db.query('COMMIT');
         transactionStarted = false;
 

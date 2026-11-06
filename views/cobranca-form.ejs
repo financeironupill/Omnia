@@ -256,6 +256,42 @@
                     </div>
                 </div>
 
+                <% if (conta && conta.id) { %>
+                <!-- SEÇÃO 4: CONTROLO DE COMISSÃO E ESTORNO -->
+                <div class="card mb-4 border-0 bg-light">
+                    <div class="card-header bg-dark text-white fw-semibold">
+                        <i class="fa-solid fa-hand-holding-dollar me-2"></i>Controlo de Comissão e Estorno
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Data do Estorno</label>
+                                <input type="date" name="data_estorno" id="dataEstorno" class="form-control" 
+                                    value="<%= conta && conta.data_estorno ? new Date(conta.data_estorno).toISOString().split('T')[0] : '' %>">
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Valor Estornado (R$)</label>
+                                <input type="text" name="valor_estornado" id="valorEstornado" class="form-control text-end mascara-moeda" 
+                                    value="<%= conta && conta.valor_estornado ? conta.valor_estornado : '' %>" placeholder="0,00">
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Data de Restituição (Devolução ao Vendedor)</label>
+                                <input type="date" name="data_restituicao" id="dataRestituicao" class="form-control" 
+                                    value="<%= conta && conta.data_restituicao ? new Date(conta.data_restituicao).toISOString().split('T')[0] : '' %>">
+                                <div class="form-text small">Preencher após o cliente quitar o débito em cartório.</div>
+                            </div>
+
+                            <div class="col-md-12">
+                                <label class="form-label small fw-bold">Observações de Estorno</label>
+                                <textarea name="observacoes_estorno" id="observacoesEstorno" class="form-control" rows="2" placeholder="Detalhes adicionais sobre o estorno da comissão..."><%= conta ? (conta.observacoes_estorno || conta.estorno_obs || '') : '' %></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <% } %>
+
                 <div class="d-flex justify-content-end align-items-center gap-2 mb-4">
                     <a href="/cobranca?<%= typeof filtrosCobrancaQuery === 'string' ? filtrosCobrancaQuery : '' %>" class="btn btn-secondary">Cancelar</a>
                     <button type="submit" class="btn btn-primary fw-semibold px-4"><i class="fa-solid fa-save me-1"></i> <%= conta && conta.id ? 'Salvar Alterações' : 'Gravar Boleto' %></button>
