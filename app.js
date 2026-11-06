@@ -76,6 +76,76 @@ function validarIdentificacaoVendedor({ cpf, cnpj, razao_social }) {
     };
 }
 
+function prepararDadosVendedor(body) {
+    const camposTexto = [
+        'gerente_id', 'nome_resumido', 'nome_completo', 'cpf', 'cnpj', 'razao_social',
+        'telefone', 'email', 'banco', 'agencia', 'conta', 'tipo_chave_pix', 'chave_pix', 'ativo'
+    ];
+    if (!body || camposTexto.some(campo => body[campo] !== undefined && typeof body[campo] !== 'string')) {
+        return { erro: 'Os dados informados são inválidos.' };
+    }
+
+    const gerenteId = (body.gerente_id || '').trim();
+    const nomeResumido = (body.nome_resumido || '').trim();
+    const nomeCompleto = (body.nome_completo || '').trim();
+    const ativo = body.ativo === undefined ? '1' : body.ativo;
+    if (!/^[1-9]\d*$/.test(gerenteId) || !Number.isSafeInteger(Number(gerenteId))) {
+        return { erro: 'Selecione um gerente válido.' };
+    }
+    if (!nomeResumido || !nomeCompleto) {
+        return { erro: 'Informe o nome resumido e o nome completo do vendedor.' };
+    }
+    if (!['0', '1'].includes(ativo)) {
+        return { erro: 'O status do vendedor é inválido.' };
+    }
+
+    const identificacao = validarIdentificacaoVendedor(body);
+    if (identificacao.erro) return identificacao;
+
+    return {
+        dados: {
+            gerenteId: Number(gerenteId),
+            nomeResumido: nomeResumido.toUpperCase(),
+            nomeCompleto: formatarCapitalizacao(nomeCompleto),
+            ...identificacao,
+            telefone: body.telefone || '',
+            email: body.email ? body.email.trim().toLowerCase() : '',
+            banco: formatarCapitalizacao(body.banco),
+            agencia: body.agencia || '',
+            conta: body.conta || '',
+            tipoChavePix: body.tipo_chave_pix || '',
+            chavePix: body.chave_pix || '',
+            ativo: Number(ativo)
+        }
+    };
+}
+
+async function renderFormularioVendedor(res, vendedor, erro, incluirInativos = false, status = 400) {
+    try {
+        const filtroAtivo = incluirInativos ? '' : ' WHERE ativo = 1';
+        const gerentes = await pool.query(
+            `SELECT id, nome_resumido, nome_completo FROM gerentes${filtroAtivo} ORDER BY nome_resumido ASC`
+        );
+        return res.status(status).render('vendedor-form', {
+            vendedor,
+            gerentes: gerentes.rows,
+            erro
+        });
+    } catch (err) {
+        console.error('ERRO AO CARREGAR FORMULÁRIO DE VENDEDOR:', err);
+        return res.status(500).send('Erro ao carregar o formulário do vendedor.');
+    }
+}
+
+function mensagemErroVendedor(err, operacao) {
+    if (err.code === '23505') return 'Já existe um vendedor com esse Nome Resumido.';
+    if (err.code === '23503') return 'O gerente selecionado não existe mais. Selecione outro gerente.';
+    if (err.code === '42703') {
+        return 'A estrutura do banco está desatualizada. Aplique as migrations de identificação de vendedores.';
+    }
+    return `Erro ao ${operacao} vendedor. Confira os dados e tente novamente.`;
+}
+
 function formatarMoedaSemSimbolo(valor) {
     const num = parseFloat(valor) || 0;
     return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -853,34 +923,32 @@ app.get('/vendedores/novo', verificarAutenticacao, async (req, res) => {
 });
 
 app.post('/vendedores/novo', verificarAutenticacao, async (req, res) => {
-    const { gerente_id, nome_resumido, nome_completo, telefone, email, banco, agencia, conta, tipo_chave_pix, chave_pix, ativo } = req.body;
-    const identificacao = validarIdentificacaoVendedor(req.body);
-    if (identificacao.erro) {
-        return res.redirect(`/vendedores?erro=${encodeURIComponent(identificacao.erro)}`);
-    }
+    const resultado = prepararDadosVendedor(req.body);
+    if (resultado.erro) return renderFormularioVendedor(res, req.body, resultado.erro);
+    const dados = resultado.dados;
 
     try {
         const sql = 'INSERT INTO vendedores (gerente_id, nome_resumido, nome_completo, cpf, cnpj, razao_social, telefone, email, banco, agencia, conta, tipo_chave_pix, chave_pix, ativo) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)';
         await pool.query(sql, [
-            gerente_id ? parseInt(gerente_id, 10) : null,
-            nome_resumido ? nome_resumido.trim().toUpperCase() : '',
-            formatarCapitalizacao(nome_completo),
-            identificacao.cpf,
-            identificacao.cnpj,
-            identificacao.razaoSocial,
-            telefone,
-            email ? email.trim().toLowerCase() : '',
-            formatarCapitalizacao(banco),
-            agencia,
-            conta,
-            tipo_chave_pix,
-            chave_pix,
-            ativo ? parseInt(ativo, 10) : 1
+            dados.gerenteId,
+            dados.nomeResumido,
+            dados.nomeCompleto,
+            dados.cpf,
+            dados.cnpj,
+            dados.razaoSocial,
+            dados.telefone,
+            dados.email,
+            dados.banco,
+            dados.agencia,
+            dados.conta,
+            dados.tipoChavePix,
+            dados.chavePix,
+            dados.ativo
         ]);
         res.redirect('/vendedores?sucesso=Vendedor cadastrado com sucesso!');
     } catch (err) {
         console.error('ERRO AO CADASTRAR VENDEDOR:', err);
-        res.redirect('/vendedores?erro=Erro ao cadastrar.');
+        return renderFormularioVendedor(res, req.body, mensagemErroVendedor(err, 'cadastrar'), false, 500);
     }
 });
 
@@ -896,35 +964,34 @@ app.get('/vendedores/editar/:id', verificarAutenticacao, async (req, res) => {
 });
 
 app.post('/vendedores/editar/:id', verificarAutenticacao, async (req, res) => {
-    const { gerente_id, nome_resumido, nome_completo, telefone, email, banco, agencia, conta, tipo_chave_pix, chave_pix, ativo } = req.body;
-    const identificacao = validarIdentificacaoVendedor(req.body);
-    if (identificacao.erro) {
-        return res.redirect(`/vendedores?erro=${encodeURIComponent(identificacao.erro)}`);
-    }
+    const resultado = prepararDadosVendedor(req.body);
+    const vendedorForm = { ...req.body, id: req.params.id };
+    if (resultado.erro) return renderFormularioVendedor(res, vendedorForm, resultado.erro, true);
+    const dados = resultado.dados;
 
     try {
         const sql = 'UPDATE vendedores SET gerente_id = $1, nome_resumido = $2, nome_completo = $3, cpf = $4, cnpj = $5, razao_social = $6, telefone = $7, email = $8, banco = $9, agencia = $10, conta = $11, tipo_chave_pix = $12, chave_pix = $13, ativo = $14 WHERE id = $15';
         await pool.query(sql, [
-            gerente_id ? parseInt(gerente_id, 10) : null,
-            nome_resumido ? nome_resumido.trim().toUpperCase() : '',
-            formatarCapitalizacao(nome_completo),
-            identificacao.cpf,
-            identificacao.cnpj,
-            identificacao.razaoSocial,
-            telefone,
-            email ? email.trim().toLowerCase() : '',
-            banco,
-            agencia,
-            conta,
-            tipo_chave_pix,
-            chave_pix,
-            ativo ? parseInt(ativo, 10) : 1,
+            dados.gerenteId,
+            dados.nomeResumido,
+            dados.nomeCompleto,
+            dados.cpf,
+            dados.cnpj,
+            dados.razaoSocial,
+            dados.telefone,
+            dados.email,
+            dados.banco,
+            dados.agencia,
+            dados.conta,
+            dados.tipoChavePix,
+            dados.chavePix,
+            dados.ativo,
             req.params.id
         ]);
         res.redirect('/vendedores?sucesso=Vendedor atualizado com sucesso!');
     } catch (err) {
         console.error('ERRO AO ATUALIZAR VENDEDOR:', err);
-        res.redirect('/vendedores?erro=Erro ao atualizar.');
+        return renderFormularioVendedor(res, vendedorForm, mensagemErroVendedor(err, 'atualizar'), true, 500);
     }
 });
 

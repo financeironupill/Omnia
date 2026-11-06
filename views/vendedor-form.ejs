@@ -8,6 +8,7 @@
     <style>body { background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }</style>
 </head>
 <body>
+    <% const editando = Boolean(vendedor && vendedor.id); %>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-4 shadow-sm mb-4">
         <div class="container-fluid">
             <a class="navbar-brand fw-bold" href="/dashboard"><i class="fa-solid fa-cube me-2"></i>OMNIA <small class="text-muted fs-6">Enterprise</small></a>
@@ -17,12 +18,12 @@
 
     <div class="container-fluid px-4" style="max-width: 900px;">
         <div class="card shadow-sm border-0 rounded-3 p-4 bg-white">
-            <h3 class="fw-bold mb-1" style="color: #20c997;"><i class="fa-solid fa-user-tag me-2"></i><%= vendedor ? 'Editar Vendedor' : 'Registar Novo Vendedor' %></h3>
+            <h3 class="fw-bold mb-1" style="color: #20c997;"><i class="fa-solid fa-user-tag me-2"></i><%= editando ? 'Editar Vendedor' : 'Registar Novo Vendedor' %></h3>
             <p class="text-muted small mb-3">Preencha os dados do vendedor, vincule o gerente responsável e informe os dados bancários.</p>
             <% if (locals.erro && erro) { %><div class="alert alert-danger"><%= erro %></div><% } %>
             <hr class="text-muted mb-4">
 
-            <form action="<%= vendedor ? '/vendedores/editar/' + vendedor.id : '/vendedores/novo' %>" method="POST">
+            <form action="<%= editando ? '/vendedores/editar/' + vendedor.id : '/vendedores/novo' %>" method="POST">
                 <section class="card border-0 shadow-sm mb-4">
                     <div class="card-header bg-primary text-white fw-semibold">
                         <i class="fa-solid fa-user-tag me-2"></i>Seção 1: Informações Gerais do Vendedor
@@ -45,8 +46,8 @@
                             <div class="col-md-4">
                                 <label class="form-label fw-semibold">Status <span class="text-danger">*</span></label>
                                 <select name="ativo" class="form-select" required>
-                                    <option value="1" <%= (!vendedor || vendedor.ativo === 1) ? 'selected' : '' %>>Ativo</option>
-                                    <option value="0" <%= (vendedor && vendedor.ativo === 0) ? 'selected' : '' %>>Inativo</option>
+                                    <option value="1" <%= (!vendedor || vendedor.ativo === undefined || vendedor.ativo === true || String(vendedor.ativo) === '1') ? 'selected' : '' %>>Ativo</option>
+                                    <option value="0" <%= vendedor && (vendedor.ativo === false || String(vendedor.ativo) === '0') ? 'selected' : '' %>>Inativo</option>
                                 </select>
                             </div>
                         </div>
