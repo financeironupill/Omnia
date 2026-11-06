@@ -139,7 +139,6 @@
                             <select id="status" name="status" required>
                                 <option value="Em Processo Interno" <%= ocorrenciaEditando.status === 'Em Processo Interno' ? 'selected' : '' %>>Em Processo Interno</option>
                                 <option value="Aguardando Autorização" <%= ocorrenciaEditando.status === 'Aguardando Autorização' ? 'selected' : '' %>>Aguardando Autorização</option>
-                                <option value="Aprovado" <%= ocorrenciaEditando.status === 'Aprovado' ? 'selected' : '' %>>Aprovado</option>
                                 <option value="Aguardando Recebimento/Pagamento" <%= ocorrenciaEditando.status === 'Aguardando Recebimento/Pagamento' ? 'selected' : '' %>>Aguardando Recebimento/Pagamento</option>
                                 <option value="Concluído" <%= ocorrenciaEditando.status === 'Concluído' ? 'selected' : '' %>>Concluído</option>
                             </select>
@@ -286,8 +285,6 @@
                                 <span class="badge badge-aberto">Em Processo Interno</span>
                             <% } else if (o.status === 'Aguardando Autorização') { %>
                                 <span class="badge badge-analise">Aguardando Autorização</span>
-                            <% } else if (o.status === 'Aprovado') { %>
-                                <span class="badge badge-aprovada">Aprovado</span>
                             <% } else if (o.status === 'Aguardando Recebimento/Pagamento') { %>
                                 <span class="badge badge-debcred">Aguardando Recebimento/Pagamento</span>
                             <% } else if (o.status === 'Concluído') { %>

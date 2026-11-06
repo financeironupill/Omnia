@@ -230,7 +230,6 @@ const fasesCobrancaValidas = [
 const statusOcorrenciaValidos = [
     'Em Processo Interno',
     'Aguardando Autorização',
-    'Aprovado',
     'Aguardando Recebimento/Pagamento',
     'Concluído'
 ];
@@ -1133,25 +1132,29 @@ app.get('/ocorrencias/nova', verificarAutenticacao, async (req, res) => {
         const tipos = await pool.query('SELECT id, descricao FROM tipos_ocorrencia ORDER BY descricao ASC');
         const clientes = await pool.query('SELECT id, nome FROM clientes ORDER BY nome ASC');
         const transportadoras = await pool.query('SELECT id, nome FROM transportadoras ORDER BY nome ASC');
-        res.render('ocorrencia-form', { ocorrencia: null, tipos: tipos.rows, clientes: clientes.rows, transportadoras: transportadoras.rows, numeroSugerido: gerarNumeroOcorrencia(), erro: req.query.erro || null });
+        res.render('ocorrencia-form', { ocorrencia: null, tipos: tipos.rows, clientes: clientes.rows, transportadoras: transportadoras.rows, numeroSugerido: gerarNumeroOcorrencia(), statusOcorrenciaValidos, erro: req.query.erro || null });
     } catch (err) {
         res.redirect('/ocorrencias?erro=Erro ao carregar.');
     }
 });
 
 app.post('/ocorrencias/novo', verificarAutenticacao, async (req, res) => {
-    const { tipo_ocorrencia_id, cliente_id, transportadora_id, nf_origem, valor_nf_origem, vencimento_atual, nfd, tipo_financeiro, valor_financeiro, descricao_problema } = req.body;
+    const { tipo_ocorrencia_id, cliente_id, transportadora_id, nf_origem, valor_nf_origem, vencimento_atual, nfd, tipo_financeiro, valor_financeiro, status, descricao_problema } = req.body;
+    const statusInicial = status === undefined ? 'Em Processo Interno' : status;
     const valorNfOrigem = converterValorOcorrencia(valor_nf_origem);
     const valorFinanceiro = converterValorOcorrencia(valor_financeiro);
     if (valorNfOrigem.erro || valorFinanceiro.erro) {
         const erro = valorNfOrigem.erro || valorFinanceiro.erro;
         return res.redirect(`/ocorrencias/nova?erro=${encodeURIComponent(erro)}`);
     }
+    if (!statusOcorrenciaValidos.includes(statusInicial)) {
+        return res.redirect(`/ocorrencias/nova?erro=${encodeURIComponent('O status da ocorrência é inválido.')}`);
+    }
     try {
         const cli = await pool.query('SELECT nome FROM clientes WHERE id = $1', [cliente_id]);
         const cliNome = cli.rows.length > 0 ? cli.rows[0].nome : '';
-        const sql = 'INSERT INTO ocorrencias (numero, tipo_ocorrencia_id, cliente_id, transportadora_id, usuario_id, cliente_nome, nf_origem, valor_nf_origem, vencimento_atual, nfd, tipo_financeiro, valor_financeiro, descricao_problema, status, criado_em, atualizado_em) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, \'Em Processo Interno\', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)';
-        await pool.query(sql, [gerarNumeroOcorrencia(), parseInt(tipo_ocorrencia_id, 10), parseInt(cliente_id, 10), transportadora_id ? parseInt(transportadora_id, 10) : null, req.session.usuario.id, cliNome, nf_origem ? nf_origem.trim().toUpperCase() : '', valorNfOrigem.valor, tratarData(vencimento_atual), nfd ? nfd.trim().toUpperCase() : '', tipo_financeiro || null, valorFinanceiro.valor, formatarCapitalizacao(descricao_problema)]);
+        const sql = 'INSERT INTO ocorrencias (numero, tipo_ocorrencia_id, cliente_id, transportadora_id, usuario_id, cliente_nome, nf_origem, valor_nf_origem, vencimento_atual, nfd, tipo_financeiro, valor_financeiro, descricao_problema, status, criado_em, atualizado_em) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)';
+        await pool.query(sql, [gerarNumeroOcorrencia(), parseInt(tipo_ocorrencia_id, 10), parseInt(cliente_id, 10), transportadora_id ? parseInt(transportadora_id, 10) : null, req.session.usuario.id, cliNome, nf_origem ? nf_origem.trim().toUpperCase() : '', valorNfOrigem.valor, tratarData(vencimento_atual), nfd ? nfd.trim().toUpperCase() : '', tipo_financeiro || null, valorFinanceiro.valor, formatarCapitalizacao(descricao_problema), statusInicial]);
         res.redirect('/ocorrencias?sucesso=Ocorrência registrada!');
     } catch (err) {
         console.error(err);

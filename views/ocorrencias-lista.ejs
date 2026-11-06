@@ -101,7 +101,6 @@
                             <option value="">Todos os status</option>
                             <option value="Em Processo Interno" <%= statusAtual === 'Em Processo Interno' ? 'selected' : '' %>>Em Processo Interno</option>
                             <option value="Aguardando Autorização" <%= statusAtual === 'Aguardando Autorização' ? 'selected' : '' %>>Aguardando Autorização</option>
-                            <option value="Aprovado" <%= statusAtual === 'Aprovado' ? 'selected' : '' %>>Aprovado</option>
                             <option value="Aguardando Recebimento/Pagamento" <%= statusAtual === 'Aguardando Recebimento/Pagamento' ? 'selected' : '' %>>Aguardando Recebimento/Pagamento</option>
                             <option value="Concluído" <%= statusAtual === 'Concluído' ? 'selected' : '' %>>Concluído</option>
                         </select>
@@ -182,7 +181,7 @@
                                         <% } %>
                                     </td>
                                     <td>
-                                        <span class="badge <%= o.status === 'Concluído' ? 'bg-success' : o.status === 'Aprovado' ? 'bg-primary' : o.status === 'Aguardando Autorização' ? 'bg-warning text-dark' : o.status === 'Aguardando Recebimento/Pagamento' ? 'bg-info text-dark' : 'bg-secondary' %>">
+                                        <span class="badge <%= o.status === 'Concluído' ? 'bg-success' : o.status === 'Aguardando Autorização' ? 'bg-warning text-dark' : o.status === 'Aguardando Recebimento/Pagamento' ? 'bg-info text-dark' : 'bg-secondary' %>">
                                             <%= o.status %>
                                         </span>
                                     </td>

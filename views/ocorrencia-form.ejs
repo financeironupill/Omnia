@@ -123,8 +123,12 @@
                     </div>
                 <% } else { %>
                     <div class="form-group span-2">
-                        <label for="statusInicial">Status da Ocorrência:</label>
-                        <input type="text" id="statusInicial" value="Em Processo Interno" readonly>
+                        <label for="status">Status da Ocorrência:</label>
+                        <select id="status" name="status" required>
+                            <% statusOcorrenciaValidos.forEach(status => { %>
+                                <option value="<%= status %>" <%= status === 'Em Processo Interno' ? 'selected' : '' %>><%= status %></option>
+                            <% }); %>
+                        </select>
                     </div>
                 <% } %>
 
