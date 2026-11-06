@@ -28,6 +28,7 @@
 
         .back-link { color: #007bff; text-decoration: none; font-weight: bold; }
         .back-link:hover { text-decoration: underline; }
+        .alert { padding: 12px; margin-bottom: 16px; border: 1px solid #f5c2c7; border-radius: 4px; background: #f8d7da; color: #842029; }
     </style>
 </head>
 <body>
@@ -36,6 +37,9 @@
             <h2><%= ocorrencia ? 'Editar Ocorrência Nº ' + ocorrencia.numero : 'Abrir Nova Ocorrência' %></h2>
             <a href="/ocorrencias" class="back-link">← Voltar à Lista</a>
         </div>
+        <% if (typeof erro !== 'undefined' && erro) { %>
+            <div class="alert alert-danger" role="alert"><%= erro %></div>
+        <% } %>
 
         <form action="<%= ocorrencia ? '/ocorrencias/editar/' + ocorrencia.id : '/ocorrencias/novo' %>" method="POST">
             <div class="form-grid">
@@ -81,7 +85,7 @@
 
                 <div class="form-group">
                     <label for="valor_nf_origem">Valor NF Origem (R$):</label>
-                    <input type="number" step="0.01" id="valor_nf_origem" name="valor_nf_origem" value="<%= ocorrencia ? ocorrencia.valor_nf_origem : '' %>" placeholder="0.00">
+                    <input type="text" inputmode="decimal" class="mascara-moeda" id="valor_nf_origem" name="valor_nf_origem" value="<%= ocorrencia && ocorrencia.valor_nf_origem != null ? Number(ocorrencia.valor_nf_origem).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '' %>" placeholder="0,00" autocomplete="off">
                 </div>
 
                 <div class="form-group">
@@ -105,7 +109,7 @@
 
                 <div class="form-group">
                     <label for="valor_financeiro">Valor Financeiro (R$):</label>
-                    <input type="number" step="0.01" id="valor_financeiro" name="valor_financeiro" value="<%= ocorrencia ? ocorrencia.valor_financeiro : '' %>" placeholder="0.00">
+                    <input type="text" inputmode="decimal" class="mascara-moeda" id="valor_financeiro" name="valor_financeiro" value="<%= ocorrencia && ocorrencia.valor_financeiro != null ? Number(ocorrencia.valor_financeiro).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '' %>" placeholder="0,00" autocomplete="off">
                 </div>
 
                 <% if (ocorrencia) { %>
@@ -137,5 +141,21 @@
             </div>
         </form>
     </div>
+    <script>
+        document.querySelectorAll('.mascara-moeda').forEach(campo => {
+            campo.addEventListener('input', () => {
+                const digitos = campo.value.replace(/\D/g, '');
+                if (!digitos) {
+                    campo.value = '';
+                    return;
+                }
+
+                const centavos = Number(digitos);
+                const valor = (centavos / 100).toFixed(2);
+                const [inteiros, decimais] = valor.split('.');
+                campo.value = `${Number(inteiros).toLocaleString('pt-BR')},${decimais}`;
+            });
+        });
+    </script>
 </body>
 </html>

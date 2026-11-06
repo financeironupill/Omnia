@@ -163,6 +163,41 @@ function limparValorMonetario(valor) {
     return parseFloat(limpo) || 0;
 }
 
+function converterValorOcorrencia(valor) {
+    if (valor === undefined || valor === null || valor === '') {
+        return { valor: 0 };
+    }
+    if (typeof valor === 'number') {
+        return Number.isFinite(valor) && valor >= 0
+            ? { valor }
+            : { erro: 'Informe um valor monetário válido e não negativo.' };
+    }
+    if (typeof valor !== 'string') {
+        return { erro: 'Informe um valor monetário válido e não negativo.' };
+    }
+
+    const texto = valor.trim();
+    if (!texto) return { valor: 0 };
+
+    const formatoMilharBrasileiro = /^\d{1,3}(?:\.\d{3})+$/;
+    const formatoBrasileiro = /^(?:\d+|\d{1,3}(?:\.\d{3})+)(?:,\d{1,2})?$/;
+    const formatoDecimal = /^\d+(?:\.\d{1,2})?$/;
+    let numero;
+    if (formatoBrasileiro.test(texto) && texto.includes(',')) {
+        numero = Number(texto.replace(/\./g, '').replace(',', '.'));
+    } else if (formatoMilharBrasileiro.test(texto)) {
+        numero = Number(texto.replace(/\./g, ''));
+    } else if (formatoDecimal.test(texto)) {
+        numero = Number(texto);
+    } else {
+        return { erro: 'Informe um valor monetário válido e não negativo.' };
+    }
+
+    return Number.isFinite(numero)
+        ? { valor: numero }
+        : { erro: 'Informe um valor monetário válido e não negativo.' };
+}
+
 function validarValorMonetario(valor, { permitirZero = false } = {}) {
     if (typeof valor === 'number') {
         return Number.isFinite(valor) && (permitirZero ? valor >= 0 : valor > 0);
@@ -1087,7 +1122,7 @@ app.get('/ocorrencias/nova', verificarAutenticacao, async (req, res) => {
         const tipos = await pool.query('SELECT id, descricao FROM tipos_ocorrencia ORDER BY descricao ASC');
         const clientes = await pool.query('SELECT id, nome FROM clientes ORDER BY nome ASC');
         const transportadoras = await pool.query('SELECT id, nome FROM transportadoras ORDER BY nome ASC');
-        res.render('ocorrencia-form', { ocorrencia: null, tipos: tipos.rows, clientes: clientes.rows, transportadoras: transportadoras.rows, numeroSugerido: gerarNumeroOcorrencia() });
+        res.render('ocorrencia-form', { ocorrencia: null, tipos: tipos.rows, clientes: clientes.rows, transportadoras: transportadoras.rows, numeroSugerido: gerarNumeroOcorrencia(), erro: req.query.erro || null });
     } catch (err) {
         res.redirect('/ocorrencias?erro=Erro ao carregar.');
     }
@@ -1095,11 +1130,17 @@ app.get('/ocorrencias/nova', verificarAutenticacao, async (req, res) => {
 
 app.post('/ocorrencias/novo', verificarAutenticacao, async (req, res) => {
     const { tipo_ocorrencia_id, cliente_id, transportadora_id, nf_origem, valor_nf_origem, vencimento_atual, nfd, tipo_financeiro, valor_financeiro, descricao_problema } = req.body;
+    const valorNfOrigem = converterValorOcorrencia(valor_nf_origem);
+    const valorFinanceiro = converterValorOcorrencia(valor_financeiro);
+    if (valorNfOrigem.erro || valorFinanceiro.erro) {
+        const erro = valorNfOrigem.erro || valorFinanceiro.erro;
+        return res.redirect(`/ocorrencias/nova?erro=${encodeURIComponent(erro)}`);
+    }
     try {
         const cli = await pool.query('SELECT nome FROM clientes WHERE id = $1', [cliente_id]);
         const cliNome = cli.rows.length > 0 ? cli.rows[0].nome : '';
         const sql = 'INSERT INTO ocorrencias (numero, tipo_ocorrencia_id, cliente_id, transportadora_id, usuario_id, cliente_nome, nf_origem, valor_nf_origem, vencimento_atual, nfd, tipo_financeiro, valor_financeiro, descricao_problema, status, criado_em, atualizado_em) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, \'Em Aberto\', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)';
-        await pool.query(sql, [gerarNumeroOcorrencia(), parseInt(tipo_ocorrencia_id, 10), parseInt(cliente_id, 10), transportadora_id ? parseInt(transportadora_id, 10) : null, req.session.usuario.id, cliNome, nf_origem ? nf_origem.trim().toUpperCase() : '', limparValorMonetario(valor_nf_origem), tratarData(vencimento_atual), nfd ? nfd.trim().toUpperCase() : '', tipo_financeiro || null, limparValorMonetario(valor_financeiro), formatarCapitalizacao(descricao_problema)]);
+        await pool.query(sql, [gerarNumeroOcorrencia(), parseInt(tipo_ocorrencia_id, 10), parseInt(cliente_id, 10), transportadora_id ? parseInt(transportadora_id, 10) : null, req.session.usuario.id, cliNome, nf_origem ? nf_origem.trim().toUpperCase() : '', valorNfOrigem.valor, tratarData(vencimento_atual), nfd ? nfd.trim().toUpperCase() : '', tipo_financeiro || null, valorFinanceiro.valor, formatarCapitalizacao(descricao_problema)]);
         res.redirect('/ocorrencias?sucesso=Ocorrência registrada!');
     } catch (err) {
         console.error(err);
@@ -1125,7 +1166,7 @@ app.get('/ocorrencias/editar/:id', verificarAutenticacao, async (req, res) => {
         const tipos = await pool.query('SELECT id, descricao FROM tipos_ocorrencia ORDER BY descricao ASC');
         const clientes = await pool.query('SELECT id, nome FROM clientes ORDER BY nome ASC');
         const transportadoras = await pool.query('SELECT id, nome FROM transportadoras ORDER BY nome ASC');
-        res.render('ocorrencia-form', { ocorrencia: edit.rows[0], tipos: tipos.rows, clientes: clientes.rows, transportadoras: transportadoras.rows, numeroSugerido: edit.rows[0].numero });
+        res.render('ocorrencia-form', { ocorrencia: edit.rows[0], tipos: tipos.rows, clientes: clientes.rows, transportadoras: transportadoras.rows, numeroSugerido: edit.rows[0].numero, erro: req.query.erro || null });
     } catch (err) {
         res.redirect('/ocorrencias?erro=Erro.');
     }
@@ -1133,11 +1174,17 @@ app.get('/ocorrencias/editar/:id', verificarAutenticacao, async (req, res) => {
 
 app.post('/ocorrencias/editar/:id', verificarAutenticacao, async (req, res) => {
     const { tipo_ocorrencia_id, cliente_id, transportadora_id, nf_origem, valor_nf_origem, vencimento_atual, nfd, tipo_financeiro, valor_financeiro, status, descricao_problema, solucao_aplicada } = req.body;
+    const valorNfOrigem = converterValorOcorrencia(valor_nf_origem);
+    const valorFinanceiro = converterValorOcorrencia(valor_financeiro);
+    if (valorNfOrigem.erro || valorFinanceiro.erro) {
+        const erro = valorNfOrigem.erro || valorFinanceiro.erro;
+        return res.redirect(`/ocorrencias/editar/${encodeURIComponent(req.params.id)}?erro=${encodeURIComponent(erro)}`);
+    }
     try {
         const cli = await pool.query('SELECT nome FROM clientes WHERE id = $1', [cliente_id]);
         const cliNome = cli.rows.length > 0 ? cli.rows[0].nome : '';
         const sql = 'UPDATE ocorrencias SET tipo_ocorrencia_id = $1, cliente_id = $2, transportadora_id = $3, cliente_nome = $4, nf_origem = $5, valor_nf_origem = $6, vencimento_atual = $7, nfd = $8, tipo_financeiro = $9, valor_financeiro = $10, status = $11, descricao_problema = $12, solucao_aplicada = $13, atualizado_em = CURRENT_TIMESTAMP WHERE id = $14';
-        await pool.query(sql, [parseInt(tipo_ocorrencia_id, 10), parseInt(cliente_id, 10), transportadora_id ? parseInt(transportadora_id, 10) : null, cliNome, limparValorMonetario(valor_nf_origem), tratarData(vencimento_atual), nfd ? nfd.trim().toUpperCase() : '', tipo_financeiro || null, limparValorMonetario(valor_financeiro), status, formatarCapitalizacao(descricao_problema), formatarCapitalizacao(solucao_aplicada), req.params.id]);
+        await pool.query(sql, [parseInt(tipo_ocorrencia_id, 10), parseInt(cliente_id, 10), transportadora_id ? parseInt(transportadora_id, 10) : null, cliNome, nf_origem ? nf_origem.trim().toUpperCase() : '', valorNfOrigem.valor, tratarData(vencimento_atual), nfd ? nfd.trim().toUpperCase() : '', tipo_financeiro || null, valorFinanceiro.valor, status, formatarCapitalizacao(descricao_problema), formatarCapitalizacao(solucao_aplicada), req.params.id]);
         res.redirect('/ocorrencias?sucesso=Atualizada com sucesso!');
     } catch (err) {
         console.error(err);

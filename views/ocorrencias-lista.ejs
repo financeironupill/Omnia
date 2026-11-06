@@ -167,7 +167,7 @@
                                     <td>
                                         <% if (o.tipo_financeiro) { %>
                                             <span class="badge bg-danger mb-1"><%= o.tipo_financeiro %></span><br>
-                                            <small class="fw-bold text-success">R$ <%= o.valor_financeiro ? Number(o.valor_financeiro).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00' %></small>
+                                            <small class="fw-bold text-success">R$ <%= Number(o.valor_financeiro || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></small>
                                         <% } else { %>
                                             <small class="text-muted">--</small>
                                         <% } %>

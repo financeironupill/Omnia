@@ -57,7 +57,7 @@
             </div>
             <div class="info-group">
                 <label>Nota Fiscal Origem / Valor:</label>
-                <span><%= ocorrencia.nf_origem || '-' %> (R$ <%= ocorrencia.valor_nf_origem ? Number(ocorrencia.valor_nf_origem).toFixed(2) : '0,00' %>)</span>
+                <span><%= ocorrencia.nf_origem || '-' %> (R$ <%= Number(ocorrencia.valor_nf_origem || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %>)</span>
             </div>
             <div class="info-group">
                 <label>Vencimento Atual:</label>
@@ -118,7 +118,7 @@
             const cliente = "<%= ocorrencia.cliente_nome_real || ocorrencia.cliente_nome || 'N/A' %>";
             const transportadora = "<%= ocorrencia.transportadora_nome || 'N/A' %>";
             const nfOrigem = "<%= ocorrencia.nf_origem || '-' %>";
-            const valorNf = "<%= ocorrencia.valor_nf_origem ? Number(ocorrencia.valor_nf_origem).toFixed(2) : '0,00' %>";
+            const valorNf = "<%= Number(ocorrencia.valor_nf_origem || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %>";
             const vencimento = "<%= ocorrencia.vencimento_atual ? new Date(ocorrencia.vencimento_atual).toISOString() : '' %>";
             const vencimentoFormatado = formatarDataBR(vencimento);
             const nfd = "<%= ocorrencia.nfd || '-' %>";
